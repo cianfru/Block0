@@ -1,0 +1,120 @@
+// Actionable launch intel for a token — the verdict engine + whale-entry map data. Exported so the
+// discover-board worker can call it per token; also runnable as a CLI (node intel.mjs --addr=0x… --sym=X).
+import { latestBlock, findDeployBlock, rpc } from "./rpc.mjs";
+import { pullTransfers, detectPool, ROUTERS } from "./engine.mjs";
+
+const ZERO = "0x0000000000000000000000000000000000000000", DEAD = "0x000000000000000000000000000000000000dead";
+const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+// Robinhood-chain quote assets for pricing (USDG ~ $1, WETH). Extend per chain.
+const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168", WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73";
+const big = (h) => BigInt(h || "0x0");
+
+// market cap = supply × price, where price = median USD paid per token across recent swaps (from tx receipts).
+// The AMM here is a singleton, so per-pair reserves aren't readable — the honest price is what swaps actually paid.
+export async function computeMcap(addr, wethUsd = 3000) {
+  try {
+    const supHex = (await rpc("eth_call", [{ to: addr, data: "0x18160ddd" }, "latest"]));
+    const supply = Number(big(supHex)) / 1e18;
+    const at = await rpc("alchemy_getAssetTransfers", [{ fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "desc", maxCount: "0x14", withMetadata: true }]);
+    const prices = [];
+    for (const t of (at?.transfers || []).slice(0, 12)) {
+      const rc = await rpc("eth_getTransactionReceipt", [t.hash]); const logs = rc?.logs || [];
+      let tok = 0, usd = 0;
+      for (const l of logs) { if ((l.topics?.[0] || "") !== TRANSFER) continue; const a = l.address.toLowerCase(); const v = Number(big(l.data));
+        if (a === addr) tok = Math.max(tok, v / 1e18);
+        else if (a === USDG) usd = Math.max(usd, v / 1e6);
+        else if (a === WETH) usd = Math.max(usd, (v / 1e18) * wethUsd); }
+      if (tok > 0 && usd > 0) prices.push(usd / tok);
+    }
+    prices.sort((a, b) => a - b);
+    const price = prices.length ? prices[Math.floor(prices.length / 2)] : 0;
+    return { price, mcap: price * supply, supply, samples: prices.length };
+  } catch { return { price: 0, mcap: 0, supply: 0, samples: 0 }; }
+}
+
+// MC buckets + how hot to monitor them (the owner's decay model): fresh sub-$500k is the ape zone (full risk
+// verdict, hot refresh); as MC grows the early-rug question fades and distribution/traction matters more; past
+// ~$10M the move has happened → cold / on-demand only.
+export function bucketOf(mcap) {
+  if (!mcap || mcap <= 0) return { key: "fresh", label: "Fresh · <$500k", monitor: "hot", tier: 0 };
+  if (mcap < 5e5) return { key: "fresh", label: "Fresh · <$500k", monitor: "hot", tier: 0 };
+  if (mcap < 1e6) return { key: "graduating", label: "$500k–$1M", monitor: "hot", tier: 1 };
+  if (mcap < 5e6) return { key: "traction", label: "$1M–$5M", monitor: "warm", tier: 2 };
+  if (mcap < 1e7) return { key: "established", label: "$5M–$10M", monitor: "cool", tier: 3 };
+  return { key: "graduated", label: ">$10M · graduated", monitor: "ondemand", tier: 4 };
+}
+
+export async function computeIntel(addr, sym = "?", opts = {}) {
+  addr = addr.toLowerCase();
+  const t0ms = Date.now();
+  const latest = await latestBlock();
+  const deploy = await findDeployBlock(addr, latest);
+  const ev = await pullTransfers(addr, deploy, latest, 18);
+  const pool = detectPool(ev);
+  const isBuy = (e) => e.from === pool || ROUTERS.has(e.from), isSell = (e) => e.to === pool || ROUTERS.has(e.to);
+  const isInfra = (a) => a === ZERO || a === DEAD || a === pool || ROUTERS.has(a);
+  const tsMax = Math.max(...ev.map((e) => e.ts || 0)), tsMin = Math.min(...ev.map((e) => e.ts || 1e18));
+  const RECENT = tsMax - 1800; // last 30 min = "now"
+
+  const W = new Map(); const g = (a) => { let w = W.get(a); if (!w) W.set(a, w = { a, bal: 0, bought: 0, sold: 0, first: null, firstBlk: null, recvRecent: 0, sentRecent: 0 }); return w; };
+  let firstPool = null, creator = null, buys = 0, sells = 0, buyR = 0, sellR = 0;
+  for (const e of ev) {
+    if (isBuy(e) && firstPool == null) firstPool = e.block;
+    if (!isInfra(e.from)) { const w = g(e.from); w.bal -= e.amt; if (isSell(e)) { w.sold += e.amt; sells++; } if (e.ts > RECENT) { w.sentRecent += e.amt; if (isSell(e)) sellR += e.amt; } }
+    if (!isInfra(e.to)) { const w = g(e.to); w.bal += e.amt; if (isBuy(e)) { w.bought += e.amt; buys++; } if (w.first == null) { w.first = e.ts; w.firstBlk = e.block; } if (e.ts > RECENT) { w.recvRecent += e.amt; if (isBuy(e)) buyR += e.amt; } }
+    if (e.from === ZERO && creator == null && !isInfra(e.to)) creator = e.to;
+  }
+  const holders = [...W.values()].filter((w) => w.bal > 1e-9);
+  const held = holders.reduce((s, w) => s + w.bal, 0) || 1;
+  for (const w of W.values()) w.sniper = w.firstBlk != null && firstPool != null && w.firstBlk <= firstPool + 3 && w.bought > 0;
+  const byBlk = new Map(); for (const w of W.values()) if (w.sniper) { if (!byBlk.has(w.firstBlk)) byBlk.set(w.firstBlk, []); byBlk.get(w.firstBlk).push(w); }
+  const bundles = [...byBlk.entries()].filter(([, l]) => l.length >= 2).map(([blk, l]) => ({ blk, n: l.length, wallets: l.map((w) => w.a), held: l.reduce((s, w) => s + Math.max(0, w.bal), 0) }));
+  const sniperW = [...W.values()].filter((w) => w.sniper);
+  const sniperHeld = sniperW.reduce((s, w) => s + Math.max(0, w.bal), 0);
+  const bundleHeld = bundles.reduce((s, b) => s + b.held, 0);
+  const top10 = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 10).reduce((s, w) => s + w.bal, 0);
+  const creatorBal = creator ? Math.max(0, (W.get(creator)?.bal || 0)) : 0;
+  const bundleSet = new Set(bundles.flatMap((b) => b.wallets));
+  const insiderSet = new Set([...sniperW.map((w) => w.a), ...bundleSet]);
+  let insiderDumpNow = 0, insiderSellers = 0;
+  for (const a of insiderSet) { const w = W.get(a); if (!w) continue; const net = w.recvRecent - w.sentRecent; if (net < 0) { insiderDumpNow += -net; insiderSellers++; } }
+  const pct = (x) => +(x / held * 100).toFixed(1);
+  const f_snipe = pct(sniperHeld), f_bundle = pct(bundleHeld), f_top10 = pct(top10), f_creator = pct(creatorBal);
+  const f_dumpNow = +(insiderDumpNow / held * 100).toFixed(2);
+  const risk = Math.min(100, Math.round(0.40 * f_top10 + Math.min(28, 0.9 * f_snipe) + Math.min(28, 0.9 * f_bundle) + Math.min(45, 3 * f_dumpNow) + Math.min(15, 0.5 * f_creator)));
+  const label = risk >= 66 ? "HIGH RISK" : risk >= 45 ? "CAUTION" : risk >= 25 ? "MIXED" : "LOOKS CLEANER";
+  // momentum: recent buy vs sell + holder base + freshness (for ranking "what's heating up")
+  const spanH = +((tsMax - tsMin) / 3600).toFixed(1);
+  const netR = buyR - sellR;
+  const momentum = Math.round(Math.max(-100, Math.min(100, (netR / held * 100) * 6 + (holders.length > 50 ? 10 : 0))));
+
+  const out = { sym, address: addr, pool, updated: Date.now(), latestBlock: latest, ageH: spanH, ms: Date.now() - t0ms,
+    risk, label, momentum,
+    flags: { snipers: sniperW.length, sniperHeldPct: f_snipe, bundles: bundles.length, bundleWallets: bundleSet.size, bundleHeldPct: f_bundle,
+      top10Pct: f_top10, holders: holders.length, creatorPct: f_creator, insiderDumpNowPct: f_dumpNow, insiderSellersNow: insiderSellers,
+      buysRecent: buys, sellsRecent: sells } };
+  if (opts.mcap !== false) { const m = await computeMcap(addr); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
+  if (opts.whales !== false) {
+    out.bundles = bundles.slice(0, 10);
+    out.whales = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 60).map((w) => ({ a: w.a, bal: +w.bal.toFixed(0), first: w.first, bought: +w.bought.toFixed(0), sold: +w.sold.toFixed(0), net: +(w.recvRecent - w.sentRecent).toFixed(0), sniper: w.sniper }));
+    out.tsMin = tsMin; out.tsMax = tsMax;
+  }
+  return out;
+}
+
+// discover the most-active non-infra tokens right now (chain-wide recent ERC-20 transfers)
+export async function discoverTokens(n = 14) {
+  const at = await rpc("alchemy_getAssetTransfers", [{ fromBlock: "0x0", toBlock: "latest", category: ["erc20"], order: "desc", maxCount: "0x3e8", withMetadata: true }]);
+  const tok = new Map();
+  for (const t of at?.transfers || []) { const a = (t.rawContract?.address || "").toLowerCase(); if (!a) continue; let e = tok.get(a); if (!e) tok.set(a, e = { a, sym: t.asset || "?", n: 0, newest: t.metadata?.blockTimestamp }); e.n++; }
+  const infra = new Set(["usdg", "weth", "usdc", "usdt", "wbtc", "dai"]);
+  return [...tok.values()].filter((e) => !infra.has((e.sym || "").toLowerCase())).sort((a, b) => b.n - a.n).slice(0, n);
+}
+
+if (import.meta.url === `file://${process.argv[1]}`) {
+  const args = Object.fromEntries(process.argv.slice(2).map((a) => { const [k, v] = a.replace(/^--/, "").split("="); return [k, v ?? true]; }));
+  const { writeFile } = await import("node:fs/promises");
+  const r = await computeIntel(args.addr, args.sym || "?");
+  await writeFile("intel.json", JSON.stringify(r));
+  console.log(`${r.sym} ${r.address} — RISK ${r.risk}/100 ${r.label} | holders ${r.flags.holders} | snipers ${r.flags.snipers} (${r.flags.sniperHeldPct}%) | bundles ${r.flags.bundles} | top10 ${r.flags.top10Pct}% | dumping ${r.flags.insiderSellersNow}`);
+}

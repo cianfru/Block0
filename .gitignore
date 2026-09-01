@@ -1,8 +1,18 @@
 node_modules/
 .env
 .env.local
-snapshot.json
-preview.html
-preview.tmpl.html
 *.log
 .DS_Store
+# scratch: mockups, investigation scripts, captured data
+*.tmpl.html
+preview.html
+mockup*.html
+board.json
+intel.json
+mock.json
+mockslim.json
+snapshot.json
+ponsjs.txt
+batch.mjs
+factory.mjs
+cap.mjs

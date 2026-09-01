@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block0 — Robinhood Chain launch radar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
+<style>
+  :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
+    --tx:#fff;--dim:#b6b6bd;--mute:#7f7f88;--lime:#c8ff4d;--cyan:#35e6e0;--magenta:#ff5cf0;--amber:#ffd23d;--coral:#ff3b5c;
+    --serif:"Instrument Serif",Georgia,serif;--sans:"Inter",system-ui,sans-serif;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:15px;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 540px at 82% -14%,rgba(200,255,77,.10),transparent 60%),radial-gradient(820px 520px at -8% 6%,rgba(53,230,224,.07),transparent 55%),radial-gradient(700px 640px at 112% 116%,rgba(255,92,240,.05),transparent 60%);}
+  .wrap{max-width:1220px;margin:0 auto;padding:0 22px 70px}
+  a{color:inherit;text-decoration:none}
+  header{display:flex;align-items:center;gap:16px;padding:22px 0 12px;flex-wrap:wrap}
+  .brand{font-family:var(--serif);font-size:2rem;line-height:1}.brand b{font-style:italic;color:var(--lime);font-weight:400}
+  .chain{display:inline-flex;align-items:center;gap:7px;font-size:.76rem;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:7px 11px;background:var(--glass)}
+  .chain i{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime)}
+  form.search{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--glass);backdrop-filter:blur(14px)}
+  form.search input{flex:1;background:none;border:none;outline:none;color:var(--tx);font-size:.92rem}form.search input::placeholder{color:var(--mute)}
+  .connect{border:none;border-radius:12px;padding:11px 18px;background:var(--lime);color:#08080b;font-weight:700;font-size:.9rem;cursor:pointer}
+  .hero{margin:14px 0 8px}
+  .hero h1{font-family:var(--serif);font-size:clamp(2.2rem,5.4vw,3.7rem);line-height:1.02;margin:0 0 8px;font-weight:400}
+  .hero h1 em{font-style:italic;color:var(--lime)}
+  .hero p{color:var(--dim);font-size:1.05rem;max-width:62ch;margin:0}
+  .live{display:inline-flex;align-items:center;gap:8px;font-size:.82rem;color:var(--mute);margin-top:12px}
+  .live i{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 0 rgba(200,255,77,.5);animation:pulse 2.1s infinite}
+  @keyframes pulse{70%{box-shadow:0 0 0 8px rgba(200,255,77,0)}100%{box-shadow:0 0 0 0 rgba(200,255,77,0)}}
+  .bkt{margin-top:26px}
+  .bkt-h{display:flex;align-items:baseline;gap:12px;margin:0 0 12px}
+  .bkt-h .t{font-family:var(--serif);font-style:italic;font-size:1.5rem}
+  .bkt-h .n{font-size:.8rem;color:var(--mute)}
+  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+  .card{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));backdrop-filter:blur(12px);overflow:hidden;cursor:pointer;transition:transform .14s,border-color .14s;display:block}
+  .card:hover{transform:translateY(-3px);border-color:var(--line-2)}
+  .stripe{height:3px}
+  .cbody{padding:16px 17px}
+  .row1{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
+  .tk{font-size:1.26rem;font-weight:800;letter-spacing:-.01em}
+  .tk .age{font-size:.72rem;color:var(--mute);font-weight:500;margin-left:8px}
+  .mc{font-size:.82rem;color:var(--cyan);font-weight:600;margin-top:2px}
+  .rk{text-align:right;flex:0 0 auto}.rk .n{font-family:var(--serif);font-size:2rem;line-height:.9}.rk .l{font-size:.64rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-top:2px}
+  .meta{display:flex;gap:10px;color:var(--mute);font-size:.75rem;margin:9px 0 11px}
+  .flagline{display:flex;flex-wrap:wrap;gap:7px}
+  .fl{display:inline-flex;align-items:center;gap:6px;font-size:.73rem;font-weight:600;padding:5px 9px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
+  .fl .d{width:7px;height:7px;border-radius:50%}
+  .fl.amber .d{background:var(--amber)}.fl.mag .d{background:var(--magenta)}.fl.coral .d{background:var(--coral)}
+  .fl.dump{color:var(--coral);border-color:rgba(255,59,92,.4);background:rgba(255,59,92,.08)}
+  .fl.clean{color:var(--lime);border-color:rgba(200,255,77,.35);background:rgba(200,255,77,.06)}
+  .state{color:var(--mute);font-size:.9rem;padding:40px 0}
+  .foot{color:var(--mute);font-size:.8rem;margin-top:28px;line-height:1.55;max-width:84ch}
+  @media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}
+  @media(max-width:600px){.grid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">block<b>0</b></div>
+    <div class="chain"><i></i> Robinhood Chain</div>
+    <form class="search" onsubmit="return go(event)"><span>⌕</span><input id="q" placeholder="paste any token contract to scan…"></form>
+    <button class="connect">Connect</button>
+  </header>
+  <div class="hero">
+    <h1>Every launch, <em>verdicted.</em></h1>
+    <p>Block0 scans every token launched on the Robinhood Chain and grades it for snipers, bundles, concentration and live dumping — so you see what's safe to ape at a glance, without pasting a single contract.</p>
+    <div class="live"><i></i> <span id="live">scanning launches…</span></div>
+  </div>
+  <div id="board"><div class="state">Loading the board — the first scan takes a moment…</div></div>
+  <div class="foot">Ranked cleanest-first inside each market-cap bucket. Fresh sub-$500k launches are the flagship; bigger caps decay to on-demand once the move has happened. <b>Risk</b> is a transparent composite of concentration, snipers, bundles and live insider-dumping — a position read, <b>signal not proof</b>, never a buy recommendation. Reconstructed from public Robinhood-Chain data. Not financial advice.</div>
+</div>
+<script>
+const $=(s)=>document.querySelector(s), short=(a)=>a.slice(0,6)+"…"+a.slice(-4);
+const band=(r)=>r>=66?"var(--coral)":r>=45?"var(--amber)":r>=25?"var(--cyan)":"var(--lime)";
+const ageT=(h)=>h==null?"":h<1?Math.round(h*60)+"m":h<48?h.toFixed(0)+"h":Math.round(h/24)+"d";
+const mcT=(x)=>!x?"—":x>=1e6?"$"+(x/1e6).toFixed(1)+"M":x>=1e3?"$"+Math.round(x/1e3)+"k":"$"+Math.round(x);
+function go(e){e.preventDefault();const v=$("#q").value.trim();if(/^0x[0-9a-fA-F]{40}$/.test(v))location.href="/token?address="+v;return false;}
+function card(r){const f=r.flags,c=band(r.risk),flags=[];
+  if(f.insiderSellersNow)flags.push(`<span class="fl dump">▼ ${f.insiderSellersNow} dumping</span>`);
+  if(f.snipers)flags.push(`<span class="fl amber"><span class="d"></span>${f.snipers} snipers</span>`);
+  if(f.bundles)flags.push(`<span class="fl mag"><span class="d"></span>${f.bundles} bundles</span>`);
+  flags.push(`<span class="fl coral"><span class="d"></span>top10 ${f.top10Pct}%</span>`);
+  return `<a class="card" href="/token?address=${r.address}"><div class="stripe" style="background:${c}"></div><div class="cbody">
+    <div class="row1"><div><div class="tk">${r.sym}<span class="age">${ageT(r.ageH)}</span></div><div class="mc">${mcT(r.mcapUsd)} mcap</div></div>
+    <div class="rk"><div class="n" style="color:${c}">${r.risk}</div><div class="l" style="color:${c}">${r.label}</div></div></div>
+    <div class="meta"><span>${f.holders} holders</span><span>·</span><span>${r.momentum>3?'▲ heating':r.momentum<-3?'▼ cooling':'– flat'}</span></div>
+    <div class="flagline">${flags.join("")}</div></div></a>`;}
+const NAMES={fresh:"Fresh · under $500k",graduating:"$500k – $1M",traction:"$1M – $5M",established:"$5M – $10M"};
+async function load(){try{
+  const b=await fetch("/api/board").then(r=>r.json());
+  if(!b.tokens||!b.tokens.length){$("#live").textContent=b.scanning?"scanning launches…":"waiting for first scan…";return;}
+  $("#live").textContent=`live · ${b.tokens.length} launches · updated ${new Date(b.updated).toLocaleTimeString()}`;
+  const order=b.order||["fresh","graduating","traction","established"];
+  let html="";
+  for(const key of order){const g=(b.buckets&&b.buckets[key])||[];if(!g.length||key==="graduated")continue;
+    html+=`<div class="bkt"><div class="bkt-h"><span class="t">${NAMES[key]||key}</span><span class="n">${g.length} token${g.length>1?"s":""}</span></div><div class="grid">${g.map(card).join("")}</div></div>`;}
+  $("#board").innerHTML=html||'<div class="state">No launches in view yet.</div>';
+}catch(e){$("#live").textContent="board unavailable — retrying…";}}
+load();setInterval(load,20000);
+</script>
+</body>
+</html>

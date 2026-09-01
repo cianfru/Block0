@@ -152,6 +152,9 @@ async function scan(){
 $("#f").addEventListener("submit",(e)=>{ e.preventDefault(); scan(); });
 $("#tf").addEventListener("click",(e)=>{ const b = e.target.closest("[data-w]"); if(!b) return; windowBlocks = +b.dataset.w; document.querySelectorAll("#tf button").forEach(x=>x.classList.toggle("on", x===b)); if($("[name=address]").value.trim()) scan(); });
 addEventListener("resize", ()=>chart.resize());
+// deep-link: /token?address=0x… (from a board card) auto-scans
+const _q=new URLSearchParams(location.search), _a=_q.get("address");
+if(_a){ $("[name=address]").value=_a; if(_q.get("decimals")) $("[name=decimals]").value=_q.get("decimals"); }
 if($("[name=address]").value.trim()) scan();
 </script>
 </body>

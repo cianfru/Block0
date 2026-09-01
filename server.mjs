@@ -11,6 +11,12 @@ import { fileURLToPath } from "node:url";
 import { scan, pullTransfers, detectPool, ROUTERS } from "./engine.mjs";
 import { latestBlock } from "./rpc.mjs";
 import { watchLogs, WS_ENABLED } from "./ws.mjs";
+import { refreshBoard, getBoard, ensureFresh } from "./board.mjs";
+
+// background discover-board: scan every live launch, verdict + market-cap-bucket, keep a ranked cache
+const BOARD_REFRESH_MS = Number(process.env.BOARD_REFRESH_MS || 180000);
+refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {});
+setInterval(() => refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {}), BOARD_REFRESH_MS);
 
 const __dir = fileURLToPath(new URL(".", import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -50,7 +56,8 @@ async function poll() {
 if (!WS_ENABLED) setInterval(poll, POLL_MS);
 
 async function serveStatic(res, urlPath) {
-  const file = urlPath === "/" ? "index.html" : urlPath.replace(/^\//, "");
+  const route = urlPath === "/" ? "board.html" : (urlPath === "/token" || urlPath === "/token.html") ? "index.html" : null;
+  const file = route || urlPath.replace(/^\//, "");
   try {
     const buf = await readFile(join(__dir, "public", file));
     res.writeHead(200, { "content-type": MIME[extname(file)] || "application/octet-stream" });
@@ -62,6 +69,12 @@ createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
+
+    if (u.pathname === "/api/board") {
+      const b = ensureFresh(BOARD_REFRESH_MS);
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify({ updated: b.updated, scanning: b.scanning, order: b.order || [], buckets: b.buckets || {}, tokens: b.tokens || [] }));
+    }
 
     if (u.pathname === "/api/scan") {
       const address = u.searchParams.get("address");
