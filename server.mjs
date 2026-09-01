@@ -98,10 +98,26 @@ createServer(async (req, res) => {
           return { span, httpStatus: r.status, ms: Date.now() - t, logs: Array.isArray(j.result) ? j.result.length : null, error: j.error?.message || (r.ok ? null : "http " + r.status) };
         } catch (e) { return { span, error: String(e.message || e) }; }
       };
-      const ranges = [];
-      for (const s of [10, 100, 2000, 10000]) ranges.push(await rangeTest(s));
+      const wait = (ms) => new Promise((r) => setTimeout(r, ms));
+      // grab a real token from Pons so getLogs is ADDRESS-scoped (our actual usage), not chain-wide.
+      let token = u.searchParams.get("addr") || null;
+      if (!token) { try { const { fetchGraduated } = await import("./pons.mjs"); const g = await fetchGraduated(); token = g.items?.[0]?.address || null; } catch {} }
+      // address-filtered range test, SPACED ~1.3s apart so a real range cap is distinct from the rate throttle.
+      const scopedTest = async (span) => {
+        if (!head || !token) return { span, skip: !token ? "no token" : "no head" };
+        const from = "0x" + Math.max(0, head - span).toString(16), to = "0x" + head.toString(16);
+        const t = Date.now();
+        try {
+          const r = await fetch(target, { method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{ address: token, fromBlock: from, toBlock: to, topics: ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"] }] }) });
+          const j = await r.json();
+          return { span, httpStatus: r.status, ms: Date.now() - t, logs: Array.isArray(j.result) ? j.result.length : null, error: j.error?.message || (r.ok ? null : "http " + r.status) };
+        } catch (e) { return { span, error: String(e.message || e) }; }
+      };
+      const scoped = [];
+      for (const s of [500, 2000, 10000, 50000, 200000]) { scoped.push(await scopedTest(s)); await wait(1300); }
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-      return res.end(JSON.stringify({ target, chainId, blockNumber: blk, head, ranges }, null, 2));
+      return res.end(JSON.stringify({ target, token, chainId, blockNumber: blk, head, scoped }, null, 2));
     }
 
     if (u.pathname === "/api/board") {
