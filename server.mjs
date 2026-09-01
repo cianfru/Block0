@@ -70,6 +70,40 @@ createServer(async (req, res) => {
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
 
+    // Temporary diagnostic: probe an EVM RPC from Railway's own network (the sandbox is Cloudflare-blocked).
+    // ?url= overrides; defaults to the native Robinhood-chain public RPC. Tests reachability + eth_getLogs range.
+    if (u.pathname === "/api/rpcprobe") {
+      const target = u.searchParams.get("url") || "https://rpc.mainnet.chain.robinhood.com";
+      const call = async (method, params) => {
+        const t = Date.now();
+        try {
+          const r = await fetch(target, { method: "POST", headers: { "content-type": "application/json", "user-agent": "curl/8.5.0" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method, params }) });
+          const text = await r.text(); let json = null; try { json = JSON.parse(text); } catch {}
+          return { method, httpStatus: r.status, ms: Date.now() - t, result: json?.result ?? null, error: json?.error ?? (r.ok ? null : text.slice(0, 200)) };
+        } catch (e) { return { method, httpStatus: 0, ms: Date.now() - t, error: String(e.message || e) }; }
+      };
+      const chainId = await call("eth_chainId", []);
+      const blk = await call("eth_blockNumber", []);
+      const head = blk.result ? parseInt(blk.result, 16) : 0;
+      // eth_getLogs range test: does it allow wide ranges (unlike Alchemy free's 10-block cap)?
+      const rangeTest = async (span) => {
+        if (!head) return { span, skip: "no head" };
+        const from = "0x" + Math.max(0, head - span).toString(16), to = "0x" + head.toString(16);
+        const t = Date.now();
+        try {
+          const r = await fetch(target, { method: "POST", headers: { "content-type": "application/json" },
+            body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_getLogs", params: [{ fromBlock: from, toBlock: to, topics: ["0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef"] }] }) });
+          const j = await r.json();
+          return { span, httpStatus: r.status, ms: Date.now() - t, logs: Array.isArray(j.result) ? j.result.length : null, error: j.error?.message || (r.ok ? null : "http " + r.status) };
+        } catch (e) { return { span, error: String(e.message || e) }; }
+      };
+      const ranges = [];
+      for (const s of [10, 100, 2000, 10000]) ranges.push(await rangeTest(s));
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify({ target, chainId, blockNumber: blk, head, ranges }, null, 2));
+    }
+
     if (u.pathname === "/api/board") {
       const b = ensureFresh(BOARD_REFRESH_MS);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
