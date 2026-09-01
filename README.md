@@ -3,7 +3,8 @@
 **From block zero.** Paste a token contract → in seconds, see **who's holding and who's dumping, live**. Built
 for freshly-launched tokens, where the whole transfer history is small enough to pull and score in real time.
 
-No database. One dependency-free Node process. Deploys to Railway with `node server.mjs`.
+No database. One small Node process (a single dependency, `ws`, for the live websocket). Deploys to Railway
+with `node server.mjs`.
 
 ## What it does
 
@@ -43,9 +44,15 @@ browser ──/api/scan?address─▶ engine.scan()  ── eth_getLogs (full or
 - `server.mjs` — static host + `/api/scan` + `/api/stream` SSE tail.
 - `public/` — the live bubble-chart UI.
 
+## Live tail
+
+When `RPC_WS` is set, the server tails via an `eth_subscribe("logs")` **websocket** — one subscription per watched
+token, opened when the first viewer connects and dropped when the last leaves, auto-reconnecting on drop. Each new
+transfer is pushed to the browser over SSE the instant it's mined (sub-second). With no `RPC_WS`, it falls back to
+HTTP polling every `POLL_MS`. See `ws.mjs`.
+
 ## Production upgrades (noted, not yet wired)
 
-- **True push latency:** swap the poll loop for an `eth_subscribe` websocket (`RPC_WS`).
 - **Warm cache:** keep hot tokens' state in memory / a cheap KV so repeat scans are instant.
 - **Access gate:** wallet-connect + `ACCESS_TOKEN` balance check before `/api/scan`.
 - **Richer sniper/bundle intel:** fold in the ETH-funding graph (shared-funder clustering) from the sibling
