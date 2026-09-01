@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block0</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<style>
+  :root{
+    --bg:#080c0a;--bg2:#0d1310;--bg3:#131c16;--line:rgba(120,200,150,.15);--line2:rgba(120,200,150,.30);
+    --ink:#eaf2ec;--dim:#a6bbad;--mute:#7d9385;--green:#43d17f;--red:#ff6f6f;--amber:#ffab52;--cyan:#5ccdda;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;--sans:"IBM Plex Sans",system-ui,sans-serif;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;
+    background-image:radial-gradient(900px 500px at 85% -10%,rgba(67,209,127,.09),transparent 60%);min-height:100vh}
+  .wrap{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
+  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0 18px}
+  .brand{font-family:var(--mono);font-weight:700;font-size:1.15rem;letter-spacing:.02em}
+  .brand b{color:var(--green)}
+  .brand .sub{display:block;font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--mute);font-weight:500;margin-top:2px}
+  form{display:flex;gap:8px;flex:1;min-width:280px;flex-wrap:wrap}
+  input,select,button{font-family:var(--mono);font-size:.9rem;border:1px solid var(--line2);background:var(--bg3);color:var(--ink);border-radius:8px;padding:10px 12px}
+  input[name=address]{flex:1;min-width:220px}
+  input[name=decimals]{width:70px}
+  button{background:var(--green);color:#04120a;font-weight:700;border-color:transparent;cursor:pointer}
+  button:hover{filter:brightness(1.08)}
+  button.ghost{background:var(--bg3);color:var(--dim);font-weight:600}
+  .tf{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
+  .tf button{border:none;border-radius:0;background:var(--bg3);color:var(--dim);font-weight:600;padding:10px 12px}
+  .tf button.on{background:var(--green);color:#04120a}
+
+  .state{font-family:var(--mono);font-size:.8rem;color:var(--mute);padding:6px 2px 14px;min-height:22px}
+  .state .live{color:var(--green)} .state .err{color:var(--red)}
+  .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px;box-shadow:0 0 0 0 rgba(67,209,127,.5);animation:blip 2s infinite;vertical-align:middle}
+  @keyframes blip{70%{box-shadow:0 0 0 7px rgba(67,209,127,0)}100%{box-shadow:0 0 0 0 rgba(67,209,127,0)}}
+
+  .scores{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
+  .sc{border:1px solid var(--line);border-radius:10px;background:var(--bg2);padding:12px 13px}
+  .sc .v{font-family:var(--mono);font-weight:700;font-size:1.35rem;font-variant-numeric:tabular-nums;line-height:1}
+  .sc .k{font-size:.72rem;color:var(--mute);margin-top:5px;line-height:1.25}
+  .sc.buy .v{color:var(--green)} .sc.sell .v{color:var(--red)} .sc.warn .v{color:var(--amber)} .sc.cy .v{color:var(--cyan)}
+
+  .chartwrap{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--bg2),#0a0f0c);overflow:hidden;position:relative}
+  .chartwrap .ch-h{display:flex;justify-content:space-between;align-items:center;padding:11px 15px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
+  .legend{display:flex;gap:14px;align-items:center}
+  .legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+  canvas{display:block;width:100%;height:440px;touch-action:none}
+  .tip{position:absolute;pointer-events:none;background:#0b140e;border:1px solid var(--line2);border-radius:7px;padding:7px 9px;font-family:var(--mono);font-size:.72rem;color:var(--ink);z-index:5;display:none;white-space:nowrap}
+  .tip b{color:var(--green)} .tip .s-sell{color:var(--red)}
+
+  .tables{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
+  .tbl{border:1px solid var(--line);border-radius:10px;background:var(--bg2);overflow:hidden}
+  .tbl h3{font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;margin:0;padding:11px 14px;border-bottom:1px solid var(--line);color:var(--dim)}
+  .tbl h3.sell{color:var(--red)} .tbl h3.buy{color:var(--green)}
+  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.82rem}
+  td{padding:7px 14px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+  tr:first-child td{border-top:none}
+  td a{color:var(--ink);text-decoration:none} td a:hover{color:var(--green)}
+  .num{text-align:right} .pos{color:var(--green)} .neg{color:var(--red)}
+  .snipe{color:var(--amber);font-size:.7rem;margin-left:5px}
+  .foot{color:var(--mute);font-size:.76rem;margin-top:16px;line-height:1.5;font-family:var(--mono)}
+  @media(max-width:820px){.scores{grid-template-columns:repeat(3,1fr)}.tables{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div class="brand">BLOCK<b>0</b><span class="sub">from block zero · who's holding · who's dumping · live</span></div>
+    <form id="f">
+      <input name="address" placeholder="paste token contract 0x…" autocomplete="off" spellcheck="false" value="0xA9E8AcF069C58aEc8825542845Fd754e41a9489A">
+      <input name="decimals" type="number" value="18" title="token decimals">
+      <button type="submit">Scan</button>
+      <div class="tf" id="tf">
+        <button type="button" data-w="300">1H</button>
+        <button type="button" data-w="1200" class="on">4H</button>
+        <button type="button" data-w="7200">1D</button>
+      </div>
+    </form>
+  </header>
+
+  <div class="state" id="state">paste a token and hit Scan — a token launched today loads its whole history in seconds.</div>
+
+  <div class="scores" id="scores"></div>
+
+  <div class="chartwrap">
+    <div class="ch-h">
+      <span id="chtitle">wallet flow — buys above, sells below</span>
+      <span class="legend"><span><i style="background:var(--green)"></i>buy</span><span><i style="background:var(--red)"></i>sell</span><span><i style="background:#fff"></i>new wallet</span></span>
+    </div>
+    <canvas id="cv"></canvas>
+    <div class="tip" id="tip"></div>
+  </div>
+
+  <div class="tables">
+    <div class="tbl"><h3 class="sell">who's selling</h3><table id="sellers"></table></div>
+    <div class="tbl"><h3 class="buy">who's buying</h3><table id="buyers"></table></div>
+  </div>
+
+  <div class="foot" id="foot">Signal, not proof — reconstructed from public chain data, reproducible. Not financial advice.</div>
+</div>
+
+<script type="module">
+import { renderChart, mountChart } from "./chart.js";
+
+const $ = (s) => document.querySelector(s);
+const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
+const k = (x) => { const n = Math.abs(x); const s = x < 0 ? "-" : ""; return n >= 1e6 ? s + (n/1e6).toFixed(2)+"M" : n >= 1e3 ? s + (n/1e3).toFixed(1)+"k" : s + n.toFixed(0); };
+const ES = (a) => `https://etherscan.io/address/${a}`;
+
+let windowBlocks = 1200, es = null, chart = mountChart($("#cv"), $("#tip"));
+
+function scoreTiles(r){
+  const s = r.scores, sell = s.pressure === "sell";
+  const tiles = [
+    { cls: sell?"sell":"buy", v: sell?"SELL":"BUY", k: `net pressure ${k(s.netVol)} (${s.buys} buys · ${s.sells} sells)` },
+    { cls: "cy", v: s.holders, k: "holders right now" },
+    { cls: s.top10Share>60?"warn":"", v: s.top10Share+"%", k: "held by top 10 wallets" },
+    { cls: s.snipers?"warn":"", v: s.snipers, k: `snipers · hold ${s.sniperHeldShare}%` },
+    { cls: s.bundles?"warn":"", v: s.bundles, k: "same-block bundles" },
+    { cls: "", v: (r.mode==="full"?"FULL":"~"+s.spanHours+"h"), k: r.mode==="full"?"whole history (exact)":"trailing window" },
+  ];
+  $("#scores").innerHTML = tiles.map(t=>`<div class="sc ${t.cls}"><div class="v">${t.v}</div><div class="k">${t.k}</div></div>`).join("");
+}
+function tbl(el, rows, dir){
+  el.innerHTML = rows.map(w=>`<tr><td><a href="${ES(w.a)}" target="_blank" rel="noreferrer">${short(w.a)}</a>${w.sniper?'<span class="snipe">⚡</span>':''}</td><td class="num ${dir}">${dir==="neg"?"":"+"}${k(w.net)}</td><td class="num" style="color:var(--mute)">bag ${k(w.bal)}</td></tr>`).join("") || `<tr><td style="color:var(--mute)">—</td></tr>`;
+}
+
+async function scan(){
+  const address = $("[name=address]").value.trim();
+  const decimals = $("[name=decimals]").value || 18;
+  if(!/^0x[0-9a-fA-F]{40}$/.test(address)){ $("#state").innerHTML = '<span class="err">that doesn\'t look like a contract address</span>'; return; }
+  $("#state").textContent = "scanning… pulling transfers from chain";
+  if(es){ es.close(); es = null; }
+  try{
+    const r = await fetch(`/api/scan?address=${address}&decimals=${decimals}&window=${windowBlocks}`).then(x=>x.json());
+    if(r.error){ $("#state").innerHTML = `<span class="err">${r.error}</span>`; return; }
+    $("#state").innerHTML = `<span class="live-dot"></span><span class="live">live</span> · ${r.mode} scan · ${r.scores.transfers} transfers in ${r.pullMs}ms · pool ${short(r.pool)} · block ${r.latestBlock}`;
+    scoreTiles(r);
+    tbl($("#sellers"), r.sellers, "neg");
+    tbl($("#buyers"), r.buyers, "pos");
+    chart.load(r.events);
+    // open the live tail
+    es = new EventSource(`/api/stream?address=${address}&decimals=${decimals}`);
+    es.addEventListener("tx", (e)=>{ const d = JSON.parse(e.data); chart.push(d); });
+    es.addEventListener("head", (e)=>{ const d = JSON.parse(e.data); if(d.n) $("#state").innerHTML = `<span class="live-dot"></span><span class="live">live</span> · block ${d.block} · +${d.n} new`; });
+    es.onerror = ()=>{ /* auto-reconnects */ };
+  }catch(err){ $("#state").innerHTML = `<span class="err">scan failed: ${err.message}</span>`; }
+}
+
+$("#f").addEventListener("submit",(e)=>{ e.preventDefault(); scan(); });
+$("#tf").addEventListener("click",(e)=>{ const b = e.target.closest("[data-w]"); if(!b) return; windowBlocks = +b.dataset.w; document.querySelectorAll("#tf button").forEach(x=>x.classList.toggle("on", x===b)); scan(); });
+addEventListener("resize", ()=>chart.resize());
+scan();
+</script>
+</body>
+</html>

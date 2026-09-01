@@ -1,0 +1,12 @@
+{
+  "name": "block0",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Block0 — from block zero. Paste a token, watch who's holding and who's dumping, live.",
+  "scripts": {
+    "start": "node server.mjs",
+    "scan": "node cli.mjs"
+  },
+  "engines": { "node": ">=18" }
+}
