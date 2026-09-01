@@ -67,7 +67,7 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const latest = await latestBlock();
   const deploy = await findDeployBlock(addr, latest);
   const ev = await pullTransfers(addr, deploy, latest, 18);
-  const pool = detectPool(ev);
+  const pool = (opts.pool || "").toLowerCase() || detectPool(ev); // prefer the Pons-API pool when provided
   const isBuy = (e) => e.from === pool || ROUTERS.has(e.from), isSell = (e) => e.to === pool || ROUTERS.has(e.to);
   const isInfra = (a) => a === ZERO || a === DEAD || a === pool || ROUTERS.has(a);
   const tsMax = Math.max(...ev.map((e) => e.ts || 0)), tsMin = Math.min(...ev.map((e) => e.ts || 1e18));
@@ -98,7 +98,18 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const pct = (x) => +(x / held * 100).toFixed(1);
   const f_snipe = pct(sniperHeld), f_bundle = pct(bundleHeld), f_top10 = pct(top10), f_creator = pct(creatorBal);
   const f_dumpNow = +(insiderDumpNow / held * 100).toFixed(2);
-  const risk = Math.min(100, Math.round(0.40 * f_top10 + Math.min(28, 0.9 * f_snipe) + Math.min(28, 0.9 * f_bundle) + Math.min(45, 3 * f_dumpNow) + Math.min(15, 0.5 * f_creator)));
+  // Risk is GRADUATION-AWARE. Pre-graduation, concentration is expected (the bonding curve + a handful of early
+  // holders naturally hold most supply), so it barely counts — the real danger is who SNIPED, whether wallets
+  // are BUNDLED, the DEPLOYER's bag, and anyone dumping NOW. Post-graduation, concentration matters again. We
+  // also weight the COUNT of snipers/bundles/dumpers, not just their held %.
+  const grad = !!opts.graduated;
+  const concW = grad ? 0.40 : 0.10;
+  const risk = Math.min(100, Math.round(
+    concW * f_top10
+    + Math.min(30, 1.0 * f_snipe + (sniperW.length > 8 ? 8 : 0))
+    + Math.min(30, 1.0 * f_bundle + (bundles.length > 2 ? 6 : 0))
+    + Math.min(45, 3 * f_dumpNow + insiderSellers * 4)
+    + Math.min(18, 0.6 * f_creator)));
   const label = risk >= 66 ? "HIGH RISK" : risk >= 45 ? "CAUTION" : risk >= 25 ? "MIXED" : "LOOKS CLEANER";
   // momentum: recent buy vs sell + holder base + freshness (for ranking "what's heating up")
   const spanH = +((tsMax - tsMin) / 3600).toFixed(1);
@@ -110,7 +121,8 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
     flags: { snipers: sniperW.length, sniperHeldPct: f_snipe, bundles: bundles.length, bundleWallets: bundleSet.size, bundleHeldPct: f_bundle,
       top10Pct: f_top10, holders: holders.length, creatorPct: f_creator, insiderDumpNowPct: f_dumpNow, insiderSellersNow: insiderSellers,
       buysRecent: buys, sellsRecent: sells } };
-  if (opts.mcap !== false) { const m = await computeMcap(addr); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
+  if (opts.mcapUsd != null) { out.mcapUsd = Math.round(opts.mcapUsd); out.bucket = bucketOf(opts.mcapUsd); } // from Pons API — accurate, no receipts
+  else if (opts.mcap !== false) { const m = await computeMcap(addr); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
   if (opts.whales !== false) {
     out.bundles = bundles.slice(0, 10);
     out.whales = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 60).map((w) => ({ a: w.a, bal: +w.bal.toFixed(0), first: w.first, bought: +w.bought.toFixed(0), sold: +w.sold.toFixed(0), net: +(w.recvRecent - w.sentRecent).toFixed(0), sniper: w.sniper }));

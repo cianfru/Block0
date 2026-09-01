@@ -73,7 +73,7 @@ createServer(async (req, res) => {
     if (u.pathname === "/api/board") {
       const b = ensureFresh(BOARD_REFRESH_MS);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-      return res.end(JSON.stringify({ updated: b.updated, scanning: b.scanning, order: b.order || [], buckets: b.buckets || {}, tokens: b.tokens || [] }));
+      return res.end(JSON.stringify({ updated: b.updated, scanning: b.scanning, cooking: b.cooking || [], graduated: b.graduated || [], stats: b.stats || {} }));
     }
 
     if (u.pathname === "/api/scan") {
