@@ -6,7 +6,7 @@
 //
 // A token launched today has a tiny history, so scan() pulls it ALL and every number is exact. Older tokens
 // fall back to a trailing window (labelled), which is still the right lens for a real-time desk.
-import { latestBlock, findDeployBlock, getTransferLogs, toNum } from "./rpc.mjs";
+import { latestBlock, findDeployBlock, getTransferLogs, getAssetTransfers, PROVIDER, toNum } from "./rpc.mjs";
 
 const ZERO = "0x0000000000000000000000000000000000000000";
 const DEAD = "0x000000000000000000000000000000000000dead";
@@ -38,6 +38,27 @@ export function decode(logs, decimals) {
   }
   ev.sort((a, b) => a.block - b.block || a.li - b.li);
   return ev;
+}
+
+// Provider-aware transfer pull → unified {from,to,amt,ts,block,li}[]. Alchemy uses the range-uncapped
+// getAssetTransfers (paged); any other RPC uses eth_getLogs + decode.
+export async function pullTransfers(address, from, to, decimals) {
+  if (PROVIDER === "alchemy") {
+    const d = 10 ** decimals; const ev = []; let pageKey;
+    do {
+      const r = await getAssetTransfers(address, from, to, pageKey);
+      for (const t of r?.transfers || []) {
+        const amt = t.rawContract?.value ? Number(BigInt(t.rawContract.value)) / d : Number(t.value || 0);
+        ev.push({ from: (t.from || "").toLowerCase(), to: (t.to || "").toLowerCase(), amt,
+          ts: t.metadata?.blockTimestamp ? Math.floor(Date.parse(t.metadata.blockTimestamp) / 1000) : null,
+          block: toNum(t.blockNum), li: 0 });
+      }
+      pageKey = r?.pageKey;
+    } while (pageKey);
+    ev.sort((a, b) => a.block - b.block);
+    return ev;
+  }
+  return decode(await getTransferLogs(address, from, to), decimals);
 }
 
 export function detectPool(ev) {
@@ -125,8 +146,7 @@ export async function scan(address, { decimals = 18, windowBlocks = 1500, full =
     if (chunks <= maxFullChunks) { from = deploy; mode = "full"; }       // small/new token → whole history, exact
     else from = Math.max(deploy, latest - windowBlocks);                  // old token → trailing window
   } else from = Math.max(0, latest - windowBlocks);
-  const logs = await getTransferLogs(address, from, latest);
-  const ev = decode(logs, decimals);
+  const ev = await pullTransfers(address, from, latest, decimals);
   const pool = detectPool(ev);
   const res = analyze(ev, pool, {});
   return { address, decimals, chain: process.env.CHAIN || "ethereum", mode,

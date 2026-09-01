@@ -8,9 +8,8 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { scan } from "./engine.mjs";
-import { latestBlock, getTransferLogs, toNum } from "./rpc.mjs";
-import { decode, detectPool, ROUTERS } from "./engine.mjs";
+import { scan, pullTransfers, detectPool, ROUTERS } from "./engine.mjs";
+import { latestBlock } from "./rpc.mjs";
 
 const __dir = fileURLToPath(new URL(".", import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -27,8 +26,7 @@ async function poll() {
     try {
       const latest = await latestBlock();
       if (latest <= st.lastBlock) continue;
-      const logs = await getTransferLogs(addr, st.lastBlock + 1, latest);
-      const ev = decode(logs, st.decimals);
+      const ev = await pullTransfers(addr, st.lastBlock + 1, latest, st.decimals);
       st.lastBlock = latest;
       const isBuy = (e) => e.from === st.pool || ROUTERS.has(e.from);
       const isSell = (e) => e.to === st.pool || ROUTERS.has(e.to);
@@ -75,7 +73,7 @@ createServer(async (req, res) => {
       let st = watch.get(address);
       if (!st) {
         const latest = await latestBlock();
-        const seed = decode(await getTransferLogs(address, latest - 400, latest), decimals);
+        const seed = await pullTransfers(address, latest - 400, latest, decimals);
         st = { clients: new Set(), lastBlock: latest, pool: detectPool(seed), decimals };
         watch.set(address, st);
       }

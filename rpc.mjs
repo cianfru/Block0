@@ -5,6 +5,10 @@ const ENV_RPC = (process.env.RPC_URL || "").trim();
 const RPCS = ENV_RPC ? [ENV_RPC] : ["https://eth.drpc.org", "https://rpc.mevblocker.io"];
 const UA = { "content-type": "application/json", "user-agent": "curl/8.5.0" };
 export const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+// Alchemy's free tier caps eth_getLogs to a 10-block range, so on Alchemy we pull via the enhanced,
+// range-uncapped alchemy_getAssetTransfers endpoint instead (same approach our other on-chain builders use).
+export const PROVIDER = /alchemy\.com/i.test(ENV_RPC) ? "alchemy" : "generic";
+export const LOGS_RANGE = Number(process.env.LOGS_RANGE || 500); // generic-RPC eth_getLogs chunk size
 
 let rid = 1;
 export async function rpc(method, params, tries = 6) {
@@ -39,7 +43,7 @@ export async function findDeployBlock(address, latest) {
 }
 
 // pull Transfer logs for a token across [from,to], chunked to stay under RPC range/row caps
-export async function getTransferLogs(address, from, to, chunk = 500) {
+export async function getTransferLogs(address, from, to, chunk = LOGS_RANGE) {
   const out = [];
   for (let b = from; b <= to; b += chunk) {
     const end = Math.min(b + chunk - 1, to);
@@ -47,4 +51,13 @@ export async function getTransferLogs(address, from, to, chunk = 500) {
     for (const l of part || []) out.push(l);
   }
   return out;
+}
+
+// Alchemy enhanced API: all ERC-20 transfers of `address` in [from,to], paged, no block-range cap.
+// Returns already-decoded {from,to,value,rawContract,blockNum,metadata.blockTimestamp}.
+export async function getAssetTransfers(address, from, to, pageKey) {
+  const params = { fromBlock: hx(from), toBlock: hx(to), contractAddresses: [address],
+    category: ["erc20"], order: "asc", withMetadata: true, excludeZeroValue: false, maxCount: "0x3e8" };
+  if (pageKey) params.pageKey = pageKey;
+  return rpc("alchemy_getAssetTransfers", [params]);
 }
