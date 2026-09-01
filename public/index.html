@@ -69,7 +69,7 @@
   <header>
     <div class="brand">BLOCK<b>0</b><span class="sub">from block zero · who's holding · who's dumping · live</span></div>
     <form id="f">
-      <input name="address" placeholder="paste token contract 0x…" autocomplete="off" spellcheck="false" value="0xA9E8AcF069C58aEc8825542845Fd754e41a9489A">
+      <input name="address" placeholder="paste token contract 0x…" autocomplete="off" spellcheck="false">
       <input name="decimals" type="number" value="18" title="token decimals">
       <button type="submit">Scan</button>
       <div class="tf" id="tf">
@@ -150,9 +150,9 @@ async function scan(){
 }
 
 $("#f").addEventListener("submit",(e)=>{ e.preventDefault(); scan(); });
-$("#tf").addEventListener("click",(e)=>{ const b = e.target.closest("[data-w]"); if(!b) return; windowBlocks = +b.dataset.w; document.querySelectorAll("#tf button").forEach(x=>x.classList.toggle("on", x===b)); scan(); });
+$("#tf").addEventListener("click",(e)=>{ const b = e.target.closest("[data-w]"); if(!b) return; windowBlocks = +b.dataset.w; document.querySelectorAll("#tf button").forEach(x=>x.classList.toggle("on", x===b)); if($("[name=address]").value.trim()) scan(); });
 addEventListener("resize", ()=>chart.resize());
-scan();
+if($("[name=address]").value.trim()) scan();
 </script>
 </body>
 </html>
