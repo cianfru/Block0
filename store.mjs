@@ -10,7 +10,7 @@
 // deploy block is resolved ONCE and cached forever (it is immutable) — and on Alchemy it's free: getAssetTransfers
 // pages by COUNT not block-range, so starting from block 0 costs the same as starting from deploy, so we skip
 // findDeployBlock entirely. Result: ~30–100× fewer RPC calls, provider-agnostic.
-import { latestBlock, findDeployBlock, PROVIDER } from "./rpc.mjs";
+import { latestBlock, findDeployBlock, PROVIDER, rpc, hx, toNum } from "./rpc.mjs";
 import { pullTransfers, detectPool } from "./engine.mjs";
 
 const S = new Map(); // addr -> { ev, lastBlock, deployBlock, pool, newN }
@@ -23,6 +23,31 @@ export async function sharedLatest(maxAgeMs = 8000) {
   return _lb.v;
 }
 
+const parseTs = (v) => { // Pons launchedAt may be unix (s/ms) or ISO
+  if (v == null) return null;
+  if (typeof v === "number") return v > 1e12 ? Math.floor(v / 1000) : v;
+  const p = Date.parse(v); return Number.isNaN(p) ? null : Math.floor(p / 1000);
+};
+
+// One-time chain calibration: measured seconds-per-block from two block HEADERS (no archive state needed,
+// unlike eth_getCode). Lets us convert a token's launch timestamp → an approximate block, so a generic-RPC
+// first-boot pulls from launch instead of genesis (the RH chain is 52M+ blocks deep at sub-second block times).
+let _cal = null;
+async function calibrate(latest) {
+  if (_cal) return _cal;
+  const ts = async (n) => { const b = await rpc("eth_getBlockByNumber", [hx(n), false]); return b ? toNum(b.timestamp) : null; };
+  const lo = Math.max(1, latest - 1_000_000);
+  const [tHi, tLo] = await Promise.all([ts(latest), ts(lo)]);
+  const spb = (tHi && tLo && latest > lo) ? (tHi - tLo) / (latest - lo) : 2;
+  _cal = { headBlock: latest, headTs: tHi || Math.floor(Date.now() / 1000), spb: spb > 0 ? spb : 2 };
+  return _cal;
+}
+export async function estimateBlockAt(tsSec, latest, marginBlocks = 10000) {
+  const c = await calibrate(latest);
+  const est = c.headBlock - Math.floor((c.headTs - tsSec) / c.spb);
+  return Math.max(0, est - marginBlocks); // margin so we never start after the token's first transfer
+}
+
 // Return the token's full transfer history, pulling only what's new since last call.
 // opts.pool (from Pons) seeds the market so we never guess it; opts.decimals defaults to 18.
 // → { ev, pool, deployBlock, latest, fresh, newN }  (fresh = there were new transfers this call)
@@ -32,8 +57,16 @@ export async function getTransfers(addr, decimals = 18, opts = {}) {
   let s = S.get(addr);
 
   if (!s) {
-    // Alchemy pages by count → block 0 is as cheap as the deploy block, so skip the binary search entirely.
-    const deployBlock = PROVIDER === "alchemy" ? 0 : await findDeployBlock(addr, latest);
+    // Where to start the first full pull:
+    //  • Alchemy pages by count → block 0 is as cheap as the deploy block (skip the binary search entirely).
+    //  • generic RPC (eth_getLogs) → start from the token's LAUNCH: estimate the block from Pons launchedAt
+    //    (header-only, no archive state), else fall back to the eth_getCode binary search.
+    let deployBlock;
+    if (PROVIDER === "alchemy") deployBlock = 0;
+    else {
+      const ts = parseTs(opts.launchedAt);
+      deployBlock = ts != null ? await estimateBlockAt(ts, latest) : await findDeployBlock(addr, latest);
+    }
     const ev = await pullTransfers(addr, deployBlock, latest, decimals);
     s = { ev, lastBlock: latest, deployBlock, pool: ((opts.pool || "").toLowerCase() || detectPool(ev) || ""), newN: ev.length };
     S.set(addr, s);

@@ -2,13 +2,16 @@
 // Alchemy/QuickNode key). Falls back to public drpc endpoints so the POC runs with no key. drpc + mevblocker
 // enrich logs with blockTimestamp, so we get the time of every transfer without a separate block fetch.
 const ENV_RPC = (process.env.RPC_URL || "").trim();
-const RPCS = ENV_RPC ? [ENV_RPC] : ["https://eth.drpc.org", "https://rpc.mevblocker.io"];
+// Default to the native Robinhood-chain public RPC (verified: chain 4663, serves 10k-block eth_getLogs ranges
+// for free). Set RPC_URL to override (e.g. Alchemy). The old Ethereum-mainnet drpc default was a POC leftover.
+const RPCS = ENV_RPC ? [ENV_RPC] : ["https://rpc.mainnet.chain.robinhood.com"];
 const UA = { "content-type": "application/json", "user-agent": "curl/8.5.0" };
 export const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 // Alchemy's free tier caps eth_getLogs to a 10-block range, so on Alchemy we pull via the enhanced,
-// range-uncapped alchemy_getAssetTransfers endpoint instead (same approach our other on-chain builders use).
+// range-uncapped alchemy_getAssetTransfers endpoint instead. Any other RPC (incl. the native RH node) uses
+// eth_getLogs, which the RH node serves in wide ranges — so this is the free path.
 export const PROVIDER = /alchemy\.com/i.test(ENV_RPC) ? "alchemy" : "generic";
-export const LOGS_RANGE = Number(process.env.LOGS_RANGE || 500); // generic-RPC eth_getLogs chunk size
+export const LOGS_RANGE = Number(process.env.LOGS_RANGE || 8000); // generic-RPC eth_getLogs span (RH serves 10k)
 
 let rid = 1;
 export async function rpc(method, params, tries = 6) {
@@ -42,13 +45,28 @@ export async function findDeployBlock(address, latest) {
   return ans;
 }
 
-// pull Transfer logs for a token across [from,to], chunked to stay under RPC range/row caps
-export async function getTransferLogs(address, from, to, chunk = LOGS_RANGE) {
+// Pull Transfer logs for a token across [from,to] via eth_getLogs. Walks in LOGS_RANGE spans with a small
+// inter-call gap (keeps us under the RH node's burst throttle), and ADAPTIVELY HALVES any span that trips the
+// node's 10k-logs-per-result cap or a query timeout — so a busy token in a wide window still completes.
+export async function getTransferLogs(address, from, to) {
+  const GAP = Number(process.env.LOGS_GAP_MS || 120);
+  const MAXR = LOGS_RANGE;
   const out = [];
-  for (let b = from; b <= to; b += chunk) {
-    const end = Math.min(b + chunk - 1, to);
-    const part = await rpc("eth_getLogs", [{ address, topics: [TRANSFER_TOPIC], fromBlock: hx(b), toBlock: hx(end) }]);
-    for (const l of part || []) out.push(l);
+  const pull = async (lo, hi) => {
+    try {
+      const part = await rpc("eth_getLogs", [{ address, topics: [TRANSFER_TOPIC], fromBlock: hx(lo), toBlock: hx(hi) }], 3);
+      for (const l of part || []) out.push(l);
+    } catch (e) {
+      const m = String(e.message || e).toLowerCase();
+      if (hi > lo && (m.includes("limit") || m.includes("exceed") || m.includes("timed out") || m.includes("too many") || m.includes("range"))) {
+        const mid = (lo + hi) >> 1;
+        await pull(lo, mid); await new Promise((s) => setTimeout(s, GAP)); await pull(mid + 1, hi);
+      } else throw e;
+    }
+  };
+  for (let b = from; b <= to; b += MAXR) {
+    await pull(b, Math.min(b + MAXR - 1, to));
+    if (b + MAXR <= to) await new Promise((s) => setTimeout(s, GAP));
   }
   return out;
 }

@@ -66,7 +66,7 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   addr = addr.toLowerCase();
   const t0ms = Date.now();
   // Incremental store: pulls only the delta since last call and caches the deploy block (free on Alchemy).
-  const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool });
+  const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool, launchedAt: opts.launchedAt });
   const pool = (opts.pool || "").toLowerCase() || poolStore || detectPool(ev); // prefer the Pons-API pool when provided
   const isBuy = (e) => e.from === pool || ROUTERS.has(e.from), isSell = (e) => e.to === pool || ROUTERS.has(e.to);
   const isInfra = (a) => a === ZERO || a === DEAD || a === pool || ROUTERS.has(a);

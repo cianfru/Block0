@@ -22,7 +22,7 @@ const FIRST_SEEN = new Map(); let BOOTED = false;
 const apeScore = (r) => Math.round((100 - r.risk) + Math.max(-30, Math.min(30, r.momentum)) - (r.flags.insiderSellersNow || 0) * 6);
 
 async function verdict(meta) {
-  const r = await computeIntel(meta.address, meta.sym, { pool: meta.pool, mcapUsd: meta.mcapUsd, graduated: meta.graduated, whales: false });
+  const r = await computeIntel(meta.address, meta.sym, { pool: meta.pool, mcapUsd: meta.mcapUsd, graduated: meta.graduated, launchedAt: meta.launchedAt, whales: false });
   r.name = meta.name; r.logo = meta.logo; r.progress = meta.progress; r.graduated = meta.graduated;
   r.launchedAt = meta.launchedAt; r.mcapUsd = Math.round(meta.mcapUsd || r.mcapUsd || 0);
   r.ape = apeScore(r);
