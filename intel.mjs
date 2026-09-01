@@ -1,7 +1,8 @@
 // Actionable launch intel for a token — the verdict engine + whale-entry map data. Exported so the
 // discover-board worker can call it per token; also runnable as a CLI (node intel.mjs --addr=0x… --sym=X).
-import { latestBlock, findDeployBlock, rpc } from "./rpc.mjs";
-import { pullTransfers, detectPool, ROUTERS } from "./engine.mjs";
+import { rpc } from "./rpc.mjs";
+import { detectPool, ROUTERS } from "./engine.mjs";
+import { getTransfers } from "./store.mjs";
 
 const ZERO = "0x0000000000000000000000000000000000000000", DEAD = "0x000000000000000000000000000000000000dead";
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
@@ -64,10 +65,9 @@ export function bucketOf(mcap) {
 export async function computeIntel(addr, sym = "?", opts = {}) {
   addr = addr.toLowerCase();
   const t0ms = Date.now();
-  const latest = await latestBlock();
-  const deploy = await findDeployBlock(addr, latest);
-  const ev = await pullTransfers(addr, deploy, latest, 18);
-  const pool = (opts.pool || "").toLowerCase() || detectPool(ev); // prefer the Pons-API pool when provided
+  // Incremental store: pulls only the delta since last call and caches the deploy block (free on Alchemy).
+  const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool });
+  const pool = (opts.pool || "").toLowerCase() || poolStore || detectPool(ev); // prefer the Pons-API pool when provided
   const isBuy = (e) => e.from === pool || ROUTERS.has(e.from), isSell = (e) => e.to === pool || ROUTERS.has(e.to);
   const isInfra = (a) => a === ZERO || a === DEAD || a === pool || ROUTERS.has(a);
   const tsMax = Math.max(...ev.map((e) => e.ts || 0)), tsMin = Math.min(...ev.map((e) => e.ts || 1e18));

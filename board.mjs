@@ -9,6 +9,7 @@
 // The ~4.2M dead-dust launches never appear — we only verdict what the launchpad surfaces as live/graduated.
 import { computeIntel } from "./intel.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
+import { keep, storeStats } from "./store.mjs";
 
 export const PONS_FACTORIES = ["0x0c37a24f5d23a486fa692d1500881d698b1f77a4", "0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb"];
 const N_ACTIVE = Number(process.env.BOARD_ACTIVE || 16); // pre-graduation tokens to verdict per refresh
@@ -42,9 +43,10 @@ export async function refreshBoard() {
     for (const m of gradPick) { try { graduated.push(await verdict(m)); } catch { /* skip */ } }
     cooking.sort((a, b) => (b.progress || 0) - (a.progress || 0) || a.risk - b.risk);
     graduated.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0));
+    keep([...cooking, ...graduated].map((r) => r.address)); // bound store memory to the live board
     BOOTED = true;
     CACHE = { updated: Date.now(), scanning: false, cooking, graduated,
-      stats: { launchTotal: active.launchTotal, activeTotal: active.total, graduatedTotal: grad.total } };
+      stats: { launchTotal: active.launchTotal, activeTotal: active.total, graduatedTotal: grad.total, store: storeStats() } };
   } finally { CACHE = { ...CACHE, scanning: false }; }
   return CACHE;
 }
