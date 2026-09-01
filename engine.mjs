@@ -42,9 +42,9 @@ export function decode(logs, decimals) {
 
 // Provider-aware transfer pull → unified {from,to,amt,ts,block,li}[]. Alchemy uses the range-uncapped
 // getAssetTransfers (paged); any other RPC uses eth_getLogs + decode.
-export async function pullTransfers(address, from, to, decimals) {
+export async function pullTransfers(address, from, to, decimals, cap = 25000) {
   if (PROVIDER === "alchemy") {
-    const d = 10 ** decimals; const ev = []; let pageKey;
+    const d = 10 ** decimals; const ev = []; let pageKey; ev.capped = false;
     do {
       const r = await getAssetTransfers(address, from, to, pageKey);
       for (const t of r?.transfers || []) {
@@ -54,6 +54,7 @@ export async function pullTransfers(address, from, to, decimals) {
           block: toNum(t.blockNum), li: 0 });
       }
       pageKey = r?.pageKey;
+      if (ev.length >= cap) { ev.capped = true; break; } // huge/old token — stop paging, treat as windowed
     } while (pageKey);
     ev.sort((a, b) => a.block - b.block);
     return ev;
@@ -142,11 +143,15 @@ export async function scan(address, { decimals = 18, windowBlocks = 1500, full =
   let from, mode = "windowed";
   if (full === true || full === "auto") {
     const deploy = await findDeployBlock(address, latest);
-    const chunks = Math.ceil((latest - deploy) / 500);
-    if (chunks <= maxFullChunks) { from = deploy; mode = "full"; }       // small/new token → whole history, exact
-    else from = Math.max(deploy, latest - windowBlocks);                  // old token → trailing window
+    if (PROVIDER === "alchemy") { from = deploy; mode = "full"; }         // getAssetTransfers pages by count, not block-span
+    else {
+      const chunks = Math.ceil((latest - deploy) / 500);                  // eth_getLogs: block-span bounded → guard by chunk count
+      if (chunks <= maxFullChunks) { from = deploy; mode = "full"; }
+      else from = Math.max(deploy, latest - windowBlocks);
+    }
   } else from = Math.max(0, latest - windowBlocks);
   const ev = await pullTransfers(address, from, latest, decimals);
+  if (ev.capped) { mode = "windowed"; from = ev.length ? ev[0].block : from; } // hit the transfer cap → not exact, relabel
   const pool = detectPool(ev);
   const res = analyze(ev, pool, {});
   return { address, decimals, chain: process.env.CHAIN || "ethereum", mode,
