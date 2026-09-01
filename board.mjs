@@ -4,13 +4,22 @@
 //
 // Discovery today = chain-wide active-token scan. Completeness upgrade (found): eth_subscribe to the Pons
 // factory contracts for a launch event the instant a token is created — see PONS_FACTORIES below.
-import { computeIntel, discoverTokens, bucketOf } from "./intel.mjs";
+import { computeIntel, discoverTokens, bucketOf, isTokenizedStock } from "./intel.mjs";
 
 // Pons launchpad factory contracts on Robinhood mainnet (chainId 4663) — watch these for every new launch.
 export const PONS_FACTORIES = ["0x0c37a24f5d23a486fa692d1500881d698b1f77a4", "0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb"];
 
 let CACHE = { updated: 0, scanning: false, tokens: [], buckets: {} };
 const BUCKET_ORDER = ["fresh", "graduating", "traction", "established", "graduated"];
+const FIRST_SEEN = new Map(); // token addr -> ms first seen on the board (drives the "new launch" vibration)
+let BOOTED = false;           // don't mark everything "new" on the very first scan
+const NEW_MS = 150000;        // a card counts as newly-launched (vibrates) for this long after first sighting
+// QUALITY FLOOR — the launchpad has millions of dead $0–4k dust tokens; a board of those is worthless. Keep
+// only tokens that clear a real bar: enough market cap OR a real holder base. Everything below is invisible
+// (still scannable on-demand by pasting the contract). Tune via env.
+const MIN_MCAP = Number(process.env.MIN_MCAP || 20000);   // $20k market-cap floor
+const MIN_HOLDERS = Number(process.env.MIN_HOLDERS || 40); // …or a genuine holder base
+const worthShowing = (r) => (r.mcapUsd || 0) >= MIN_MCAP || (r.flags?.holders || 0) >= MIN_HOLDERS;
 
 // an "ape score" for ranking within a bucket: cleaner + heating + not-dumping rises. Higher = more interesting.
 const apeScore = (r) => (100 - r.risk) + Math.max(-30, Math.min(30, r.momentum)) - (r.flags.insiderSellersNow || 0) * 6;
@@ -19,12 +28,23 @@ export async function refreshBoard({ n = 16, whales = false } = {}) {
   if (CACHE.scanning) return CACHE;
   CACHE.scanning = true;
   try {
-    const toks = await discoverTokens(n);
+    const disc = await discoverTokens(n);
+    // drop tokenized stocks (Robinhood equity issuer) — not Pons memecoins; keep the board to launches
+    const toks = [];
+    for (const t of disc) { try { if (!(await isTokenizedStock(t.a))) toks.push(t); } catch { toks.push(t); } }
     const out = [];
     for (const t of toks) {
-      try { const r = await computeIntel(t.a, t.sym, { whales, mcap: true }); r.ape = Math.round(apeScore(r)); out.push(r); }
-      catch { /* skip a token that fails to scan this pass */ }
+      try {
+        const r = await computeIntel(t.a, t.sym, { whales, mcap: true });
+        r.ape = Math.round(apeScore(r));
+        const known = FIRST_SEEN.has(r.address); if (!known) FIRST_SEEN.set(r.address, Date.now());
+        r.firstSeenAt = FIRST_SEEN.get(r.address);
+        r.isNew = BOOTED && !known;                 // truly new since the last scan
+        if (worthShowing(r)) out.push(r);           // prune dead dust below the quality floor
+
+      } catch { /* skip a token that fails to scan this pass */ }
     }
+    BOOTED = true;
     // group by bucket, rank cleanest/most-interesting first inside each
     const buckets = {};
     for (const key of BUCKET_ORDER) buckets[key] = [];

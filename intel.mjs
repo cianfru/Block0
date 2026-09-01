@@ -9,6 +9,23 @@ const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523
 const USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168", WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73";
 const big = (h) => BigInt(h || "0x0");
 
+// Robinhood's tokenized-STOCK issuer — every tokenized equity/ETF (NVDA, PLTR, META, RDDT, SPY, SPCX…) is
+// deployed by this one address. They're not Pons memecoins and their 99% concentration is structural, not a
+// rug — so we exclude this deployer from the launch board. Extend if more issuers surface.
+export const STOCK_ISSUERS = new Set(["0x2b94105fff37630f98e1f24811dad588fc5c3a87"]);
+const _deployer = new Map(); // addr -> deployer EOA (immutable, cached)
+export async function deployerOf(addr) {
+  addr = addr.toLowerCase(); if (_deployer.has(addr)) return _deployer.get(addr);
+  let dep = null;
+  try {
+    const at = await rpc("alchemy_getAssetTransfers", [{ fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "asc", maxCount: "0xa", withMetadata: true }]);
+    const mint = (at?.transfers || []).find((x) => (x.from || "").toLowerCase() === ZERO) || at?.transfers?.[0];
+    if (mint?.hash) { const tx = await rpc("eth_getTransactionByHash", [mint.hash]); dep = (tx?.from || "").toLowerCase() || null; }
+  } catch { /* */ }
+  _deployer.set(addr, dep); return dep;
+}
+export async function isTokenizedStock(addr) { return STOCK_ISSUERS.has(await deployerOf(addr)); }
+
 // market cap = supply × price, where price = median USD paid per token across recent swaps (from tx receipts).
 // The AMM here is a singleton, so per-pair reserves aren't readable — the honest price is what swaps actually paid.
 export async function computeMcap(addr, wethUsd = 3000) {
