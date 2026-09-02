@@ -83,10 +83,11 @@ createServer(async (req, res) => {
       const token = (u.searchParams.get("token") || "").toLowerCase();
       if (!/^0x[0-9a-f]{40}$/.test(token)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?token=0x…"}'); }
       const points = Number(u.searchParams.get("points") || 90), ethUsd = Number(u.searchParams.get("eth") || 3000);
-      const key = `${token}:${points}:${ethUsd}`;
+      const noPrice = u.searchParams.get("price") === "0", cap = Number(u.searchParams.get("cap") || 400000);
+      const key = `${token}:${points}:${ethUsd}:${noPrice}:${cap}`;
       if (!_btCache.has(key)) {
         const meta = await ponsMeta(token);
-        _btCache.set(key, backtest(token, { sym: meta?.sym || u.searchParams.get("sym") || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd })
+        _btCache.set(key, backtest(token, { sym: meta?.sym || u.searchParams.get("sym") || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd, noPrice, cap })
           .then((r) => ({ ...r, name: meta?.name, logo: meta?.logo, mcapUsd: meta?.mcapUsd, priceUsd: meta?.priceUsd }))
           .catch((e) => { _btCache.delete(key); throw e; }));
       }

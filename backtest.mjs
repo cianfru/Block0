@@ -16,9 +16,11 @@ const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73", USDG = "0x5fc5360d040
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const big = (h) => BigInt(h && h !== "0x" ? h : "0x0"); // guard empty "0x" data fields
 
-// full transfer history WITH tx hashes (needed for receipt-based price). Alchemy enhanced API, paged.
-async function pullWithHash(addr) {
+// transfer history from launch WITH tx hashes (needed for receipt-based price). Alchemy enhanced API, paged
+// ascending from block 0. `cap` bounds the pull to the launch window for fast cohort profiling.
+async function pullWithHash(addr, cap = 400000) {
   const ev = []; let pageKey, guard = 0;
+  const maxPages = Math.ceil(cap / 1000);
   do {
     const p = { fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "asc", withMetadata: true, excludeZeroValue: false, maxCount: "0x3e8" };
     if (pageKey) p.pageKey = pageKey;
@@ -30,7 +32,7 @@ async function pullWithHash(addr) {
       block: Number(big(t.blockNum || "0x0")), hash: t.hash,
     });
     pageKey = r?.pageKey;
-  } while (pageKey && ++guard < 400);
+  } while (pageKey && ++guard < maxPages && ev.length < cap);
   return ev;
 }
 
@@ -51,7 +53,7 @@ async function swapPrice(hash, addr, ethUsd) {
 export async function backtest(addr, opts = {}) {
   addr = addr.toLowerCase();
   const points = opts.points || 90, ethUsd = opts.ethUsd || 3000, grad = !!opts.graduated;
-  const ev = await pullWithHash(addr);
+  const ev = await pullWithHash(addr, opts.cap || 400000);
   const sorted = ev.filter((e) => e.ts).sort((a, b) => a.ts - b.ts || a.block - b.block);
   if (sorted.length < 8) return { addr, sym: opts.sym, error: "too few timestamped transfers", n: sorted.length };
 
@@ -104,7 +106,9 @@ export async function backtest(addr, opts = {}) {
   }
   while (bi < bounds.length) snap(bounds[bi++]);
 
-  // PRICE: one representative (median-size) swap per bucket → receipt → price; forward/back fill gaps
+  // PRICE: one representative (median-size) swap per bucket → receipt → price; forward/back fill gaps.
+  // Skipped in profile mode (noPrice) — the cohort blueprint only needs the score/distribution trajectory.
+  if (opts.noPrice) return { addr, sym: opts.sym, graduated: grad, points: series.length, firstPoolBlock: firstPool, snipers: snipers.size, bundles: nBundles, t0, t1, transfers: sorted.length, capped: sorted.length >= (opts.cap || 400000), series };
   const buckets = Array.from({ length: bounds.length }, () => []);
   for (const e of sorted) if ((isBuy(e) || isSell(e)) && e.amt > 0 && e.hash) { const k = Math.min(bounds.length - 1, Math.max(0, Math.floor((e.ts - t0) / step))); buckets[k].push(e); }
   const prices = new Array(bounds.length).fill(null);
