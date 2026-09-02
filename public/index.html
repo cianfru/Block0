@@ -117,7 +117,7 @@
     <a class="back" href="/">← all launches</a>
   </header>
   <div id="root"><div class="state">Loading the dossier…</div></div>
-  <div class="foot"><b>Signal, not proof — never a buy recommendation.</b> Every number is reconstructed from public Robinhood-Chain transfer data and is reproducible. Risk is a transparent composite of concentration, snipers, bundles, live insider-dumping and the deployer's bag. Blueprint fit and the valuation ladder place this token against the biggest past graduations — a pattern, not a promise. Prices are swap-implied reconstructions (no oracle), smoothed; treat exact figures as estimates.</div>
+  <div class="foot"><b>Signal, not proof — never a buy recommendation.</b> Every number is reconstructed from public Robinhood-Chain transfer data and is reproducible. Risk is a transparent composite of concentration, snipers, bundles, live insider-dumping and the deployer's bag. Blueprint fit and the valuation ladder place this token against the biggest past graduations — a pattern, not a promise. Prices are swap-implied reconstructions (no oracle), smoothed; treat exact figures as estimates. <a href="/methodology" style="color:var(--lime)">How it works &amp; how well it works →</a></div>
 </div>
 
 <script>
@@ -295,6 +295,8 @@ function setCorVerdict(){
   const pts=SERIES.filter(s=>s.traj!=null); if(!pts.length){el.innerHTML="";return;}
   const st=corStatus(pts[pts.length-1]);
   if(DOSSIER&&DOSSIER.graduated){ el.innerHTML=`<b class="pill" style="background:var(--cyan)">GRADUATED</b>`; return; }
+  // the signal barely discriminates in the first ~30 min (measured AUC ~0.55) — don't fake confidence that early
+  if((DOSSIER?.ageH??pts[pts.length-1].ageH)<0.5){ el.innerHTML=`<b class="pill" style="background:var(--mute);color:#08080b">TOO EARLY TO CALL</b>`; return; }
   const T={ontrack:["ON THE WINNER PATH","var(--lime)"],behind:["DRIFTING BELOW THE BAND","var(--amber)"],failing:["OFF PACE — STALLING","var(--coral)"],na:["",""]};
   const t=T[st]; el.innerHTML=t[0]?`<b class="pill" style="background:${t[1]}">${t[0]}</b>`:"";
 }

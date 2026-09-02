@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block0 — how it works</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
+<style>
+  :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
+    --tx:#fff;--dim:#c2c2c9;--mute:#8b8b94;--lime:#c8ff4d;--cyan:#35e6e0;--magenta:#ff5cf0;--amber:#ffd23d;--coral:#ff3b5c;
+    --serif:"Instrument Serif",Georgia,serif;--sans:"Inter",system-ui,sans-serif;}
+  *{box-sizing:border-box}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:15.5px;line-height:1.6;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1100px 520px at 84% -14%,rgba(200,255,77,.09),transparent 60%),radial-gradient(760px 500px at -8% 4%,rgba(53,230,224,.06),transparent 55%);}
+  .wrap{max-width:820px;margin:0 auto;padding:0 22px 80px}
+  a{color:var(--cyan);text-decoration:none} a:hover{text-decoration:underline}
+  header{display:flex;align-items:center;gap:16px;padding:22px 0 10px;flex-wrap:wrap}
+  .brand{font-family:var(--serif);font-size:2rem;line-height:1}.brand b{font-style:italic;color:var(--lime);font-weight:400}
+  .chain{display:inline-flex;align-items:center;gap:7px;font-size:.76rem;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:7px 11px;background:var(--glass)}
+  .chain i{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime)}
+  .back{margin-left:auto;font-size:.85rem;color:var(--dim);border:1px solid var(--line);border-radius:11px;padding:9px 15px;background:var(--glass)}
+  .back:hover{border-color:var(--line-2);color:var(--tx);text-decoration:none}
+  h1{font-family:var(--serif);font-weight:400;font-size:clamp(2.2rem,5vw,3.1rem);line-height:1.05;margin:18px 0 6px}
+  h1 em{font-style:italic;color:var(--lime)}
+  .lede{color:var(--dim);font-size:1.08rem;max-width:64ch;margin:0 0 8px}
+  h2{font-family:var(--serif);font-style:italic;font-weight:400;font-size:1.7rem;margin:44px 0 6px;padding-top:22px;border-top:1px solid var(--line)}
+  h3{font-size:1.02rem;font-weight:700;margin:22px 0 4px}
+  p{color:var(--dim);margin:9px 0}
+  b,strong{color:var(--tx)}
+  code{font-family:ui-monospace,monospace;font-size:.86em;background:rgba(255,255,255,.06);border:1px solid var(--line);border-radius:5px;padding:1px 6px;color:var(--lime)}
+  ul{color:var(--dim);padding-left:20px;margin:8px 0} li{margin:5px 0}
+  .tag{display:inline-block;font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--dim);margin-right:6px}
+  table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.9rem}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
+  th{color:var(--dim);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.03em}
+  td.n,th.n{text-align:right}
+  .strong{color:var(--lime);font-weight:700} .weak{color:var(--amber)} .flip{color:var(--mute)}
+  .callout{border:1px solid var(--line);border-left:3px solid var(--lime);border-radius:0 12px 12px 0;background:var(--glass);padding:14px 18px;margin:18px 0}
+  .callout.warn{border-left-color:var(--amber)}
+  .foot{color:var(--mute);font-size:.82rem;margin-top:40px;padding-top:18px;border-top:1px solid var(--line);line-height:1.6}
+  .barw{display:inline-block;width:90px;height:8px;border-radius:4px;background:rgba(255,255,255,.08);vertical-align:middle;overflow:hidden;margin-right:8px}
+  .barw i{display:block;height:100%;border-radius:4px}
+  .muted{color:var(--mute)}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <a class="brand" href="/">block<b>0</b></a>
+    <div class="chain"><i></i> Robinhood Chain</div>
+    <a class="back" href="/">← all launches</a>
+  </header>
+
+  <h1>How Block0 <em>works</em></h1>
+  <p class="lede">Every score here is reconstructed from public Robinhood-Chain transfer data and is reproducible — no black box, no proprietary feed. This page is the whole method, and an honest measurement of how well it actually separates winners from the rest.</p>
+  <div class="callout"><b>Signal, not proof — never a buy recommendation.</b> Block0 is a forensic and pattern tool: it tells you whether a launch is <i>clean</i> and whether it <i>looks like</i> past winners looked. That is a position read, not a prediction, and certainly not financial advice.</div>
+
+  <h2>The risk verdict</h2>
+  <p>The headline <b>0–100 risk score</b> is a transparent weighted composite of five sub-scores, each computed from the token's own transfer history over its real distributed float (the bonding curve and known venues are excluded so their reserves don't read as a giant holder).</p>
+  <table>
+    <thead><tr><th>Sub-score</th><th>What it measures</th><th class="n">Weight*</th></tr></thead>
+    <tbody>
+      <tr><td><b>Concentration</b></td><td>Share of supply held by the top 10 wallets, above a healthy baseline</td><td class="n">30–42%</td></tr>
+      <tr><td><b>Bundles</b></td><td>Coordinated same-block buying at launch (one actor, many wallets)</td><td class="n">10–24%</td></tr>
+      <tr><td><b>Dumping now</b></td><td>Insiders (snipers + bundles) net-selling in the live 30-min window</td><td class="n">22–28%</td></tr>
+      <tr><td><b>Snipers</b></td><td>Wallets that bought within 3 blocks of the first pool trade, and their held share</td><td class="n">12–16%</td></tr>
+      <tr><td><b>Deployer</b></td><td>Share of supply still sitting in the deployer's wallet</td><td class="n">8%</td></tr>
+    </tbody>
+  </table>
+  <p class="muted">*Weights shift once a token graduates: concentration and live dumping matter more for an established coin, launch-mechanics (bundles) matter less. On top of the weighted mean sit two <b>disqualifying floors</b> — near-total concentration (top-10 ≥ 82–92%) or two-plus insiders selling right now force a high score regardless of everything else, because those single-handedly define the risk.</p>
+  <p>Labels: <span class="tag" style="color:var(--lime)">Looks cleaner &lt;25</span><span class="tag" style="color:var(--cyan)">Mixed 25–44</span><span class="tag" style="color:var(--amber)">Caution 45–65</span><span class="tag" style="color:var(--coral)">High risk 66+</span></p>
+
+  <h2>Blueprint fit — the winner fingerprint</h2>
+  <p>Separately from risk, <b>blueprint fit (0–100)</b> asks how well a fresh launch matches the shape the biggest past graduations had. Validated discriminators, in order of weight:</p>
+  <ul>
+    <li><b>No bundles (up to 40 pts)</b> — the hard veto; coordinated launches rarely become winners.</li>
+    <li><b>A float that opens up (up to 25 pts)</b> — top-10 concentration falling below 40–60%.</li>
+    <li><b>A settled, clean score (up to 20 pts)</b> — risk under 25–45.</li>
+    <li><b>Real adoption (up to 15 pts)</b> — 80–200+ actual holders.</li>
+  </ul>
+  <p>It deliberately does <i>not</i> reward low sniper activity — the winner cohort showed heavy early snipers were survivable, while bundles were what killed. A strong fit is worth watching; it is a pattern, not a promise (see the measured limits below).</p>
+
+  <h2>The winner corridor &amp; valuation ladder</h2>
+  <p>These come from a <b>study of the top graduated cohort</b>: each winner's whole history is replayed and reduced to a trajectory (distribution health blended with real wallet inflow) and a wallets→market-cap curve.</p>
+  <ul>
+    <li><b>The corridor</b> is the winners' healthy trajectory zone (25th–75th percentile) at each age. A live token's own trajectory is drawn through it — inside the band is tracking the winners, below is drifting.</li>
+    <li><b>Stage targets</b> — each corridor box also shows the median unique-wallet count and market cap the winners actually carried by that age, so you see whether a token is hitting the real adoption and valuation a main player needs at each stage.</li>
+    <li><b>The valuation ladder</b> places a token's current wallet count against what winners were worth at the same count.</li>
+  </ul>
+  <p class="muted">The model is a committed, reproducible pipeline — the cohort backtests build the study data, which is assembled into the live model. It refreshes as more tokens graduate.</p>
+
+  <h2>Does it actually work?</h2>
+  <p>The honest question. Below is a <b>separation test</b> on the study cohort — at each age, how well the trajectory tells eventual winners apart from tokens that faded or died. <code>AUC</code> is the probability a random winner scores above a random loser: <b>0.50 is a coin flip, 1.00 is perfect.</b></p>
+  <div id="valbox"><p class="muted">loading measurement…</p></div>
+  <div class="callout warn"><b>Read this honestly.</b> This is <b>in-sample separation on a small cohort</b> (the launchpad is young), not out-of-sample proof. It shows the signal is nearly a coin-flip in the first ~30 minutes — everything looks alike that early — and separates well only once a token is an hour or more old. Treat a very fresh launch's read as low-confidence by design, and the whole model as evidence that compounds as more tokens graduate, not a guarantee.</p></div>
+
+  <h2>Limits — what this can't tell you</h2>
+  <ul>
+    <li><b>Prices are reconstructed.</b> There's no oracle; price is implied from swap receipts and smoothed. Treat exact figures as estimates, not quotes.</li>
+    <li><b>On-chain can't see intent.</b> A clean distribution can still be a slow rug; a messy one can still run. This reads structure, not the future.</li>
+    <li><b>The cohort is small and survivorship-shaped.</b> Winners are defined by having already graduated. The signal is suggestive, not deterministic.</li>
+    <li><b>Fresh is uncertain.</b> As measured above, the first half hour barely discriminates. Earliest is riskiest — that's inherent, not a bug.</li>
+  </ul>
+
+  <div class="foot">Block0 reconstructs everything from public Robinhood-Chain data and the Pons launchpad's own market data. It is a research and forensic tool — a position read, <b>signal not proof</b>, never a buy recommendation, and not financial advice. You are responsible for your own decisions.</div>
+</div>
+
+<script>
+const $=(s)=>document.querySelector(s);
+const pc=(x)=>x==null?"—":Math.round(x*100)+"%";
+const aucCls=(a)=>a==null?"":a>=0.75?"strong":a>=0.6?"":"weak";
+const aucRead=(a)=>a==null?"—":a>=0.75?"strong":a>=0.65?"useful":a>=0.55?"weak":"coin-flip";
+const barCol=(a)=>a==null?"var(--mute)":a>=0.75?"var(--lime)":a>=0.6?"var(--cyan)":a>=0.55?"var(--amber)":"var(--coral)";
+(async()=>{
+  try{
+    const v=await fetch("/api/validation").then(r=>r.json());
+    if(v.error){ $("#valbox").innerHTML='<p class="muted">Validation data not available on this deployment.</p>'; return; }
+    const rows=v.perBin.map(r=>{
+      const w=r.auc==null?0:Math.round(r.auc*100);
+      return `<tr><td>${r.age}</td>
+        <td class="n">${r.medW??"—"} / <span class="muted">${r.medL??"—"}</span></td>
+        <td class="n">${pc(r.onW)} / <span class="muted">${pc(r.onL)}</span></td>
+        <td class="n"><span class="barw"><i style="width:${w}%;background:${barCol(r.auc)}"></i></span>${r.auc==null?"—":r.auc.toFixed(2)}</td>
+        <td class="${aucCls(r.auc)}">${aucRead(r.auc)}</td></tr>`;}).join("");
+    const late=v.lateLife||{}, bt=late.bestThreshold||{};
+    $("#valbox").innerHTML=`
+      <table><thead><tr><th>Token age</th><th class="n">median traj<br><span class="muted" style="font-weight:400">winner / loser</span></th>
+        <th class="n">on-band<br><span class="muted" style="font-weight:400">winner / loser</span></th><th class="n">AUC</th><th>separation</th></tr></thead>
+        <tbody>${rows}</tbody></table>
+      <p class="muted">Cohort: <b style="color:var(--tx)">${v.cohort.winners} winners</b> vs <b style="color:var(--tx)">${v.cohort.losers} losers</b>.
+      Late-life "did it sustain the path" AUC <b style="color:var(--tx)">${late.aucWinnerVsLoser??"—"}</b> — at trajectory ≥ ${bt.thr??"—"} that caught ${pc(bt.tpr)} of winners with a ${pc(bt.fpr)} false-positive rate on losers. Measured ${v.generatedAt}.</p>`;
+  }catch(e){ $("#valbox").innerHTML='<p class="muted">Couldn\'t load the measurement — reload in a moment.</p>'; }
+})();
+</script>
+</body>
+</html>

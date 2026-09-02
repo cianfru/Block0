@@ -66,7 +66,8 @@ async function poll() {
 if (!WS_ENABLED) setInterval(poll, POLL_MS);
 
 async function serveStatic(res, urlPath) {
-  const route = urlPath === "/" ? "board.html" : (urlPath === "/token" || urlPath === "/token.html") ? "index.html" : null;
+  const route = urlPath === "/" ? "board.html" : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
+    : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html" : null;
   const file = route || urlPath.replace(/^\//, "");
   try {
     const buf = await readFile(join(__dir, "public", file));
@@ -95,6 +96,12 @@ createServer(async (req, res) => {
       const out = await _btCache.get(key);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(out));
+    }
+
+    if (u.pathname === "/api/validation") {
+      try { const buf = await readFile(join(__dir, "study", "validation.json"));
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=3600" }); return res.end(buf);
+      } catch { res.writeHead(404, { "content-type": "application/json" }); return res.end('{"error":"no validation data"}'); }
     }
 
     if (u.pathname === "/api/token") {
