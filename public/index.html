@@ -230,7 +230,7 @@ function render(r){
       </div>
       <div style="position:relative"><canvas id="cvcor" style="height:340px"></canvas><div class="tip" id="tipcor"></div></div>
       <div class="chnote" id="chnotecor" hidden></div>
-      <div class="corcap"><span id="corverdict"></span> Each green box is where the 10 biggest past graduations sat at that age — one 0–100 <b style="color:var(--dim)">trajectory</b> score combining clean distribution (no bundles, an opening float, insiders not dumping) with real wallet adoption. Inside the boxes = tracking the winners; below the band = drifting; near the floor = dying.</div>
+      <div class="corcap"><span id="corverdict"></span> Each green box is where the 10 biggest past graduations sat at that age — a 0–100 <b style="color:var(--dim)">trajectory</b> score (clean distribution + real wallet adoption) with, below it, the concrete <b style="color:var(--lime)">wallet count</b> and <b style="color:var(--dim)">market cap</b> those winners typically carried by that stage. Inside the boxes on all three = tracking the winners; below = drifting; near the floor = dying. Hover to compare this token to the winner target at any age.</div>
     </div>
 
     <h2 class="sec">History — valuation &amp; score over time</h2>
@@ -289,6 +289,7 @@ const CORCOL={ontrack:"#c8ff4d",behind:"#ffd23d",failing:"#ff3b5c",na:"#7f7f88"}
 function corBinAt(ageH){ if(!CORR||!CORR.length) return null; return CORR.find(b=>ageH>=b.lo&&ageH<b.hi)||CORR[CORR.length-1]; }
 function corStatus(s){ const b=corBinAt(s.ageH); if(!b||s.traj==null) return "na"; if(s.traj<35) return "failing"; return s.traj>=b.q1?"ontrack":"behind"; }
 const ageLab=(h)=>h<1?Math.round(h*60)+"m":h<48?Math.round(h)+"h":Math.round(h/24)+"d";
+const wShort=(n)=>n==null?"—":n>=1000?(n/1000).toFixed(n>=10000?0:1)+"k":String(Math.round(n));
 function setCorVerdict(){
   const el=$("#corverdict"); if(!el||!SERIES) return;
   const pts=SERIES.filter(s=>s.traj!=null); if(!pts.length){el.innerHTML="";return;}
@@ -307,7 +308,7 @@ function drawCorridorChart(hoverIdx=-1){
   if(!CORR||!CORR.length||!SERIES) return;
   CVC=$("#cvcor"); const W=CVC.clientWidth,H=CVC.clientHeight;
   CVC.width=W*DPR;CVC.height=H*DPR;const g=CVC.getContext("2d");g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);
-  const padL=44,padR=16,padT=16,padB=30,iw=W-padL-padR,ih=H-padT-padB;
+  const padL=44,padR=16,padT=16,padB=50,iw=W-padL-padR,ih=H-padT-padB;
   const tokMax=(SERIES[SERIES.length-1].ageH)||1, AGE_LO=0.15, maxBinHi=CORR[CORR.length-1].hi;
   const AGE_HI=Math.min(maxBinHi,Math.max(tokMax*1.4,4));
   const lx=(a)=>Math.log10(Math.max(AGE_LO,a)), x0=lx(AGE_LO), x1=lx(AGE_HI);
@@ -321,7 +322,11 @@ function drawCorridorChart(hoverIdx=-1){
     g.fillStyle="rgba(200,255,77,.11)";g.strokeStyle="rgba(200,255,77,.32)";g.lineWidth=1;
     g.beginPath();g.rect(x+0.5,yT,xw-1.5,yB-yT);g.fill();g.stroke();
     g.strokeStyle="rgba(200,255,77,.55)";g.setLineDash([4,3]);g.beginPath();g.moveTo(x+0.5,yOf(b.med));g.lineTo(x+xw-1,yOf(b.med));g.stroke();g.setLineDash([]);
-    g.fillStyle="#7f7f88";g.textAlign="center";g.font="10px Inter,system-ui,sans-serif";g.fillText("→"+ageLab(b.hi),x+xw/2,H-10);
+    // stage label + the concrete winner target at this age (wallets + market cap)
+    const cx=x+xw/2; g.textAlign="center";
+    g.fillStyle="#9aa091";g.font="10px Inter,system-ui,sans-serif";g.fillText("by "+ageLab(b.hi),cx,H-36);
+    if(b.tw&&xw>46){ g.fillStyle="#c8ff4d";g.font="600 10.5px Inter,system-ui,sans-serif";g.fillText("~"+wShort(b.tw)+" wallets",cx,H-21);
+      g.fillStyle="#8f9a86";g.font="10px Inter,system-ui,sans-serif";g.fillText(mcT(b.tm),cx,H-7); }
   }
   // token trajectory line through the cone, coloured by inside / below / failing
   g.lineWidth=2.6;
@@ -344,8 +349,10 @@ function onHoverCor(e){
   let idx=0,best=1e18; for(let i=0;i<GEOC.pts.length;i++){const d=Math.abs(GEOC.pts[i].ageH-age);if(d<best){best=d;idx=i;}}
   const s=GEOC.pts[idx]; drawCorridorChart(idx);
   const st=corStatus(s), col=CORCOL[st], LB={ontrack:"on the winner path",behind:"below the band",failing:"failing",na:""};
-  TIPC.innerHTML=`<div class="d">${ageLab(s.ageH)} old</div><b style="color:${col}">trajectory ${s.traj}</b> · ${LB[st]}<br>
-    <span style="color:var(--mute)">${(s.wallets||0).toLocaleString()} wallets · blueprint ${s.blueprint} · top10 ${s.top10}%</span>`;
+  const b=corBinAt(s.ageH);
+  TIPC.innerHTML=`<div class="d">at ${ageLab(s.ageH)} old</div><b style="color:${col}">trajectory ${s.traj}</b> · ${LB[st]}<br>
+    <span style="color:var(--dim)">this token: ${(s.wallets||0).toLocaleString()} wallets · ${mcT(s.mcap)}</span>
+    ${b&&b.tw?`<br><span style="color:var(--lime)">winners here: ~${b.tw.toLocaleString()} wallets · ${mcT(b.tm)}</span>`:""}`;
   TIPC.style.display="block";
   const x=GEOC.xOf(s.ageH), tw=TIPC.offsetWidth;
   TIPC.style.left=Math.max(6,Math.min(CVC.clientWidth-tw-6,x-tw/2))+"px"; TIPC.style.top="12px";
