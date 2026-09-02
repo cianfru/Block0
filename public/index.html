@@ -64,6 +64,16 @@
   .ftrack{height:5px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:2px}
   .ffill{height:100%;border-radius:3px}
 
+  /* deployer track record */
+  .depwrap{border:1px solid var(--line);border-radius:13px;background:var(--glass);padding:13px 15px;margin-top:14px}
+  .dephead{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
+  .depbadge{font-size:.68rem;font-weight:800;letter-spacing:.05em;padding:4px 9px;border-radius:7px}
+  .depmeta{font-size:.86rem;color:var(--dim)} .depmeta b{color:var(--tx)}
+  .depaddr{margin-left:auto;font-family:ui-monospace,monospace;font-size:.74rem;color:var(--mute)}
+  .depchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
+  .depchip{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--tx)}
+  .depchip:hover{border-color:var(--line-2)} .depchip .dm{color:var(--mute);font-weight:500}
+  .depnote{font-size:.8rem;color:var(--mute);margin-top:9px}
   /* placement: blueprint / corridor / ladder */
   .place{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:14px}
   .pcard{border:1px solid var(--line);border-radius:14px;background:var(--glass);padding:15px 16px}
@@ -141,6 +151,21 @@ function meter(k,v,detail){const c=sev(v);return `<div class="fac"><div class="f
 const DRV={concentration:"top-heavy — a few wallets hold the float",dumping:"insiders are selling into the market now",
   bundles:"coordinated same-block buying at launch",snipers:"heavy block-0 sniping",deployer:"the deployer still holds a big bag"};
 
+function deployerCard(r){
+  const d=r.deployer; if(!d) return "";
+  const REP={proven:["PROVEN BUILDER","var(--lime)","has graduated a token before"],
+    serial:["SERIAL LAUNCHER","var(--coral)","many launches, none graduated"],
+    repeat:["REPEAT DEPLOYER","var(--amber)","has launched before"],
+    first:["FIRST LAUNCH","var(--mute)","no prior launches Block0 has seen"]};
+  const t=REP[d.reputation]||REP.first;
+  const chips=(d.others||[]).map(o=>`<a class="depchip" href="/token?address=${o.address}">${o.sym}${o.graduated?'<span style="color:var(--cyan)"> ◆</span>':''} <span class="dm">${mcT(o.mcapUsd)}</span></a>`).join("");
+  return `<div class="depwrap">
+    <div class="dephead"><span class="depbadge" style="color:#08080b;background:${t[1]}">${t[0]}</span>
+      <span class="depmeta"><b>${d.launched}</b> launch${d.launched>1?'es':''} · <b style="color:${d.graduated?'var(--cyan)':'var(--mute)'}">${d.graduated}</b> graduated — ${t[2]}</span>
+      <span class="depaddr" title="deployer">${short(d.address)}</span></div>
+    ${chips?`<div class="depchips">${chips}</div>`:`<div class="depnote">This is the only launch Block0 has seen from this wallet.</div>`}
+  </div>`;
+}
 function placement(r){
   if(r.graduated){
     return `<div class="place"><div class="pcard" style="grid-column:1/-1">
@@ -218,6 +243,7 @@ function render(r){
 
     <h2 class="sec">What's under the hood</h2>
     <div class="facs">${facs}</div>
+    ${deployerCard(r)}
 
     <h2 class="sec">${r.graduated?"Status":"Where it stands vs the winners"}</h2>
     ${placement(r)}

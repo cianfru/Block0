@@ -20,9 +20,29 @@ async function ponsMetaAll() {
   return _metaCache.items;
 }
 
+// Deployer track record — RPC-free, from Pons's own `deployer` field: every other launch by the same wallet.
+// This is the "is this a serial rugger or a proven builder" read, and it's always current (no accumulation needed).
+function deployerReputation(all, meta) {
+  const dep = (meta?.deployer || "").toLowerCase();
+  if (!dep || /^0x0+$/.test(dep)) return null;
+  const mine = all.filter((t) => (t.deployer || "").toLowerCase() === dep);
+  const others = mine.filter((t) => (t.address || "").toLowerCase() !== (meta.address || "").toLowerCase());
+  const graduated = mine.filter((t) => t.graduated).length;
+  const launched = mine.length;
+  // classification: a prior graduation is a genuine positive; many launches with none is a caution.
+  const rep = graduated >= 1 ? "proven" : launched >= 3 ? "serial" : launched >= 2 ? "repeat" : "first";
+  return {
+    address: dep, launched, graduated,
+    reputation: rep,
+    others: others.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0)).slice(0, 8)
+      .map((t) => ({ sym: t.sym, address: t.address, mcapUsd: Math.round(t.mcapUsd || 0), graduated: !!t.graduated })),
+  };
+}
+
 export async function tokenDossier(address) {
   address = address.toLowerCase();
-  const meta = (await ponsMetaAll()).find((t) => (t.address || "").toLowerCase() === address) || null;
+  const all = await ponsMetaAll();
+  const meta = all.find((t) => (t.address || "").toLowerCase() === address) || null;
   // full on-chain read incl. the whale/holder table (who's buying, who's selling now)
   const r = await computeIntel(address, meta?.sym || "?", {
     pool: meta?.pool, mcapUsd: meta?.mcapUsd, graduated: meta?.graduated, launchedAt: meta?.launchedAt, whales: true,
@@ -48,5 +68,6 @@ export async function tokenDossier(address) {
   r.buyers = whales.filter((w) => w.net > 0).sort((a, b) => b.net - a.net).slice(0, 12);
   r.sellers = whales.filter((w) => w.net < 0).sort((a, b) => a.net - b.net).slice(0, 12);
   r.topHolders = whales.slice().sort((a, b) => b.bal - a.bal).slice(0, 12);
+  r.deployer = deployerReputation(all, meta); // deployer track record (other launches by the same wallet)
   return r;
 }
