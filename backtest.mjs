@@ -86,6 +86,7 @@ export async function backtest(addr, opts = {}) {
   const bal = new Map();
   const recent = []; let rs0 = 0; // rolling 30-min send window for live-dumping, front-trimmed by pointer
   const series = [];
+  const buyers = new Set(); let volAccum = 0; // cumulative UNIQUE buyer wallets + per-bucket buy volume (tokens)
   const snap = (T) => {
     while (rs0 < recent.length && recent[rs0].ts < T - 1800) rs0++;
     let held = 0, sniperHeld = 0, bundleHeld = 0, creatorBal = 0; const bags = [];
@@ -96,13 +97,15 @@ export async function backtest(addr, opts = {}) {
     for (let i = rs0; i < recent.length; i++) { const r = recent[i]; if (r.ts <= T && insiderSet.has(r.w)) { dump += r.amt; sellers.add(r.w); } }
     const pct = (x) => +(x / held * 100).toFixed(2);
     const r = computeRisk({ f_snipe: pct(sniperHeld), f_bundle: pct(bundleHeld), f_top10: pct(top10), f_creator: pct(creatorBal), f_dumpNow: +(dump / held * 100).toFixed(2), nBundles, nSnipers: snipers.size, nSellers: sellers.size, grad });
-    series.push({ t: Math.round(T), risk: r.risk, label: r.label, top10: pct(top10), sniperHeld: pct(sniperHeld), holders: bags.length, bundles: nBundles, topFactor: r.topFactor, price: null });
+    series.push({ t: Math.round(T), risk: r.risk, label: r.label, top10: pct(top10), sniperHeld: pct(sniperHeld), holders: bags.length, wallets: buyers.size, bundles: nBundles, topFactor: r.topFactor, volTok: +volAccum.toFixed(2), price: null });
+    volAccum = 0;
   };
   let bi = 0;
   for (const e of sorted) {
     while (bi < bounds.length && e.ts > bounds[bi]) snap(bounds[bi++]);
     if (!isInfra(e.from)) { bal.set(e.from, (bal.get(e.from) || 0) - e.amt); recent.push({ ts: e.ts, w: e.from, amt: e.amt }); }
     if (!isInfra(e.to)) bal.set(e.to, (bal.get(e.to) || 0) + e.amt);
+    if (isBuy(e) && !isInfra(e.to)) { buyers.add(e.to); volAccum += e.amt; } // a real buy from the pool → unique wallet + volume
   }
   while (bi < bounds.length) snap(bounds[bi++]);
 
@@ -120,10 +123,16 @@ export async function backtest(addr, opts = {}) {
   }
   let last = null; for (let k = 0; k < prices.length; k++) { if (prices[k] != null) last = prices[k]; else prices[k] = last; }
   let next = null; for (let k = prices.length - 1; k >= 0; k--) { if (prices[k] != null) next = prices[k]; else prices[k] = next; }
-  for (let k = 0; k < series.length; k++) series[k].price = prices[k];
+  // total supply (once) → market cap = price × supply; USD volume = token volume × price
+  let supply = 0; try { supply = Number(big(await rpc("eth_call", [{ to: addr, data: "0x18160ddd" }, "latest"]).catch(() => "0x0"))) / 1e18; } catch { /* */ }
+  for (let k = 0; k < series.length; k++) {
+    series[k].price = prices[k];
+    series[k].mcap = prices[k] != null && supply ? Math.round(prices[k] * supply) : null;
+    series[k].volUsd = prices[k] != null ? Math.round(series[k].volTok * prices[k]) : null;
+  }
 
   return {
-    addr, sym: opts.sym, graduated: grad, points: series.length, ethUsd,
+    addr, sym: opts.sym, graduated: grad, points: series.length, ethUsd, supply,
     firstPoolBlock: firstPool, snipers: snipers.size, bundles: nBundles,
     t0, t1, transfers: sorted.length, series,
   };
