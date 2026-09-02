@@ -36,12 +36,16 @@ async function pullWithHash(addr, cap = 400000) {
   return ev;
 }
 
-// price of one swap tx = quote paid (WETH×ethUsd or USDG) ÷ token received/sent, from its receipt logs
-async function swapPrice(hash, addr, ethUsd) {
+// price of one swap tx = quote paid (WETH×ethUsd or USDG) ÷ token moved, from its receipt logs. Only legs that
+// TOUCH THE POOL count — otherwise an aggregator/multi-swap tx's unrelated WETH leg over a tiny token amount
+// produces a phantom 100× price spike. The quote and token legs must both be the swap's own pool legs.
+async function swapPrice(hash, addr, ethUsd, venues) {
   const rc = await rpc("eth_getTransactionReceipt", [hash]).catch(() => null);
   let tok = 0, quote = 0;
   for (const l of rc?.logs || []) {
-    if ((l.topics?.[0] || "") !== TRANSFER) continue;
+    if ((l.topics?.[0] || "") !== TRANSFER || (l.topics || []).length !== 3) continue;
+    const from = "0x" + l.topics[1].slice(26).toLowerCase(), to = "0x" + l.topics[2].slice(26).toLowerCase();
+    if (!venues.has(from) && !venues.has(to)) continue; // not a pool leg → ignore
     const a = l.address.toLowerCase(), v = Number(big(l.data));
     if (a === addr) tok = Math.max(tok, v / 1e18);
     else if (a === USDG) quote = Math.max(quote, v / 1e6);
@@ -118,8 +122,15 @@ export async function backtest(addr, opts = {}) {
   for (let k = 0; k < buckets.length; k++) {
     const arr = buckets[k]; if (!arr.length) continue;
     arr.sort((a, b) => a.amt - b.amt);
-    const p = await swapPrice(arr[Math.floor(arr.length / 2)].hash, addr, ethUsd);
+    const p = await swapPrice(arr[Math.floor(arr.length / 2)].hash, addr, ethUsd, venues);
     if (p) prices[k] = p;
+  }
+  // local-outlier guard: a real price trends across buckets; a >6× jump vs the local median of sampled prices is
+  // a bad receipt (multi-token tx), so drop it before filling.
+  const sampled = prices.map((p, i) => ({ p, i })).filter((x) => x.p != null);
+  for (const x of sampled) {
+    const win = sampled.filter((y) => y !== x && Math.abs(y.i - x.i) <= 4).map((y) => y.p).sort((a, b) => a - b);
+    if (win.length >= 3) { const med = win[Math.floor(win.length / 2)]; if (x.p > med * 6 || x.p < med / 6) prices[x.i] = null; }
   }
   let last = null; for (let k = 0; k < prices.length; k++) { if (prices[k] != null) last = prices[k]; else prices[k] = last; }
   let next = null; for (let k = prices.length - 1; k >= 0; k--) { if (prices[k] != null) next = prices[k]; else prices[k] = next; }
