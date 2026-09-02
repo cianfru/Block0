@@ -106,34 +106,42 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const pct = (x) => +(x / held * 100).toFixed(1);
   const f_snipe = pct(sniperHeld), f_bundle = pct(bundleHeld), f_top10 = pct(top10), f_creator = pct(creatorBal);
   const f_dumpNow = +(insiderDumpNow / held * 100).toFixed(2);
-  // Risk = five interpretable sub-scores, each 0–100, so the card can show WHY a token scores what it does
-  // (no opaque min() caps). Each measures held SUPPLY share, not raw counts, so one small wallet can't spike it.
+  // Risk = five interpretable sub-scores, each 0–100 (curve/pool excluded, so shares are of the REAL distributed
+  // float). The card shows every sub-score, so the number is always explainable. Two DISQUALIFYING FLOORS sit on
+  // top: a single fact that makes a token un-apeable — near-total concentration, or insiders selling right now —
+  // elevates risk regardless of the average, because a weighted mean alone can't let one true red flag win.
   const grad = !!opts.graduated;
   const clamp = (x) => Math.max(0, Math.min(100, x));
   const parts = {
     // coordinated same-block first-buyers — the strongest insider tell. Held share dominates; count adds a little.
     bundles: Math.round(clamp(f_bundle * 3 + bundles.length * 12)),
-    // fast block-0/near-launch buyers: how much supply they STILL hold (count secondary, only past a handful)
-    snipers: Math.round(clamp(f_snipe * 2 + Math.max(0, sniperW.length - 4) * 3)),
-    // capital concentration in the top 10 — softened pre-graduation (a bonding curve concentrates by design:
-    // ~45% top-10 is normal for a cooking token; post-graduation the bar tightens to ~20%).
-    concentration: Math.round(clamp((f_top10 - (grad ? 20 : 45)) * 1.6)),
+    // fast early buyers: held share + a bump for MANY of them (coordination). A lone early buyer's grab is mostly
+    // just concentration (measured below), so held share is weighted gently and count past ~3 is what escalates.
+    snipers: Math.round(clamp(f_snipe * 0.9 + Math.max(0, sniperW.length - 3) * 8)),
+    // capital concentration in the top-10 real holders. Baseline ~25% (cooking) / ~15% (graduated) reads as 0.
+    concentration: Math.round(clamp((f_top10 - (grad ? 15 : 25)) * 1.5)),
     // insiders (snipers/bundles) selling in the last 30 min — a live exit in progress
     dumping: Math.round(clamp(f_dumpNow * 4 + insiderSellers * 10)),
     // the deployer's own remaining bag
     deployer: Math.round(clamp(f_creator * 3)),
   };
-  // Weights differ pre/post graduation. A fresh launch is about WHO got in (bundles/snipers) + who's exiting now;
-  // a graduated token is about how concentrated the float has stayed. Weights sum to 1 → risk is a clean 0–100.
+  // Weights differ pre/post graduation. Concentration is the master signal on both; a fresh launch also cares
+  // who got in (bundles) and who's exiting, a graduated token cares most about how concentrated the float stayed.
   const w = grad
-    ? { bundles: 0.12, snipers: 0.15, concentration: 0.40, dumping: 0.25, deployer: 0.08 }
-    : { bundles: 0.28, snipers: 0.22, concentration: 0.18, dumping: 0.22, deployer: 0.10 };
-  const risk = Math.round(clamp(
-    parts.bundles * w.bundles + parts.snipers * w.snipers + parts.concentration * w.concentration
-    + parts.dumping * w.dumping + parts.deployer * w.deployer));
+    ? { concentration: 0.42, dumping: 0.28, bundles: 0.10, snipers: 0.12, deployer: 0.08 }
+    : { concentration: 0.30, bundles: 0.24, dumping: 0.22, snipers: 0.16, deployer: 0.08 };
+  const weighted = parts.bundles * w.bundles + parts.snipers * w.snipers + parts.concentration * w.concentration
+    + parts.dumping * w.dumping + parts.deployer * w.deployer;
+  // disqualifying floors: one wallet owning ~everything, or insiders actively dumping, can't read "clean"
+  const concFloor = f_top10 >= 92 ? 72 : f_top10 >= 82 ? 55 : f_top10 >= 72 ? 40 : 0;
+  const dumpFloor = insiderSellers >= 2 ? 58 : f_dumpNow >= 20 ? 50 : 0;
+  const floor = Math.max(concFloor, dumpFloor);
+  const risk = Math.round(clamp(Math.max(weighted, floor)));
   const label = risk >= 66 ? "HIGH RISK" : risk >= 45 ? "CAUTION" : risk >= 25 ? "MIXED" : "LOOKS CLEANER";
-  // the single biggest contributor, so the UI can lead with the reason ("driven by: bundles")
-  const driver = Object.entries(parts).map(([k, v]) => [k, v * w[k]]).sort((a, b) => b[1] - a[1])[0];
+  // the single biggest reason, so the UI can lead with it ("driven by: concentration")
+  const contrib = { ...Object.fromEntries(Object.keys(parts).map((k) => [k, parts[k] * w[k]])) };
+  if (floor > weighted) contrib[concFloor >= dumpFloor ? "concentration" : "dumping"] = floor;
+  const driver = Object.entries(contrib).sort((a, b) => b[1] - a[1])[0];
   const topFactor = driver && driver[1] > 3 ? driver[0] : null;
   // momentum: recent buy vs sell + holder base + freshness (for ranking "what's heating up")
   const spanH = +((tsMax - tsMin) / 3600).toFixed(1);
