@@ -12,6 +12,15 @@ import { scan, pullTransfers, detectPool, ROUTERS } from "./engine.mjs";
 import { latestBlock } from "./rpc.mjs";
 import { watchLogs, WS_ENABLED } from "./ws.mjs";
 import { refreshBoard, getBoard, ensureFresh } from "./board.mjs";
+import { backtest } from "./backtest.mjs";
+import { fetchActive, fetchGraduated } from "./pons.mjs";
+
+// find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
+const _btCache = new Map();
+async function ponsMeta(token) {
+  const [a, g] = await Promise.all([fetchActive({ pageSize: 400 }).catch(() => ({ items: [] })), fetchGraduated().catch(() => ({ items: [] }))]);
+  return [...(a.items || []), ...(g.items || [])].find((t) => t.address === token) || null;
+}
 
 // background discover-board: scan every live launch, verdict + market-cap-bucket, keep a ranked cache
 const BOARD_REFRESH_MS = Number(process.env.BOARD_REFRESH_MS || 180000);
@@ -100,6 +109,22 @@ createServer(async (req, res) => {
       }
       res.writeHead(200, { "content-type": "application/json" });
       return res.end(JSON.stringify({ q, count: matches.length, matches, probes }, null, 2));
+    }
+
+    if (u.pathname === "/api/backtest") {
+      const token = (u.searchParams.get("token") || "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(token)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?token=0x…"}'); }
+      const points = Number(u.searchParams.get("points") || 90), ethUsd = Number(u.searchParams.get("eth") || 3000);
+      const key = `${token}:${points}:${ethUsd}`;
+      if (!_btCache.has(key)) {
+        const meta = await ponsMeta(token);
+        _btCache.set(key, backtest(token, { sym: meta?.sym || u.searchParams.get("sym") || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd })
+          .then((r) => ({ ...r, name: meta?.name, logo: meta?.logo, mcapUsd: meta?.mcapUsd, priceUsd: meta?.priceUsd }))
+          .catch((e) => { _btCache.delete(key); throw e; }));
+      }
+      const out = await _btCache.get(key);
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify(out));
     }
 
     if (u.pathname === "/api/board") {
