@@ -1,16 +1,22 @@
 // Minimal, dependency-free JSON-RPC client. Works with any EVM RPC URL (set RPC_URL on Railway to your
 // Alchemy/QuickNode key). Falls back to public drpc endpoints so the POC runs with no key. drpc + mevblocker
 // enrich logs with blockTimestamp, so we get the time of every transfer without a separate block fetch.
-const ENV_RPC = (process.env.RPC_URL || "").trim();
-// Default to the native Robinhood-chain public RPC (verified: chain 4663, serves 10k-block eth_getLogs ranges
-// for free). Set RPC_URL to override (e.g. Alchemy). The old Ethereum-mainnet drpc default was a POC leftover.
-const RPCS = ENV_RPC ? [ENV_RPC] : ["https://rpc.mainnet.chain.robinhood.com"];
-const UA = { "content-type": "application/json", "user-agent": "curl/8.5.0" };
-export const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
+const NATIVE_RPC = "https://rpc.mainnet.chain.robinhood.com";
+// RPC_URL may be a single URL or a comma-separated list (primary first, then fallbacks) — redundancy so one
+// endpoint's hiccup/throttle doesn't take the product down. Default is the native Robinhood-chain public RPC
+// (verified: chain 4663, serves 10k-block eth_getLogs ranges for free).
+const ENV_RPCS = (process.env.RPC_URL || "").split(",").map((s) => s.trim()).filter(Boolean);
+const PRIMARY = ENV_RPCS[0] || NATIVE_RPC;
 // Alchemy's free tier caps eth_getLogs to a 10-block range, so on Alchemy we pull via the enhanced,
 // range-uncapped alchemy_getAssetTransfers endpoint instead. Any other RPC (incl. the native RH node) uses
-// eth_getLogs, which the RH node serves in wide ranges — so this is the free path.
-export const PROVIDER = /alchemy\.com/i.test(ENV_RPC) ? "alchemy" : "generic";
+// eth_getLogs, which the RH node serves in wide ranges. Provider is fixed by the PRIMARY endpoint, because the
+// transfer-pull method is provider-specific — so fallbacks should be the SAME provider kind as the primary.
+export const PROVIDER = /alchemy\.com/i.test(PRIMARY) ? "alchemy" : "generic";
+// Assemble the rotation: the configured endpoints, plus the native RH node as a last-resort GENERIC fallback
+// (only when we're already on the generic path — never mix a generic node into an Alchemy-enhanced rotation).
+const RPCS = [...new Set([...(ENV_RPCS.length ? ENV_RPCS : [NATIVE_RPC]), ...(PROVIDER === "generic" ? [NATIVE_RPC] : [])])];
+const UA = { "content-type": "application/json", "user-agent": "curl/8.5.0" };
+export const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 export const LOGS_RANGE = Number(process.env.LOGS_RANGE || 8000); // generic-RPC eth_getLogs span (RH serves 10k)
 
 let rid = 1;
