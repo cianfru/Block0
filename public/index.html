@@ -246,6 +246,7 @@ function render(r){
       </div>
       <div style="position:relative"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
       <div class="chnote" id="chnote" hidden></div>
+      <div class="corcap" id="pricewarn" hidden></div>
     </div>
 
     <h2 class="sec">Who's in it</h2>
@@ -274,6 +275,10 @@ async function loadHistory(r){
       $("#corverdict").innerHTML=""; return; }
     SERIES=bt.series.map(s=>({t:s.t,risk:s.risk,label:s.label,mcap:s.mcap,price:s.price,wallets:s.wallets,volUsd:s.volUsd,holders:s.holders,top10:s.top10,ageH:s.ageH,traj:s.traj,blueprint:s.blueprint}));
     CORR=bt.corridor||[];
+    const pw=$("#pricewarn");
+    if(bt.priceRough){ pw.hidden=false; pw.innerHTML='⚠ <b style="color:var(--amber)">Rough price reconstruction.</b> The level is pinned to the current market cap, but the shape over time is uncertain for this token — read valuation as approximate.'; }
+    else if(bt.priceAnchor){ pw.hidden=false; pw.innerHTML='Price &amp; market cap are swap-implied and <b style="color:var(--dim)">pinned to the live market cap</b> at the latest point; treat exact figures as estimates.'; }
+    else pw.hidden=true;
     drawChart(); wireChart();
     if(CORR.length){ drawCorridorChart(); wireCorridor(); setCorVerdict(); }
     else { $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="Winner corridor model not loaded."; }

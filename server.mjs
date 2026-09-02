@@ -23,6 +23,28 @@ async function ponsMeta(token) {
   return [...(a.items || []), ...(g.items || [])].find((t) => t.address === token) || null;
 }
 
+// Price-safety: the history's mcap/price is a swap-implied RECONSTRUCTION; Pons gives the authoritative CURRENT
+// market cap. Anchor the reconstruction so its latest point matches Pons — this folds out any absolute-level error
+// (wrong decimals / supply — the class of bug that once showed a $367M phantom) while keeping the honest RELATIVE
+// trajectory. If the pre-anchor level was wildly off (>20×), the shape is suspect too → flag priceRough so the UI
+// can caption it. Never invent: with no Pons mcap or no reconstructed level, we leave the series untouched.
+function anchorToPons(r, ponsMcap) {
+  if (!r || !Array.isArray(r.series) || !ponsMcap || ponsMcap <= 0) return r;
+  let lastMcap = null;
+  for (let i = r.series.length - 1; i >= 0; i--) { const m = r.series[i].mcap; if (m != null && isFinite(m) && m > 0) { lastMcap = m; break; } }
+  if (!lastMcap) return r;
+  const ratio = ponsMcap / lastMcap;
+  if (!isFinite(ratio) || ratio <= 0) return r;
+  r.priceAnchor = +ratio.toFixed(4);
+  r.priceRough = ratio > 20 || ratio < 0.05; // reconstruction level was far off Pons — treat the shape as rough
+  for (const s of r.series) {
+    if (s.mcap != null) s.mcap = Math.round(s.mcap * ratio);
+    if (s.price != null) s.price = s.price * ratio;
+    if (s.volUsd != null) s.volUsd = Math.round(s.volUsd * ratio);
+  }
+  return r;
+}
+
 // background discover-board: scan every live launch, verdict + market-cap-bucket, keep a ranked cache
 const BOARD_REFRESH_MS = Number(process.env.BOARD_REFRESH_MS || 180000);
 refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {});
@@ -90,7 +112,7 @@ createServer(async (req, res) => {
       if (!_btCache.has(key)) {
         const meta = await ponsMeta(token);
         _btCache.set(key, backtest(token, { sym: meta?.sym || u.searchParams.get("sym") || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd, noPrice, cap })
-          .then((r) => ({ ...r, name: meta?.name, logo: meta?.logo, mcapUsd: meta?.mcapUsd, priceUsd: meta?.priceUsd }))
+          .then((r) => anchorToPons({ ...r, name: meta?.name, logo: meta?.logo, mcapUsd: meta?.mcapUsd, priceUsd: meta?.priceUsd }, meta?.mcapUsd))
           .catch((e) => { _btCache.delete(key); throw e; }));
       }
       const out = await _btCache.get(key);
