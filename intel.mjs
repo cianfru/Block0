@@ -98,26 +98,42 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const pct = (x) => +(x / held * 100).toFixed(1);
   const f_snipe = pct(sniperHeld), f_bundle = pct(bundleHeld), f_top10 = pct(top10), f_creator = pct(creatorBal);
   const f_dumpNow = +(insiderDumpNow / held * 100).toFixed(2);
-  // Risk is GRADUATION-AWARE. Pre-graduation, concentration is expected (the bonding curve + a handful of early
-  // holders naturally hold most supply), so it barely counts — the real danger is who SNIPED, whether wallets
-  // are BUNDLED, the DEPLOYER's bag, and anyone dumping NOW. Post-graduation, concentration matters again. We
-  // also weight the COUNT of snipers/bundles/dumpers, not just their held %.
+  // Risk = five interpretable sub-scores, each 0–100, so the card can show WHY a token scores what it does
+  // (no opaque min() caps). Each measures held SUPPLY share, not raw counts, so one small wallet can't spike it.
   const grad = !!opts.graduated;
-  const concW = grad ? 0.40 : 0.10;
-  const risk = Math.min(100, Math.round(
-    concW * f_top10
-    + Math.min(30, 1.0 * f_snipe + (sniperW.length > 8 ? 8 : 0))
-    + Math.min(30, 1.0 * f_bundle + (bundles.length > 2 ? 6 : 0))
-    + Math.min(45, 3 * f_dumpNow + insiderSellers * 4)
-    + Math.min(18, 0.6 * f_creator)));
+  const clamp = (x) => Math.max(0, Math.min(100, x));
+  const parts = {
+    // coordinated same-block first-buyers — the strongest insider tell. Held share dominates; count adds a little.
+    bundles: Math.round(clamp(f_bundle * 3 + bundles.length * 12)),
+    // fast block-0/near-launch buyers: how much supply they STILL hold (count secondary, only past a handful)
+    snipers: Math.round(clamp(f_snipe * 2 + Math.max(0, sniperW.length - 4) * 3)),
+    // capital concentration in the top 10 — softened pre-graduation (a bonding curve concentrates by design:
+    // ~45% top-10 is normal for a cooking token; post-graduation the bar tightens to ~20%).
+    concentration: Math.round(clamp((f_top10 - (grad ? 20 : 45)) * 1.6)),
+    // insiders (snipers/bundles) selling in the last 30 min — a live exit in progress
+    dumping: Math.round(clamp(f_dumpNow * 4 + insiderSellers * 10)),
+    // the deployer's own remaining bag
+    deployer: Math.round(clamp(f_creator * 3)),
+  };
+  // Weights differ pre/post graduation. A fresh launch is about WHO got in (bundles/snipers) + who's exiting now;
+  // a graduated token is about how concentrated the float has stayed. Weights sum to 1 → risk is a clean 0–100.
+  const w = grad
+    ? { bundles: 0.12, snipers: 0.15, concentration: 0.40, dumping: 0.25, deployer: 0.08 }
+    : { bundles: 0.28, snipers: 0.22, concentration: 0.18, dumping: 0.22, deployer: 0.10 };
+  const risk = Math.round(clamp(
+    parts.bundles * w.bundles + parts.snipers * w.snipers + parts.concentration * w.concentration
+    + parts.dumping * w.dumping + parts.deployer * w.deployer));
   const label = risk >= 66 ? "HIGH RISK" : risk >= 45 ? "CAUTION" : risk >= 25 ? "MIXED" : "LOOKS CLEANER";
+  // the single biggest contributor, so the UI can lead with the reason ("driven by: bundles")
+  const driver = Object.entries(parts).map(([k, v]) => [k, v * w[k]]).sort((a, b) => b[1] - a[1])[0];
+  const topFactor = driver && driver[1] > 3 ? driver[0] : null;
   // momentum: recent buy vs sell + holder base + freshness (for ranking "what's heating up")
   const spanH = +((tsMax - tsMin) / 3600).toFixed(1);
   const netR = buyR - sellR;
   const momentum = Math.round(Math.max(-100, Math.min(100, (netR / held * 100) * 6 + (holders.length > 50 ? 10 : 0))));
 
   const out = { sym, address: addr, pool, updated: Date.now(), latestBlock: latest, ageH: spanH, ms: Date.now() - t0ms,
-    risk, label, momentum,
+    risk, label, momentum, parts, topFactor, graduated: grad,
     flags: { snipers: sniperW.length, sniperHeldPct: f_snipe, bundles: bundles.length, bundleWallets: bundleSet.size, bundleHeldPct: f_bundle,
       top10Pct: f_top10, holders: holders.length, creatorPct: f_creator, insiderDumpNowPct: f_dumpNow, insiderSellersNow: insiderSellers,
       buysRecent: buys, sellsRecent: sells } };
