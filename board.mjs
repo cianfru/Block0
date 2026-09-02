@@ -7,7 +7,7 @@
 //                 The "get in before it graduates" zone. (Active tokens cap ~$40k and graduate at 4.2 ETH.)
 //   • graduated — the ~510 tokens that completed the curve: the investable universe, ranked by market cap.
 // The ~4.2M dead-dust launches never appear — we only verdict what the launchpad surfaces as live/graduated.
-import { computeIntel } from "./intel.mjs";
+import { computeIntel, blueprintMatch, blueprintLabel } from "./intel.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { keep, storeStats } from "./store.mjs";
 
@@ -26,6 +26,8 @@ async function verdict(meta) {
   r.name = meta.name; r.logo = meta.logo; r.progress = meta.progress; r.graduated = meta.graduated;
   r.launchedAt = meta.launchedAt; r.mcapUsd = Math.round(meta.mcapUsd || r.mcapUsd || 0);
   r.ape = apeScore(r);
+  r.blueprint = blueprintMatch({ bundles: r.flags.bundles, top10Pct: r.flags.top10Pct, holders: r.flags.holders, risk: r.risk });
+  r.blueprintLabel = blueprintLabel(r.blueprint);
   const known = FIRST_SEEN.has(r.address); if (!known) FIRST_SEEN.set(r.address, Date.now());
   r.firstSeenAt = FIRST_SEEN.get(r.address); r.isNew = BOOTED && !known;
   return r;

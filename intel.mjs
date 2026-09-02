@@ -90,6 +90,20 @@ export function bucketOf(mcap) {
   return { key: "graduated", label: ">$10M · graduated", monitor: "ondemand", tier: 4 };
 }
 
+// "Blueprint match" 0–100 — how well a token fits the winner fingerprint extracted from the top graduated
+// cohort (see the Success Blueprint study). Validated discriminators, in order of weight: NO bundles (the veto),
+// a float that isn't stuck in a few hands, a clean/settled risk, and real holder adoption. Deliberately does NOT
+// reward low sniper-held — the cohort showed heavy early snipers were survivable; bundles are what kill.
+export function blueprintMatch({ bundles = 0, top10Pct = 100, holders = 0, risk = 100 }) {
+  let s = 0;
+  s += bundles === 0 ? 40 : bundles === 1 ? 12 : 0;                                   // bundles = the hard veto
+  s += top10Pct <= 40 ? 25 : top10Pct <= 60 ? 16 : top10Pct <= 80 ? 7 : 0;            // float opened up
+  s += risk < 25 ? 20 : risk < 45 ? 10 : 0;                                           // score settled clean
+  s += holders >= 200 ? 15 : holders >= 80 ? 10 : holders >= 30 ? 5 : 0;              // real adoption
+  return Math.round(Math.max(0, Math.min(100, s)));
+}
+export const blueprintLabel = (m) => m >= 75 ? "STRONG FIT" : m >= 55 ? "PARTIAL FIT" : m >= 35 ? "WEAK FIT" : "OFF-BLUEPRINT";
+
 export async function computeIntel(addr, sym = "?", opts = {}) {
   addr = addr.toLowerCase();
   const t0ms = Date.now();
