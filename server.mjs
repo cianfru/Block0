@@ -14,6 +14,7 @@ import { watchLogs, WS_ENABLED } from "./ws.mjs";
 import { refreshBoard, getBoard, ensureFresh } from "./board.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
+import { startAlerts, runAlertScan, ALERTS_ON } from "./alerts.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
@@ -49,6 +50,9 @@ function anchorToPons(r, ponsMcap) {
 const BOARD_REFRESH_MS = Number(process.env.BOARD_REFRESH_MS || 180000);
 refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {});
 setInterval(() => refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {}), BOARD_REFRESH_MS);
+
+// launch alert push (Telegram) — dormant unless TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set
+startAlerts();
 
 const __dir = fileURLToPath(new URL(".", import.meta.url));
 const PORT = process.env.PORT || 8080;
@@ -118,6 +122,16 @@ createServer(async (req, res) => {
       const out = await _btCache.get(key);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(out));
+    }
+
+    if (u.pathname === "/api/alerts/status") {
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ on: ALERTS_ON }));
+    }
+    if (u.pathname === "/api/alerts/scan") { // manual trigger to test the pipeline after setting the bot token
+      const r = await runAlertScan();
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify(r));
     }
 
     if (u.pathname === "/api/validation") {
