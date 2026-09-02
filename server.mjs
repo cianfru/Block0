@@ -79,22 +79,6 @@ createServer(async (req, res) => {
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
 
-    // Temporary: source a WIDE loser/laggard control group from the Pons universe to confirm the blueprint contrast.
-    if (u.pathname === "/api/losers") {
-      const [a, g] = await Promise.all([fetchActive({ pageSize: 500 }).catch(() => ({ items: [] })), fetchGraduated().catch(() => ({ items: [] }))]);
-      const now = Date.now();
-      const ageD = (t) => t.launchedAt ? (now - Date.parse(t.launchedAt)) / 86400000 : 0;
-      const staleD = (t) => (now - Date.parse(t.latestBuyAt || t.launchedAt || 0)) / 86400000;
-      // launched >3d ago, small cap now, no recent buys → had a shot and died
-      const dead = (a.items || []).filter((t) => t.address && ageD(t) > 3 && t.mcapUsd < 12000 && staleD(t) > 1)
-        .sort((x, y) => ageD(y) - ageD(x)).slice(0, 20);
-      // graduated but faded to the bottom of the pack (widened)
-      const faded = (g.items || []).filter((t) => t.address).sort((x, y) => (x.mcapUsd || 0) - (y.mcapUsd || 0)).slice(0, 16);
-      const map = (t, kind) => ({ sym: t.sym, address: t.address, mcapUsd: Math.round(t.mcapUsd || 0), graduated: !!t.graduated, launchedAt: t.launchedAt, pool: t.pool, kind });
-      res.writeHead(200, { "content-type": "application/json" });
-      return res.end(JSON.stringify({ dead: dead.map((t) => map(t, "dead")), faded: faded.map((t) => map(t, "faded")) }, null, 2));
-    }
-
     if (u.pathname === "/api/backtest") {
       const token = (u.searchParams.get("token") || "").toLowerCase();
       if (!/^0x[0-9a-f]{40}$/.test(token)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?token=0x…"}'); }
