@@ -10,9 +10,11 @@ cohort backtests ──► study/*.json ──► model.json
 
 ## Steps
 
-1. **Backtest the cohort** — run `backtest()` on each winner (top graduations) and a loser control set, saving
-   one JSON per token into `winners_full/`, `profiles/`, and `losers/` (plus `board.json`, `losers.json`).
-   This is the only step that needs an RPC, so it runs offline, not in the deploy.
+1. **Backtest the cohort** — `node tools/build-cohort.mjs` picks the winners (top graduations) and a loser control
+   set (aged, low-mcap, non-graduated launches) straight from Pons, backtests each, and writes one JSON per token
+   into `winners_full/`, `profiles/`, and `losers/` (plus `board.json`, `losers.json`). This is the only step that
+   needs an RPC, so it runs offline, not in the deploy. Widen the cohort as the launchpad grows:
+   `node tools/build-cohort.mjs --winners=16 --losers=40`.
 
 2. **Build the study data** (from the scanner root, with the cohort dirs present):
    - `node tools/corridor.mjs`   → `study/corridor_data.json`   — per-age trajectory envelope (winner q1/med/q3 by age bin)
@@ -29,5 +31,10 @@ a model refresh regenerated this way can never silently drop the targets.
 
 ## Refreshing with more graduations later
 
-Re-run step 1 with the larger cohort, then steps 2–3. `model.json` is rewritten with the new ladder, corridor, and
-targets automatically — no manual editing, no lost fields.
+Re-run step 1 with the larger cohort, then steps 2–3, then `node tools/validate.mjs` to re-measure how well the
+signal separates winners from losers on the bigger sample. `model.json` and `study/validation.json` are rewritten
+automatically — no manual editing, no lost fields. The full refresh in one line:
+
+```
+node tools/build-cohort.mjs --winners=16 --losers=40 && node tools/corridor.mjs && node tools/projection.mjs && node tools/gen-model.mjs && node tools/validate.mjs
+```
