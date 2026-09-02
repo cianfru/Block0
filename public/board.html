@@ -141,7 +141,13 @@ function render(){
     $("#board").innerHTML='<div class="state">'+(b&&b.scanning?"Scanning the launch universe — the first pass takes a moment…":"Waiting for the first scan…")+'</div>';return;}
   const cooking=(b.cooking||[]).slice(), grad=(b.graduated||[]).slice();
   if(FILTER==="cooking"){$("#board").innerHTML=section("About to graduate",`${cooking.length} · ranked by bonding-curve progress`,cooking);return;}
-  if(FILTER==="graduated"){$("#board").innerHTML=section("Graduated",`${b.stats&&b.stats.graduatedTotal||grad.length} made it · top by market cap`,grad);return;}
+  if(FILTER==="graduated"){
+    const tiers=[[1e8,"$100M+"],[1e7,"$10M – $100M"],[1e6,"$1M – $10M"],[0,"under $1M"]];
+    let html="";
+    for(let i=0;i<tiers.length;i++){const lo=tiers[i][0],hi=i===0?Infinity:tiers[i-1][0];
+      const rows=grad.filter(r=>(r.mcapUsd||0)>=lo&&(r.mcapUsd||0)<hi);
+      if(rows.length)html+=section(tiers[i][1],`${rows.length} coin${rows.length>1?'s':''}`,rows);}
+    $("#board").innerHTML=html||section("Graduated","none yet",[]);return;}
   let all=cooking.concat(grad);
   if(FILTER==="heating") all.sort((a,b)=>(b.momentum||0)-(a.momentum||0));
   if(FILTER==="safe") all.sort((a,b)=>a.risk-b.risk||(b.ape||0)-(a.ape||0));

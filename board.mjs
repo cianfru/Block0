@@ -13,7 +13,7 @@ import { keep, storeStats } from "./store.mjs";
 
 export const PONS_FACTORIES = ["0x0c37a24f5d23a486fa692d1500881d698b1f77a4", "0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb"];
 const N_ACTIVE = Number(process.env.BOARD_ACTIVE || 16); // pre-graduation tokens to verdict per refresh
-const N_GRAD = Number(process.env.BOARD_GRAD || 10);     // graduated tokens to verdict per refresh
+const N_GRAD = Number(process.env.BOARD_GRAD || 24);     // graduated (higher-MC) tokens to verdict per refresh
 const NEW_MS = 150000;
 
 let CACHE = { updated: 0, scanning: false, cooking: [], graduated: [], stats: {} };
