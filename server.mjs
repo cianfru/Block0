@@ -14,8 +14,10 @@ import { watchLogs, WS_ENABLED } from "./ws.mjs";
 import { refreshBoard, getBoard, ensureFresh } from "./board.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
-import { startAlerts, runAlertScan, ALERTS_ON } from "./alerts.mjs";
+import { startAlerts, runAlertScan, getCalls, ALERTS_ON } from "./alerts.mjs";
+import { KV_BACKEND } from "./store/kv.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
+import { PROVIDER } from "./rpc.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -106,6 +108,25 @@ createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
+
+    if (u.pathname === "/api/status") { // system health/monitoring — board freshness, alert + store state, RPC provider
+      const b = getBoard();
+      const ageMs = b.updated ? Date.now() - b.updated : null;
+      const healthy = !!b.updated && ageMs < BOARD_REFRESH_MS * 3;
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify({
+        ok: healthy, uptimeS: Math.round(process.uptime()),
+        board: { updated: b.updated || null, ageSeconds: ageMs == null ? null : Math.round(ageMs / 1000), scanning: !!b.scanning,
+          cooking: (b.cooking || []).length, graduated: (b.graduated || []).length, store: b.stats?.store || null },
+        rpc: { provider: PROVIDER }, alerts: { on: ALERTS_ON }, storage: { backend: KV_BACKEND },
+      }));
+    }
+
+    if (u.pathname === "/api/alerts/calls") { // the durable track record of past alerts
+      const calls = await getCalls(Number(u.searchParams.get("n") || 100));
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify({ calls }));
+    }
 
     if (u.pathname === "/api/backtest") {
       const token = (u.searchParams.get("token") || "").toLowerCase();

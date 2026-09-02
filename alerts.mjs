@@ -10,6 +10,7 @@
 import { fetchActive } from "./pons.mjs";
 import { computeIntel, blueprintMatch, blueprintLabel } from "./intel.mjs";
 import { pathPosition, liveTrajectory, corridorStatus } from "./model.mjs";
+import { sAdd, sHas, sMembers, lPush, lRange, KV_BACKEND } from "./store/kv.mjs";
 
 const TOKEN = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
 const CHAT = (process.env.TELEGRAM_CHAT_ID || "").trim();
@@ -27,8 +28,17 @@ const CFG = {
 };
 const intervalMs = Number(process.env.ALERT_INTERVAL_MS || 120000);
 
-const alerted = new Set(); // addresses already pushed (in-memory; a datastore makes this durable later)
+const ALERTED_KEY = "alerts:sent", CALLS_KEY = "alerts:calls";
+const alerted = new Set(); // in-memory cache of ALERTED_KEY, hydrated from the durable store at startup
 let seeded = false;        // first pass just learns the current set so a cold start doesn't blast a backlog
+let hydrated = false;
+async function hydrate() {
+  if (hydrated) return; hydrated = true;
+  try { for (const a of await sMembers(ALERTED_KEY)) alerted.add(a); } catch { /* */ }
+  if (alerted.size) seeded = true; // a durable store that already knows tokens means this isn't a cold start
+}
+// the recorded track record of past alerts (durable) — the honest foundation for showing whether calls worked out
+export async function getCalls(n = 100) { return lRange(CALLS_KEY, n); }
 
 async function verdict(meta) {
   const r = await computeIntel(meta.address, meta.sym, { pool: meta.pool, mcapUsd: meta.mcapUsd, graduated: false, launchedAt: meta.launchedAt, whales: false });
@@ -80,6 +90,7 @@ async function sendTelegram(text) {
 
 export async function runAlertScan() {
   if (!ALERTS_ON) return { on: false };
+  await hydrate();
   let fired = 0, checked = 0;
   try {
     const { items } = await fetchActive({ sort: "newest", pageSize: CFG.scan });
@@ -88,8 +99,14 @@ export async function runAlertScan() {
       let r; try { r = await verdict(m); } catch { continue; }
       checked++;
       if (!qualifies(r)) continue;
-      alerted.add(m.address);            // mark before send so a send error can't double-fire on the next pass
-      if (seeded) { try { await sendTelegram(format(r)); fired++; } catch (e) { /* keep marked; log */ console.error("alert send failed", e.message); } }
+      alerted.add(m.address); await sAdd(ALERTED_KEY, m.address); // mark (durably) before send so an error can't double-fire
+      if (seeded) {
+        try {
+          await sendTelegram(format(r)); fired++;
+          await lPush(CALLS_KEY, { address: m.address, sym: r.meta.sym, at: Date.now(), risk: r.risk, blueprint: r.blueprint,
+            corridor: r.corridor?.status || null, mcapAtCall: r.mcapUsd || null, wallets: r.wallets, ageH: r.ageH }, 500);
+        } catch (e) { console.error("alert send failed", e.message); }
+      }
     }
     if (!seeded) { seeded = true; console.log(`[alerts] seeded ${alerted.size} existing tokens (no backlog blast); watching newest ${CFG.scan}/pass`); }
   } catch (e) { console.error("[alerts] scan error", e.message); }
@@ -98,7 +115,7 @@ export async function runAlertScan() {
 
 export function startAlerts() {
   if (!ALERTS_ON) { console.log("[alerts] dormant — set TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID to enable launch alerts"); return; }
-  console.log(`[alerts] on — Telegram launch alerts every ${Math.round(intervalMs / 1000)}s (age ${CFG.minAgeH}-${CFG.maxAgeH}h · risk ≤${CFG.maxRisk} · blueprint ≥${CFG.minBlueprint} · no bundles)`);
+  console.log(`[alerts] on — Telegram launch alerts every ${Math.round(intervalMs / 1000)}s (age ${CFG.minAgeH}-${CFG.maxAgeH}h · risk ≤${CFG.maxRisk} · blueprint ≥${CFG.minBlueprint} · no bundles) · store: ${KV_BACKEND}${KV_BACKEND === "file" ? " (set KV_REST_API_* for durable alerts across redeploys)" : ""}`);
   runAlertScan().catch(() => {});
   setInterval(() => runAlertScan().catch(() => {}), intervalMs);
 }
