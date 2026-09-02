@@ -134,6 +134,11 @@ export async function backtest(addr, opts = {}) {
   }
   let last = null; for (let k = 0; k < prices.length; k++) { if (prices[k] != null) last = prices[k]; else prices[k] = last; }
   let next = null; for (let k = prices.length - 1; k >= 0; k--) { if (prices[k] != null) next = prices[k]; else prices[k] = next; }
+  // rolling-median smooth (w=5): the swap-implied price is a reconstruction; a transient pump/retrace or a lone
+  // residual bad sample shouldn't set a stage valuation, so report the local typical price.
+  const sm = prices.slice();
+  for (let k = 0; k < prices.length; k++) { const w = []; for (let j = Math.max(0, k - 2); j <= Math.min(prices.length - 1, k + 2); j++) if (prices[j] != null) w.push(prices[j]); w.sort((a, b) => a - b); if (w.length) sm[k] = w[Math.floor(w.length / 2)]; }
+  for (let k = 0; k < prices.length; k++) prices[k] = sm[k];
   // total supply (once) → market cap = price × supply; USD volume = token volume × price
   let supply = 0; try { supply = Number(big(await rpc("eth_call", [{ to: addr, data: "0x18160ddd" }, "latest"]).catch(() => "0x0"))) / 1e18; } catch { /* */ }
   for (let k = 0; k < series.length; k++) {

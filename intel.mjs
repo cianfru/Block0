@@ -160,7 +160,7 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const out = { sym, address: addr, pool, updated: Date.now(), latestBlock: latest, ageH: spanH, ms: Date.now() - t0ms,
     risk, label, momentum, parts, topFactor, graduated: grad,
     flags: { snipers: sniperW.length, sniperHeldPct: f_snipe, bundles: bundles.length, bundleWallets: bundleSet.size, bundleHeldPct: f_bundle,
-      top10Pct: f_top10, holders: holders.length, creatorPct: f_creator, insiderDumpNowPct: f_dumpNow, insiderSellersNow: insiderSellers,
+      top10Pct: f_top10, holders: holders.length, wallets: [...W.values()].filter((w) => w.bought > 0).length, creatorPct: f_creator, insiderDumpNowPct: f_dumpNow, insiderSellersNow: insiderSellers,
       buysRecent: buys, sellsRecent: sells } };
   if (opts.mcapUsd != null) { out.mcapUsd = Math.round(opts.mcapUsd); out.bucket = bucketOf(opts.mcapUsd); } // from Pons API — accurate, no receipts
   else if (opts.mcap !== false) { const m = await computeMcap(addr); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
