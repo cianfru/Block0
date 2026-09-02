@@ -44,4 +44,7 @@ export function pathPosition(wallets, mcap) {
   const pos = mcap >= p.p75 ? "ahead" : mcap >= p.p25 ? "on-path" : mcap >= p.p25 / 3 ? "lagging" : "off-path";
   return { precedent: p.med, p25: p.p25, p75: p.p75, vol: p.vol, ratio: +(mcap / p.med).toFixed(2), pos };
 }
+// the raw study artifacts, for drawing the corridor cone + ladder on the token page
+export const corridorBins = () => CORRIDOR;
+export const ladderRungs = () => LADDER;
 export const hasModel = () => LADDER.length > 0;

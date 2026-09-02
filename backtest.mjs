@@ -7,9 +7,10 @@
 // gives token-out vs WETH/USDG-in → price. Sampled to `points` buckets so it's ~points receipt calls, one-time.
 // Alchemy-only (uses the enhanced getAssetTransfers to keep tx hashes for the receipt lookups).
 import { detectPool, ROUTERS } from "./engine.mjs";
-import { computeRisk } from "./intel.mjs";
+import { computeRisk, blueprintMatch } from "./intel.mjs";
 import { rpc, toNum, PROVIDER, getTransferLogs, latestBlock, findDeployBlock } from "./rpc.mjs";
 import { estimateBlockAt, chainCalibration, parseTs } from "./store.mjs";
+import { liveTrajectory, corridorBins } from "./model.mjs";
 
 const ZERO = "0x0000000000000000000000000000000000000000", DEAD = "0x000000000000000000000000000000000000dead";
 const AMM = "0x8366a39cc670b4001a1121b8f6a443a643e40951"; // RH singleton AMM
@@ -128,7 +129,12 @@ export async function backtest(addr, opts = {}) {
     for (let i = rs0; i < recent.length; i++) { const r = recent[i]; if (r.ts <= T && insiderSet.has(r.w)) { dump += r.amt; sellers.add(r.w); } }
     const pct = (x) => +(x / held * 100).toFixed(2);
     const r = computeRisk({ f_snipe: pct(sniperHeld), f_bundle: pct(bundleHeld), f_top10: pct(top10), f_creator: pct(creatorBal), f_dumpNow: +(dump / held * 100).toFixed(2), nBundles, nSnipers: snipers.size, nSellers: sellers.size, grad });
-    series.push({ t: Math.round(T), risk: r.risk, label: r.label, top10: pct(top10), sniperHeld: pct(sniperHeld), holders: bags.length, wallets: buyers.size, bundles: nBundles, topFactor: r.topFactor, volTok: +volAccum.toFixed(2), price: null });
+    // winner-corridor placement at this historical moment: the same blueprint + trajectory the live board uses,
+    // so the token's path can be drawn THROUGH the study's healthy cone (is it tracking the winner band by age?).
+    const ageH = Math.max(0, (T - t0) / 3600);
+    const bp = blueprintMatch({ bundles: nBundles, top10Pct: pct(top10), holders: bags.length, risk: r.risk });
+    const traj = liveTrajectory({ blueprint: bp, holders: bags.length, ageH });
+    series.push({ t: Math.round(T), risk: r.risk, label: r.label, top10: pct(top10), sniperHeld: pct(sniperHeld), holders: bags.length, wallets: buyers.size, bundles: nBundles, topFactor: r.topFactor, volTok: +volAccum.toFixed(2), price: null, ageH: +ageH.toFixed(2), blueprint: bp, traj });
     volAccum = 0;
   };
   let bi = 0;
@@ -142,7 +148,7 @@ export async function backtest(addr, opts = {}) {
 
   // PRICE: one representative (median-size) swap per bucket → receipt → price; forward/back fill gaps.
   // Skipped in profile mode (noPrice) — the cohort blueprint only needs the score/distribution trajectory.
-  if (opts.noPrice) return { addr, sym: opts.sym, graduated: grad, points: series.length, firstPoolBlock: firstPool, snipers: snipers.size, bundles: nBundles, t0, t1, transfers: sorted.length, capped: sorted.length >= (opts.cap || 400000), series };
+  if (opts.noPrice) return { addr, sym: opts.sym, graduated: grad, points: series.length, firstPoolBlock: firstPool, snipers: snipers.size, bundles: nBundles, t0, t1, transfers: sorted.length, capped: sorted.length >= (opts.cap || 400000), corridor: corridorBins(), series };
   const buckets = Array.from({ length: bounds.length }, () => []);
   for (const e of sorted) if ((isBuy(e) || isSell(e)) && e.amt > 0 && e.hash) { const k = Math.min(bounds.length - 1, Math.max(0, Math.floor((e.ts - t0) / step))); buckets[k].push(e); }
   const prices = new Array(bounds.length).fill(null);
@@ -177,6 +183,6 @@ export async function backtest(addr, opts = {}) {
   return {
     addr, sym: opts.sym, graduated: grad, points: series.length, ethUsd, supply,
     firstPoolBlock: firstPool, snipers: snipers.size, bundles: nBundles,
-    t0, t1, transfers: sorted.length, series,
+    t0, t1, transfers: sorted.length, corridor: corridorBins(), series,
   };
 }

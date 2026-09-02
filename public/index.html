@@ -89,6 +89,9 @@
   .tip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;font-size:.74rem;z-index:5;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
   .tip .d{color:var(--mute);margin-bottom:4px} .tip b{font-variant-numeric:tabular-nums}
   .chnote{padding:34px 16px;color:var(--mute);font-size:.86rem;text-align:center}
+  .corcap{padding:13px 16px;border-top:1px solid var(--line);font-size:.8rem;color:var(--mute);line-height:1.55}
+  .zswatch{display:inline-block;width:15px;height:10px;background:rgba(200,255,77,.16);border:1px solid var(--lime);border-radius:2px;margin-right:6px;vertical-align:middle}
+  .corverdict b.pill{display:inline-block;font-weight:800;font-size:.76rem;letter-spacing:.02em;padding:3px 9px;border-radius:8px;margin-right:8px;color:#08080b}
 
   /* holder tables */
   .tables{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
@@ -219,6 +222,17 @@ function render(r){
     <h2 class="sec">${r.graduated?"Status":"Where it stands vs the winners"}</h2>
     ${placement(r)}
 
+    <h2 class="sec">${r.graduated?"How it tracked the winner path":"Is it on the winner path?"}</h2>
+    <div class="chartwrap">
+      <div class="ch-h">
+        <div style="font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim)">winner corridor · trajectory by age</div>
+        <div class="legend"><span><span class="zswatch"></span>winner zone</span><span><i style="background:var(--cyan)"></i>this token</span></div>
+      </div>
+      <div style="position:relative"><canvas id="cvcor" style="height:340px"></canvas><div class="tip" id="tipcor"></div></div>
+      <div class="chnote" id="chnotecor" hidden></div>
+      <div class="corcap"><span id="corverdict"></span> Each green box is where the 10 biggest past graduations sat at that age — one 0–100 <b style="color:var(--dim)">trajectory</b> score combining clean distribution (no bundles, an opening float, insiders not dumping) with real wallet adoption. Inside the boxes = tracking the winners; below the band = drifting; near the floor = dying.</div>
+    </div>
+
     <h2 class="sec">History — valuation &amp; score over time</h2>
     <div class="chartwrap">
       <div class="ch-h">
@@ -249,14 +263,92 @@ const VMETA={mcap:{lab:"market cap",fmt:mcT,col:"#35e6e0"},price:{lab:"price",fm
   wallets:{lab:"unique wallets",fmt:(x)=>Math.round(x).toLocaleString(),col:"#ff5cf0"},volUsd:{lab:"volume / bucket",fmt:mcT,col:"#ffd23d"}};
 
 async function loadHistory(r){
+  DOSSIER=r;
   CV=$("#cv"); TIP=$("#tip");
-  const note=$("#chnote");
+  const note=$("#chnote"), noteC=$("#chnotecor");
   try{
     const bt=await fetch(`/api/backtest?token=${r.address}`).then(x=>x.json());
-    if(bt.error||!bt.series||bt.series.length<3){ CV.style.display="none"; note.hidden=false; note.textContent="Not enough trade history to reconstruct a timeline for this token yet."; return; }
-    SERIES=bt.series.map(s=>({t:s.t,risk:s.risk,label:s.label,mcap:s.mcap,price:s.price,wallets:s.wallets,volUsd:s.volUsd,holders:s.holders,top10:s.top10}));
+    if(bt.error||!bt.series||bt.series.length<3){
+      CV.style.display="none"; note.hidden=false; note.textContent="Not enough trade history to reconstruct a timeline for this token yet.";
+      $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="Not enough history yet to plot the winner corridor.";
+      $("#corverdict").innerHTML=""; return; }
+    SERIES=bt.series.map(s=>({t:s.t,risk:s.risk,label:s.label,mcap:s.mcap,price:s.price,wallets:s.wallets,volUsd:s.volUsd,holders:s.holders,top10:s.top10,ageH:s.ageH,traj:s.traj,blueprint:s.blueprint}));
+    CORR=bt.corridor||[];
     drawChart(); wireChart();
-  }catch(e){ CV.style.display="none"; note.hidden=false; note.textContent="History is still reconstructing — reload in a moment."; }
+    if(CORR.length){ drawCorridorChart(); wireCorridor(); setCorVerdict(); }
+    else { $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="Winner corridor model not loaded."; }
+  }catch(e){
+    CV.style.display="none"; note.hidden=false; note.textContent="History is still reconstructing — reload in a moment.";
+    $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="";
+  }
+}
+
+/* ---------------- winner-corridor cone (the study band, drawn on the token) ---------------- */
+let CORR=null, DOSSIER=null, CVC, TIPC, GEOC=null;
+const CORCOL={ontrack:"#c8ff4d",behind:"#ffd23d",failing:"#ff3b5c",na:"#7f7f88"};
+function corBinAt(ageH){ if(!CORR||!CORR.length) return null; return CORR.find(b=>ageH>=b.lo&&ageH<b.hi)||CORR[CORR.length-1]; }
+function corStatus(s){ const b=corBinAt(s.ageH); if(!b||s.traj==null) return "na"; if(s.traj<35) return "failing"; return s.traj>=b.q1?"ontrack":"behind"; }
+const ageLab=(h)=>h<1?Math.round(h*60)+"m":h<48?Math.round(h)+"h":Math.round(h/24)+"d";
+function setCorVerdict(){
+  const el=$("#corverdict"); if(!el||!SERIES) return;
+  const pts=SERIES.filter(s=>s.traj!=null); if(!pts.length){el.innerHTML="";return;}
+  const st=corStatus(pts[pts.length-1]);
+  if(DOSSIER&&DOSSIER.graduated){ el.innerHTML=`<b class="pill" style="background:var(--cyan)">GRADUATED</b>`; return; }
+  const T={ontrack:["ON THE WINNER PATH","var(--lime)"],behind:["DRIFTING BELOW THE BAND","var(--amber)"],failing:["OFF PACE — STALLING","var(--coral)"],na:["",""]};
+  const t=T[st]; el.innerHTML=t[0]?`<b class="pill" style="background:${t[1]}">${t[0]}</b>`:"";
+}
+function wireCorridor(){
+  CVC=$("#cvcor"); TIPC=$("#tipcor");
+  CVC.addEventListener("pointermove",onHoverCor);
+  CVC.addEventListener("pointerleave",()=>{TIPC.style.display="none";drawCorridorChart();});
+  addEventListener("resize",()=>drawCorridorChart());
+}
+function drawCorridorChart(hoverIdx=-1){
+  if(!CORR||!CORR.length||!SERIES) return;
+  CVC=$("#cvcor"); const W=CVC.clientWidth,H=CVC.clientHeight;
+  CVC.width=W*DPR;CVC.height=H*DPR;const g=CVC.getContext("2d");g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);
+  const padL=44,padR=16,padT=16,padB=30,iw=W-padL-padR,ih=H-padT-padB;
+  const tokMax=(SERIES[SERIES.length-1].ageH)||1, AGE_LO=0.15, maxBinHi=CORR[CORR.length-1].hi;
+  const AGE_HI=Math.min(maxBinHi,Math.max(tokMax*1.4,4));
+  const lx=(a)=>Math.log10(Math.max(AGE_LO,a)), x0=lx(AGE_LO), x1=lx(AGE_HI);
+  const xOf=(a)=>padL+(lx(a)-x0)/(x1-x0)*iw, yOf=(t)=>padT+ih-(Math.max(0,Math.min(100,t))/100)*ih;
+  // y grid
+  g.font="11px Inter,system-ui,sans-serif";g.textBaseline="middle";g.fillStyle="#7f7f88";g.strokeStyle="rgba(255,255,255,.06)";g.lineWidth=1;
+  for(let i=0;i<=4;i++){const yy=padT+ih*i/4;g.beginPath();g.moveTo(padL,yy);g.lineTo(W-padR,yy);g.stroke();g.textAlign="right";g.fillText((100-i*25)+"",padL-6,yy);}
+  // corridor boxes (the milestone squares) + median + age tick
+  for(const b of CORR){ const bl=Math.max(b.lo,AGE_LO); if(bl>=AGE_HI) continue; const bh=Math.min(b.hi,AGE_HI);
+    const x=xOf(bl),xw=Math.max(2,xOf(bh)-x),yT=yOf(b.q3),yB=yOf(b.q1);
+    g.fillStyle="rgba(200,255,77,.11)";g.strokeStyle="rgba(200,255,77,.32)";g.lineWidth=1;
+    g.beginPath();g.rect(x+0.5,yT,xw-1.5,yB-yT);g.fill();g.stroke();
+    g.strokeStyle="rgba(200,255,77,.55)";g.setLineDash([4,3]);g.beginPath();g.moveTo(x+0.5,yOf(b.med));g.lineTo(x+xw-1,yOf(b.med));g.stroke();g.setLineDash([]);
+    g.fillStyle="#7f7f88";g.textAlign="center";g.font="10px Inter,system-ui,sans-serif";g.fillText("→"+ageLab(b.hi),x+xw/2,H-10);
+  }
+  // token trajectory line through the cone, coloured by inside / below / failing
+  g.lineWidth=2.6;
+  const pts=SERIES.filter(s=>s.ageH>=AGE_LO&&s.ageH<=AGE_HI&&s.traj!=null);
+  for(let i=1;i<pts.length;i++){g.strokeStyle=CORCOL[corStatus(pts[i])];g.beginPath();g.moveTo(xOf(pts[i-1].ageH),yOf(pts[i-1].traj));g.lineTo(xOf(pts[i].ageH),yOf(pts[i].traj));g.stroke();}
+  // current position marker
+  if(pts.length){const last=pts[pts.length-1],cx=xOf(last.ageH),cy=yOf(last.traj);
+    g.fillStyle="#35e6e0";g.strokeStyle="#08080b";g.lineWidth=2;g.beginPath();g.arc(cx,cy,5.5,0,7);g.fill();g.stroke();
+    g.fillStyle="#35e6e0";g.font="600 11px Inter,system-ui,sans-serif";g.textAlign=cx>W-70?"right":"left";
+    g.fillText(DOSSIER&&DOSSIER.graduated?"graduated":"now",cx+(cx>W-70?-9:9),cy);}
+  if(hoverIdx>=0&&hoverIdx<pts.length){const s=pts[hoverIdx],x=xOf(s.ageH);
+    g.strokeStyle="rgba(255,255,255,.22)";g.lineWidth=1;g.beginPath();g.moveTo(x,padT);g.lineTo(x,padT+ih);g.stroke();
+    g.fillStyle="#fff";g.beginPath();g.arc(x,yOf(s.traj),3.5,0,7);g.fill();}
+  GEOC={padL,iw,AGE_LO,AGE_HI,x0,x1,xOf,pts};
+}
+function onHoverCor(e){
+  if(!GEOC||!GEOC.pts.length) return;
+  const rect=CVC.getBoundingClientRect(), mx=e.clientX-rect.left;
+  const frac=Math.max(0,Math.min(1,(mx-GEOC.padL)/GEOC.iw)), age=Math.pow(10,GEOC.x0+frac*(GEOC.x1-GEOC.x0));
+  let idx=0,best=1e18; for(let i=0;i<GEOC.pts.length;i++){const d=Math.abs(GEOC.pts[i].ageH-age);if(d<best){best=d;idx=i;}}
+  const s=GEOC.pts[idx]; drawCorridorChart(idx);
+  const st=corStatus(s), col=CORCOL[st], LB={ontrack:"on the winner path",behind:"below the band",failing:"failing",na:""};
+  TIPC.innerHTML=`<div class="d">${ageLab(s.ageH)} old</div><b style="color:${col}">trajectory ${s.traj}</b> · ${LB[st]}<br>
+    <span style="color:var(--mute)">${(s.wallets||0).toLocaleString()} wallets · blueprint ${s.blueprint} · top10 ${s.top10}%</span>`;
+  TIPC.style.display="block";
+  const x=GEOC.xOf(s.ageH), tw=TIPC.offsetWidth;
+  TIPC.style.left=Math.max(6,Math.min(CVC.clientWidth-tw-6,x-tw/2))+"px"; TIPC.style.top="12px";
 }
 function wireChart(){
   $("#views").addEventListener("click",(e)=>{const b=e.target.closest(".view");if(!b)return;VIEW=b.dataset.v;
