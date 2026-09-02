@@ -69,5 +69,6 @@ export async function tokenDossier(address) {
   r.sellers = whales.filter((w) => w.net < 0).sort((a, b) => a.net - b.net).slice(0, 12);
   r.topHolders = whales.slice().sort((a, b) => b.bal - a.bal).slice(0, 12);
   r.deployer = deployerReputation(all, meta); // deployer track record (other launches by the same wallet)
+  r.explorer = (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null; // when set, wallet/contract links activate
   return r;
 }

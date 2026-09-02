@@ -112,6 +112,8 @@
   td{padding:8px 15px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
   tr:first-child td{border-top:none}
   .num{text-align:right} .pos{color:var(--lime)} .neg{color:var(--coral)}
+  td a.wal{color:var(--tx);text-decoration:none} td a.wal:hover{color:var(--cyan)}
+  .depaddr a{color:var(--mute);text-decoration:none} .depaddr a:hover{color:var(--cyan)}
   .snipe{color:var(--amber);margin-left:5px;font-size:.72rem}
   .empty{color:var(--mute);padding:16px 15px;font-size:.8rem}
   .foot{color:var(--mute);font-size:.8rem;margin-top:30px;line-height:1.55;max-width:88ch}
@@ -127,7 +129,7 @@
     <a class="back" href="/">← all launches</a>
   </header>
   <div id="root"><div class="state">Loading the dossier…</div></div>
-  <div class="foot"><b>Signal, not proof — never a buy recommendation.</b> Every number is reconstructed from public Robinhood-Chain transfer data and is reproducible. Risk is a transparent composite of concentration, snipers, bundles, live insider-dumping and the deployer's bag. Blueprint fit and the valuation ladder place this token against the biggest past graduations — a pattern, not a promise. Prices are swap-implied reconstructions (no oracle), smoothed; treat exact figures as estimates. <a href="/methodology" style="color:var(--lime)">How it works &amp; how well it works →</a></div>
+  <div class="foot"><b>Signal, not proof — never a buy recommendation.</b> Every number is reconstructed from public Robinhood-Chain transfer data and is reproducible. Risk is a transparent composite of concentration, snipers, bundles, live insider-dumping and the deployer's bag. Blueprint fit and the valuation ladder place this token against the biggest past graduations — a pattern, not a promise. Prices are swap-implied reconstructions (no oracle), smoothed; treat exact figures as estimates. <a href="/methodology" style="color:var(--lime)">How it works &amp; how well it works →</a> · <a href="/terms" style="color:var(--mute)">Terms &amp; privacy</a></div>
 </div>
 
 <script>
@@ -140,6 +142,9 @@ const band=(r)=>r>=66?"var(--coral)":r>=45?"var(--amber)":r>=25?"var(--cyan)":"v
 const sev=(v)=>v>=60?"var(--coral)":v>=30?"var(--amber)":v>=12?"var(--cyan)":"var(--lime)";
 const HUES=["#c8ff4d","#35e6e0","#ff5cf0","#ffd23d","#ff8a5c","#7ee787","#8ab4ff","#ff7ab6"];
 const q=new URLSearchParams(location.search), ADDR=(q.get("address")||"").toLowerCase();
+let EXPLORER=null;
+const exHref=(a)=>EXPLORER?`${EXPLORER}/address/${a}`:null;
+const addrLink=(a,cls="")=>{const h=exHref(a);return h?`<a href="${h}" target="_blank" rel="noreferrer" class="${cls}">${short(a)}</a>`:`<span class="${cls}">${short(a)}</span>`;};
 
 function icon(r){const sym=r.sym||"?";let h=0;for(let i=0;i<sym.length;i++)h=(h*31+sym.charCodeAt(i))|0;
   const bg=HUES[Math.abs(h)%HUES.length],ini=sym.replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?";
@@ -162,7 +167,7 @@ function deployerCard(r){
   return `<div class="depwrap">
     <div class="dephead"><span class="depbadge" style="color:#08080b;background:${t[1]}">${t[0]}</span>
       <span class="depmeta"><b>${d.launched}</b> launch${d.launched>1?'es':''} · <b style="color:${d.graduated?'var(--cyan)':'var(--mute)'}">${d.graduated}</b> graduated — ${t[2]}</span>
-      <span class="depaddr" title="deployer">${short(d.address)}</span></div>
+      <span class="depaddr" title="deployer">${addrLink(d.address)}</span></div>
     ${chips?`<div class="depchips">${chips}</div>`:`<div class="depnote">This is the only launch Block0 has seen from this wallet.</div>`}
   </div>`;
 }
@@ -207,10 +212,11 @@ function tableRows(rows,dir){
   return rows.map(w=>{
     const val = dir==="top" ? `<td class="num" style="color:var(--dim)">${kT(w.bal)}</td>`
       : `<td class="num ${dir==='buy'?'pos':'neg'}">${w.net>0?"+":""}${kT(w.net)}</td>`;
-    return `<tr><td>${short(w.a)}${w.sniper?'<span class="snipe">⚡</span>':''}</td>${val}</tr>`;}).join("");
+    return `<tr><td>${addrLink(w.a,"wal")}${w.sniper?'<span class="snipe">⚡</span>':''}</td>${val}</tr>`;}).join("");
 }
 
 function render(r){
+  EXPLORER=r.explorer||null;
   const c=band(r.risk), f=r.flags, p=r.parts||{};
   const facs=[
     meter("Snipers",p.snipers||0,f.snipers?`${f.snipers} wallet${f.snipers>1?'s':''} · hold ${f.sniperHeldPct}%`:"none at launch"),

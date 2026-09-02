@@ -95,7 +95,8 @@ if (!WS_ENABLED) setInterval(poll, POLL_MS);
 
 async function serveStatic(res, urlPath) {
   const route = urlPath === "/" ? "board.html" : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
-    : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html" : null;
+    : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html"
+    : (urlPath === "/terms" || urlPath === "/terms.html") ? "terms.html" : null;
   const file = route || urlPath.replace(/^\//, "");
   try {
     const buf = await readFile(join(__dir, "public", file));
