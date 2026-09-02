@@ -62,6 +62,10 @@
   .bpchip .dia{font-size:.8rem}
   .bpchip .sc{font-variant-numeric:tabular-nums}
   .bpchip .lb{font-weight:600;color:var(--mute);font-size:.68rem;letter-spacing:.03em}
+  /* live valuation-ladder placement: current wallets → winner precedent, and pace vs the winner band */
+  .pathline{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;padding-top:9px;border-top:1px solid var(--line);font-size:.74rem;flex-wrap:wrap}
+  .pathline .pw{color:var(--dim)} .pathline .pw b{color:var(--cyan);font-weight:700}
+  .pathline .ppos{font-weight:700;font-size:.72rem}
   /* filter tabs */
   .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 4px}
   .tab{font-size:.86rem;font-weight:600;color:var(--dim);border:1px solid var(--line);border-radius:11px;padding:8px 15px;background:var(--glass);cursor:pointer}
@@ -134,6 +138,9 @@ function card(r){const f=r.flags,p=r.parts||{},c=band(r.risk);
     :(!f.snipers&&!f.bundles)?`<div class="flagline"><span class="fl clean">✓ no snipers · no bundles</span></div>`:"";
   const bpc=r.blueprint>=75?"var(--lime)":r.blueprint>=55?"var(--cyan)":r.blueprint>=35?"var(--amber)":"var(--mute)";
   const bp=(!r.graduated&&r.blueprint!=null)?`<div class="bpchip"><span class="dia" style="color:${bpc}">◆</span><span class="sc" style="color:${bpc}">Blueprint ${r.blueprint}</span><span class="lb">${r.blueprintLabel||''}</span></div>`:"";
+  const PC={ahead:"var(--amber)","on-path":"var(--lime)",lagging:"var(--cyan)","off-path":"var(--mute)"};
+  const PL={ahead:"ahead of pace","on-path":"on the winner path",lagging:"lagging winners","off-path":"off the path"};
+  const pathline=(!r.graduated&&r.path)?`<div class="pathline"><span class="pw">${(r.wallets||0).toLocaleString()} wallets → precedent <b>${mcT(r.path.precedent)}</b></span><span class="ppos" style="color:${PC[r.path.pos]}">${PL[r.path.pos]} · ${r.path.ratio}×</span></div>`:"";
   const prog=(!r.graduated&&r.progress!=null)?`<div class="prog"><div class="lab"><span>bonding curve</span><b>${r.progress}%</b></div><div class="track"><div class="fill" style="width:${Math.min(100,r.progress)}%"></div></div></div>`:"";
   return `<a class="card${isNew(r)?' new':''}" href="/token?address=${r.address}"><div class="stripe" style="background:${c}"></div><div class="cbody">
     <div class="row1"><div class="idn">${icon(r)}<div><div class="tk">${r.sym}${isNew(r)?'<span class="newbadge">NEW</span>':""}</div><div class="mc">${mcT(r.mcapUsd)} mcap</div></div></div>
@@ -142,6 +149,7 @@ function card(r){const f=r.flags,p=r.parts||{},c=band(r.risk);
     <div class="meta"><span>${f.holders} holders</span><span>·</span><span>${r.momentum>3?'▲ heating':r.momentum<-3?'▼ cooling':'– flat'}</span></div>
     <div class="facs">${facs}</div>
     ${bp}
+    ${pathline}
     ${alert}</div></a>`;}
 let LAST=null, FILTER="cooking";
 function section(title,n,rows){return `<div class="bkt"><div class="bkt-h"><span class="t">${title}</span><span class="n">${n}</span></div><div class="grid">${rows.map(card).join("")}</div></div>`;}
