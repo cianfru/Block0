@@ -57,6 +57,11 @@
   .fac .fh b{font-weight:700;font-size:.7rem}
   .ftrack{height:4px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden}
   .ffill{height:100%;border-radius:3px;transition:width .3s}
+  /* blueprint-fit chip — how well a fresh launch matches the winner fingerprint */
+  .bpchip{display:inline-flex;align-items:center;gap:7px;margin-top:2px;font-size:.72rem;font-weight:700;padding:5px 10px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
+  .bpchip .dia{font-size:.8rem}
+  .bpchip .sc{font-variant-numeric:tabular-nums}
+  .bpchip .lb{font-weight:600;color:var(--mute);font-size:.68rem;letter-spacing:.03em}
   /* filter tabs */
   .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 4px}
   .tab{font-size:.86rem;font-weight:600;color:var(--dim);border:1px solid var(--line);border-radius:11px;padding:8px 15px;background:var(--glass);cursor:pointer}
@@ -96,6 +101,7 @@
   </div>
   <div class="tabs" id="tabs">
     <div class="tab on" data-f="cooking">About to graduate</div>
+    <div class="tab" data-f="blueprint">◆ Blueprint fit</div>
     <div class="tab" data-f="graduated">Graduated</div>
     <div class="tab" data-f="heating">Heating</div>
     <div class="tab" data-f="safe">Safest</div>
@@ -126,6 +132,8 @@ function card(r){const f=r.flags,p=r.parts||{},c=band(r.risk);
   ].join("");
   const alert=f.insiderSellersNow?`<div class="flagline"><span class="fl dump">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow>1?'s':''} selling now</span></div>`
     :(!f.snipers&&!f.bundles)?`<div class="flagline"><span class="fl clean">✓ no snipers · no bundles</span></div>`:"";
+  const bpc=r.blueprint>=75?"var(--lime)":r.blueprint>=55?"var(--cyan)":r.blueprint>=35?"var(--amber)":"var(--mute)";
+  const bp=(!r.graduated&&r.blueprint!=null)?`<div class="bpchip"><span class="dia" style="color:${bpc}">◆</span><span class="sc" style="color:${bpc}">Blueprint ${r.blueprint}</span><span class="lb">${r.blueprintLabel||''}</span></div>`:"";
   const prog=(!r.graduated&&r.progress!=null)?`<div class="prog"><div class="lab"><span>bonding curve</span><b>${r.progress}%</b></div><div class="track"><div class="fill" style="width:${Math.min(100,r.progress)}%"></div></div></div>`:"";
   return `<a class="card${isNew(r)?' new':''}" href="/token?address=${r.address}"><div class="stripe" style="background:${c}"></div><div class="cbody">
     <div class="row1"><div class="idn">${icon(r)}<div><div class="tk">${r.sym}${isNew(r)?'<span class="newbadge">NEW</span>':""}</div><div class="mc">${mcT(r.mcapUsd)} mcap</div></div></div>
@@ -133,6 +141,7 @@ function card(r){const f=r.flags,p=r.parts||{},c=band(r.risk);
     ${prog}
     <div class="meta"><span>${f.holders} holders</span><span>·</span><span>${r.momentum>3?'▲ heating':r.momentum<-3?'▼ cooling':'– flat'}</span></div>
     <div class="facs">${facs}</div>
+    ${bp}
     ${alert}</div></a>`;}
 let LAST=null, FILTER="cooking";
 function section(title,n,rows){return `<div class="bkt"><div class="bkt-h"><span class="t">${title}</span><span class="n">${n}</span></div><div class="grid">${rows.map(card).join("")}</div></div>`;}
@@ -141,6 +150,13 @@ function render(){
     $("#board").innerHTML='<div class="state">'+(b&&b.scanning?"Scanning the launch universe — the first pass takes a moment…":"Waiting for the first scan…")+'</div>';return;}
   const cooking=(b.cooking||[]).slice(), grad=(b.graduated||[]).slice();
   if(FILTER==="cooking"){$("#board").innerHTML=section("About to graduate",`${cooking.length} · ranked by bonding-curve progress`,cooking);return;}
+  if(FILTER==="blueprint"){
+    const rows=cooking.slice().sort((a,b)=>(b.blueprint||0)-(a.blueprint||0));
+    const strong=rows.filter(r=>(r.blueprint||0)>=75), rest=rows.filter(r=>(r.blueprint||0)<75);
+    let html='<p style="color:var(--dim);font-size:.9rem;margin:0 0 16px;max-width:76ch">Fresh launches ranked by how well they fit the <b style="color:var(--tx)">winner fingerprint</b> from the 10 biggest graduations — no bundles, a float that opens up, a clean settled score, real adoption. A strong fit is worth watching; it is a pattern, not a promise.</p>';
+    if(strong.length)html+=section("Strong fit — fits the winner pattern",`${strong.length}`,strong);
+    html+=section(strong.length?"The rest":"Blueprint fit","ranked by match",rest);
+    $("#board").innerHTML=html;return;}
   if(FILTER==="graduated"){
     const tiers=[[1e8,"$100M+"],[1e7,"$10M – $100M"],[1e6,"$1M – $10M"],[0,"under $1M"]];
     let html="";
