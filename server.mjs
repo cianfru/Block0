@@ -78,7 +78,9 @@ createServer(async (req, res) => {
       const HDR = { "user-agent": "Mozilla/5.0 (compatible; Block0/1.0) curl/8.5.0", "referer": BASE + "/launchpad", "accept": "application/json" };
       const j = async (url) => { try { const r = await fetch(url, { headers: HDR }); return r.ok ? await r.json() : { _err: r.status }; } catch (e) { return { _err: String(e.message || e) }; } };
       const act = await j(`${BASE}/api/pons-launches?explore=1&sort=marketCap&age=all&page=1&pageSize=600&includeGraduated=1&v=22`);
-      const pool = [...(act.active?.items || []), ...(act.graduated?.items || [])];
+      const cat = await j(`${BASE}/api/pons-launches/graduations?catalog=1&v=12`);
+      const catArr = Array.isArray(cat) ? cat : (cat.items || cat.graduated?.items || []);
+      const pool = [...(act.active?.items || []), ...(act.graduated?.items || []), ...catArr];
       const matches = pool.filter((t) => (t.symbol || "").toLowerCase().includes(q) || (t.name || "").toLowerCase().includes(q))
         .map((t) => ({ symbol: t.symbol, name: t.name, token: t.token, mcapUsd: t.marketCapUsd, graduated: t.graduated, launchedAt: t.launchedAt, pool: t.pool, keys: Object.keys(t) }))
         .sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0)).slice(0, 12);
