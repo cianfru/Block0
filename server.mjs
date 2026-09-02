@@ -70,6 +70,36 @@ createServer(async (req, res) => {
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
 
+    // Temporary research probe: find a token by symbol across the Pons universe + discover what price-history
+    // data Pons exposes. ?q=SYMBOL. Runs from Railway (sandbox is Cloudflare-blocked from ponsfamily.com).
+    if (u.pathname === "/api/research") {
+      const q = (u.searchParams.get("q") || "").toLowerCase();
+      const BASE = "https://www.ponsfamily.com";
+      const HDR = { "user-agent": "Mozilla/5.0 (compatible; Block0/1.0) curl/8.5.0", "referer": BASE + "/launchpad", "accept": "application/json" };
+      const j = async (url) => { try { const r = await fetch(url, { headers: HDR }); return r.ok ? await r.json() : { _err: r.status }; } catch (e) { return { _err: String(e.message || e) }; } };
+      const act = await j(`${BASE}/api/pons-launches?explore=1&sort=marketCap&age=all&page=1&pageSize=600&includeGraduated=1&v=22`);
+      const pool = [...(act.active?.items || []), ...(act.graduated?.items || [])];
+      const matches = pool.filter((t) => (t.symbol || "").toLowerCase().includes(q) || (t.name || "").toLowerCase().includes(q))
+        .map((t) => ({ symbol: t.symbol, name: t.name, token: t.token, mcapUsd: t.marketCapUsd, graduated: t.graduated, launchedAt: t.launchedAt, pool: t.pool, keys: Object.keys(t) }))
+        .sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0)).slice(0, 12);
+      // probe likely price-history endpoints for the first match
+      const probes = {};
+      if (matches[0]) {
+        const a = matches[0].token;
+        for (const [k, url] of Object.entries({
+          candles: `${BASE}/api/pons-launches/candles?token=${a}&interval=1h`,
+          chart: `${BASE}/api/pons-launches/chart?token=${a}`,
+          history: `${BASE}/api/pons-launches/history?token=${a}`,
+          priceHistory: `${BASE}/api/pons-launches/price-history?token=${a}`,
+          ohlc: `${BASE}/api/pons-launches/ohlc?token=${a}`,
+          detail: `${BASE}/api/pons-launches/${a}`,
+          trades: `${BASE}/api/pons-launches/trades?token=${a}`,
+        })) { const r = await j(url); probes[k] = r._err ? "ERR " + r._err : (Array.isArray(r) ? `array[${r.length}]` : `keys: ${Object.keys(r).slice(0, 14).join(",")}`); }
+      }
+      res.writeHead(200, { "content-type": "application/json" });
+      return res.end(JSON.stringify({ q, count: matches.length, matches, probes }, null, 2));
+    }
+
     if (u.pathname === "/api/board") {
       const b = ensureFresh(BOARD_REFRESH_MS);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
