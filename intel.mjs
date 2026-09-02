@@ -67,9 +67,17 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const t0ms = Date.now();
   // Incremental store: pulls only the delta since last call and caches the deploy block (free on Alchemy).
   const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool, launchedAt: opts.launchedAt });
-  const pool = (opts.pool || "").toLowerCase() || poolStore || detectPool(ev); // prefer the Pons-API pool when provided
-  const isBuy = (e) => e.from === pool || ROUTERS.has(e.from), isSell = (e) => e.to === pool || ROUTERS.has(e.to);
-  const isInfra = (a) => a === ZERO || a === DEAD || a === pool || ROUTERS.has(a);
+  const ponsPool = (opts.pool || "").toLowerCase();
+  const detected = detectPool(ev); // highest-degree address = the bonding curve / trading contract
+  const pool = ponsPool || poolStore || detected; // the venue we report
+  // The bonding curve holds all UNDISTRIBUTED supply and touches every pre-graduation trade, so it is the
+  // highest-degree address. Pre-graduation it is a DIFFERENT address from the Pons graduation-AMM pool, so we
+  // must treat BOTH as venues/infra — otherwise the curve's reserve reads as one giant "sniper" holding ~half
+  // the supply and inflates every concentration number. (Post-graduation the curve has emptied → no-op there.)
+  const AMM = "0x8366a39cc670b4001a1121b8f6a443a643e40951"; // Robinhood singleton AMM
+  const venues = new Set([ponsPool, poolStore, detected, AMM].filter(Boolean));
+  const isBuy = (e) => venues.has(e.from) || ROUTERS.has(e.from), isSell = (e) => venues.has(e.to) || ROUTERS.has(e.to);
+  const isInfra = (a) => a === ZERO || a === DEAD || venues.has(a) || ROUTERS.has(a);
   const tsMax = Math.max(...ev.map((e) => e.ts || 0)), tsMin = Math.min(...ev.map((e) => e.ts || 1e18));
   const RECENT = tsMax - 1800; // last 30 min = "now"
 
