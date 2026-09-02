@@ -47,6 +47,10 @@ export async function estimateBlockAt(tsSec, latest, marginBlocks = 10000) {
   const est = c.headBlock - Math.floor((c.headTs - tsSec) / c.spb);
   return Math.max(0, est - marginBlocks); // margin so we never start after the token's first transfer
 }
+// Chain calibration for INVERSE use (block → timestamp): the generic backtest pulls raw eth_getLogs, which on
+// the native RH node carry no blockTimestamp, so we derive each transfer's time from its block linearly.
+export async function chainCalibration(latest) { return calibrate(latest); }
+export { parseTs };
 
 // Return the token's full transfer history, pulling only what's new since last call.
 // opts.pool (from Pons) seeds the market so we never guess it; opts.decimals defaults to 18.

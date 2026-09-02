@@ -3,159 +3,344 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Block0</title>
+<title>Block0 — token dossier</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600;700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
 <style>
-  :root{
-    --bg:#080c0a;--bg2:#0d1310;--bg3:#131c16;--line:rgba(120,200,150,.15);--line2:rgba(120,200,150,.30);
-    --ink:#eaf2ec;--dim:#a6bbad;--mute:#7d9385;--green:#43d17f;--red:#ff6f6f;--amber:#ffab52;--cyan:#5ccdda;
-    --mono:"IBM Plex Mono",ui-monospace,monospace;--sans:"IBM Plex Sans",system-ui,sans-serif;
-  }
+  :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
+    --tx:#fff;--dim:#b6b6bd;--mute:#7f7f88;--lime:#c8ff4d;--cyan:#35e6e0;--magenta:#ff5cf0;--amber:#ffd23d;--coral:#ff3b5c;
+    --serif:"Instrument Serif",Georgia,serif;--sans:"Inter",system-ui,sans-serif;}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--ink);font-family:var(--sans);font-size:15px;
-    background-image:radial-gradient(900px 500px at 85% -10%,rgba(67,209,127,.09),transparent 60%);min-height:100vh}
-  .wrap{max-width:1180px;margin:0 auto;padding:20px 18px 60px}
-  header{display:flex;align-items:center;gap:14px;flex-wrap:wrap;padding:6px 0 18px}
-  .brand{font-family:var(--mono);font-weight:700;font-size:1.15rem;letter-spacing:.02em}
-  .brand b{color:var(--green)}
-  .brand .sub{display:block;font-size:.62rem;letter-spacing:.22em;text-transform:uppercase;color:var(--mute);font-weight:500;margin-top:2px}
-  form{display:flex;gap:8px;flex:1;min-width:280px;flex-wrap:wrap}
-  input,select,button{font-family:var(--mono);font-size:.9rem;border:1px solid var(--line2);background:var(--bg3);color:var(--ink);border-radius:8px;padding:10px 12px}
-  input[name=address]{flex:1;min-width:220px}
-  input[name=decimals]{width:70px}
-  button{background:var(--green);color:#04120a;font-weight:700;border-color:transparent;cursor:pointer}
-  button:hover{filter:brightness(1.08)}
-  button.ghost{background:var(--bg3);color:var(--dim);font-weight:600}
-  .tf{display:inline-flex;border:1px solid var(--line2);border-radius:8px;overflow:hidden}
-  .tf button{border:none;border-radius:0;background:var(--bg3);color:var(--dim);font-weight:600;padding:10px 12px}
-  .tf button.on{background:var(--green);color:#04120a}
+  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:15px;-webkit-font-smoothing:antialiased;
+    background-image:radial-gradient(1200px 540px at 82% -14%,rgba(200,255,77,.10),transparent 60%),radial-gradient(820px 520px at -8% 6%,rgba(53,230,224,.07),transparent 55%),radial-gradient(700px 640px at 112% 116%,rgba(255,92,240,.05),transparent 60%);min-height:100vh}
+  .wrap{max-width:1120px;margin:0 auto;padding:0 22px 70px}
+  a{color:inherit;text-decoration:none}
+  header{display:flex;align-items:center;gap:16px;padding:22px 0 12px;flex-wrap:wrap}
+  .brand{font-family:var(--serif);font-size:2rem;line-height:1}.brand b{font-style:italic;color:var(--lime);font-weight:400}
+  .chain{display:inline-flex;align-items:center;gap:7px;font-size:.76rem;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:7px 11px;background:var(--glass)}
+  .chain i{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime)}
+  .back{margin-left:auto;font-size:.85rem;color:var(--dim);border:1px solid var(--line);border-radius:11px;padding:9px 15px;background:var(--glass)}
+  .back:hover{border-color:var(--line-2);color:var(--tx)}
 
-  .state{font-family:var(--mono);font-size:.8rem;color:var(--mute);padding:6px 2px 14px;min-height:22px}
-  .state .live{color:var(--green)} .state .err{color:var(--red)}
-  .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--green);margin-right:6px;box-shadow:0 0 0 0 rgba(67,209,127,.5);animation:blip 2s infinite;vertical-align:middle}
-  @keyframes blip{70%{box-shadow:0 0 0 7px rgba(67,209,127,0)}100%{box-shadow:0 0 0 0 rgba(67,209,127,0)}}
+  .state{color:var(--mute);font-size:.95rem;padding:46px 2px}
+  .state.err{color:var(--coral)}
 
-  .scores{display:grid;grid-template-columns:repeat(6,1fr);gap:10px;margin-bottom:14px}
-  .sc{border:1px solid var(--line);border-radius:10px;background:var(--bg2);padding:12px 13px}
-  .sc .v{font-family:var(--mono);font-weight:700;font-size:1.35rem;font-variant-numeric:tabular-nums;line-height:1}
-  .sc .k{font-size:.72rem;color:var(--mute);margin-top:5px;line-height:1.25}
-  .sc.buy .v{color:var(--green)} .sc.sell .v{color:var(--red)} .sc.warn .v{color:var(--amber)} .sc.cy .v{color:var(--cyan)}
+  /* identity + verdict header */
+  .top{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;margin-top:10px;
+    border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));backdrop-filter:blur(12px);padding:20px 22px}
+  .idn{display:flex;gap:15px;align-items:center;min-width:0}
+  .ic{width:58px;height:58px;border-radius:15px;flex:0 0 auto;display:grid;place-items:center;font-weight:800;font-size:1.5rem;color:#0a0a0a;letter-spacing:-.02em;overflow:hidden}
+  .ic img{width:100%;height:100%;object-fit:cover;display:block}
+  .who{min-width:0}
+  .sym{font-size:1.9rem;font-weight:800;letter-spacing:-.02em;line-height:1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .badge{font-size:.62rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;padding:4px 8px;border-radius:7px}
+  .badge.grad{color:#08080b;background:var(--cyan)} .badge.cook{color:#08080b;background:var(--lime)}
+  .name{color:var(--dim);font-size:.95rem;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46ch}
+  .addr{font-family:ui-monospace,monospace;font-size:.72rem;color:var(--mute);margin-top:6px;cursor:pointer}
+  .addr:hover{color:var(--dim)}
+  .facts{display:flex;gap:18px;flex-wrap:wrap;margin-top:13px}
+  .fact .v{font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums}
+  .fact .k{font-size:.68rem;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
+  .verdict{text-align:right;flex:0 0 auto}
+  .verdict .n{font-family:var(--serif);font-size:3.6rem;line-height:.85}
+  .verdict .l{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
+  .verdict .drv{font-size:.72rem;color:var(--mute);margin-top:7px;max-width:20ch;margin-left:auto}
+  .prog{margin-top:14px;grid-column:1/-1}
+  .prog .lab{display:flex;justify-content:space-between;font-size:.72rem;color:var(--mute);margin-bottom:5px}
+  .prog .lab b{color:var(--lime)}
+  .prog .track{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
+  .prog .fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--lime));border-radius:4px}
 
-  .chartwrap{border:1px solid var(--line);border-radius:12px;background:linear-gradient(180deg,var(--bg2),#0a0f0c);overflow:hidden;position:relative}
-  .chartwrap .ch-h{display:flex;justify-content:space-between;align-items:center;padding:11px 15px;border-bottom:1px solid var(--line);font-family:var(--mono);font-size:.72rem;letter-spacing:.12em;text-transform:uppercase;color:var(--mute)}
-  .legend{display:flex;gap:14px;align-items:center}
-  .legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
-  canvas{display:block;width:100%;height:440px;touch-action:none}
-  .tip{position:absolute;pointer-events:none;background:#0b140e;border:1px solid var(--line2);border-radius:7px;padding:7px 9px;font-family:var(--mono);font-size:.72rem;color:var(--ink);z-index:5;display:none;white-space:nowrap}
-  .tip b{color:var(--green)} .tip .s-sell{color:var(--red)}
+  h2.sec{font-family:var(--serif);font-style:italic;font-size:1.4rem;font-weight:400;margin:30px 0 13px}
 
-  .tables{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}
-  .tbl{border:1px solid var(--line);border-radius:10px;background:var(--bg2);overflow:hidden}
-  .tbl h3{font-family:var(--mono);font-size:.78rem;letter-spacing:.1em;text-transform:uppercase;margin:0;padding:11px 14px;border-bottom:1px solid var(--line);color:var(--dim)}
-  .tbl h3.sell{color:var(--red)} .tbl h3.buy{color:var(--green)}
-  table{width:100%;border-collapse:collapse;font-family:var(--mono);font-size:.82rem}
-  td{padding:7px 14px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+  /* sub-score meters */
+  .facs{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
+  .fac{border:1px solid var(--line);border-radius:13px;background:var(--glass);padding:13px 14px}
+  .fac .fh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
+  .fac .fk{font-size:.74rem;color:var(--dim);font-weight:600}
+  .fac .fv{font-family:var(--serif);font-size:1.5rem;line-height:.8}
+  .fac .fd{font-size:.7rem;color:var(--mute);margin-top:8px;min-height:1.1em}
+  .ftrack{height:5px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:2px}
+  .ffill{height:100%;border-radius:3px}
+
+  /* placement: blueprint / corridor / ladder */
+  .place{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:14px}
+  .pcard{border:1px solid var(--line);border-radius:14px;background:var(--glass);padding:15px 16px}
+  .pcard .ph{font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:9px}
+  .pcard .pv{font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px}
+  .pcard .pv .u{font-size:.8rem;font-weight:600;color:var(--dim)}
+  .pcard .pl{font-size:.78rem;font-weight:600;margin-top:5px}
+  .pcard .psub{font-size:.74rem;color:var(--mute);margin-top:8px;line-height:1.4}
+  .ladbar{position:relative;height:8px;border-radius:5px;margin:12px 0 6px;background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(200,255,77,.18))}
+  .ladbar .band{position:absolute;top:0;bottom:0;background:rgba(200,255,77,.22);border-left:1px solid var(--lime);border-right:1px solid var(--lime)}
+  .ladbar .you{position:absolute;top:-4px;width:2px;height:16px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
+  .ladlab{display:flex;justify-content:space-between;font-size:.68rem;color:var(--mute);font-variant-numeric:tabular-nums}
+
+  /* history chart */
+  .chartwrap{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));overflow:hidden}
+  .ch-h{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .views{display:inline-flex;gap:6px;flex-wrap:wrap}
+  .view{font-size:.78rem;font-weight:600;color:var(--dim);border:1px solid var(--line);border-radius:9px;padding:6px 12px;background:transparent;cursor:pointer}
+  .view.on{border-color:var(--lime);color:var(--lime);background:rgba(200,255,77,.08)}
+  .legend{display:flex;gap:14px;align-items:center;font-size:.72rem;color:var(--mute)}
+  .legend i{width:16px;height:3px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:middle}
+  canvas{display:block;width:100%;height:380px;touch-action:none}
+  .tip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;font-size:.74rem;z-index:5;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  .tip .d{color:var(--mute);margin-bottom:4px} .tip b{font-variant-numeric:tabular-nums}
+  .chnote{padding:34px 16px;color:var(--mute);font-size:.86rem;text-align:center}
+
+  /* holder tables */
+  .tables{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
+  .tbl{border:1px solid var(--line);border-radius:14px;background:var(--glass);overflow:hidden}
+  .tbl h3{font-size:.74rem;letter-spacing:.05em;text-transform:uppercase;margin:0;padding:12px 15px;border-bottom:1px solid var(--line);color:var(--dim);display:flex;justify-content:space-between}
+  .tbl h3.buy{color:var(--lime)} .tbl h3.sell{color:var(--coral)}
+  table{width:100%;border-collapse:collapse;font-family:ui-monospace,monospace;font-size:.8rem}
+  td{padding:8px 15px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
   tr:first-child td{border-top:none}
-  td a{color:var(--ink);text-decoration:none} td a:hover{color:var(--green)}
-  .num{text-align:right} .pos{color:var(--green)} .neg{color:var(--red)}
-  .snipe{color:var(--amber);font-size:.7rem;margin-left:5px}
-  .foot{color:var(--mute);font-size:.76rem;margin-top:16px;line-height:1.5;font-family:var(--mono)}
-  @media(max-width:820px){.scores{grid-template-columns:repeat(3,1fr)}.tables{grid-template-columns:1fr}}
+  .num{text-align:right} .pos{color:var(--lime)} .neg{color:var(--coral)}
+  .snipe{color:var(--amber);margin-left:5px;font-size:.72rem}
+  .empty{color:var(--mute);padding:16px 15px;font-size:.8rem}
+  .foot{color:var(--mute);font-size:.8rem;margin-top:30px;line-height:1.55;max-width:88ch}
+  @media(max-width:860px){.top{grid-template-columns:1fr}.verdict{text-align:left}.verdict .drv{margin-left:0}
+    .facs{grid-template-columns:repeat(2,1fr)}.place{grid-template-columns:1fr}.tables{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
 <div class="wrap">
   <header>
-    <div class="brand">BLOCK<b>0</b><span class="sub">from block zero · who's holding · who's dumping · live</span></div>
-    <form id="f">
-      <input name="address" placeholder="paste token contract 0x…" autocomplete="off" spellcheck="false">
-      <input name="decimals" type="number" value="18" title="token decimals">
-      <button type="submit">Scan</button>
-      <div class="tf" id="tf">
-        <button type="button" data-w="300">1H</button>
-        <button type="button" data-w="1200" class="on">4H</button>
-        <button type="button" data-w="7200">1D</button>
-      </div>
-    </form>
+    <a class="brand" href="/">block<b>0</b></a>
+    <div class="chain"><i></i> Robinhood Chain</div>
+    <a class="back" href="/">← all launches</a>
   </header>
-
-  <div class="state" id="state">paste a token and hit Scan — a token launched today loads its whole history in seconds.</div>
-
-  <div class="scores" id="scores"></div>
-
-  <div class="chartwrap">
-    <div class="ch-h">
-      <span id="chtitle">wallet flow — buys above, sells below</span>
-      <span class="legend"><span><i style="background:var(--green)"></i>buy</span><span><i style="background:var(--red)"></i>sell</span><span><i style="background:#fff"></i>new wallet</span></span>
-    </div>
-    <canvas id="cv"></canvas>
-    <div class="tip" id="tip"></div>
-  </div>
-
-  <div class="tables">
-    <div class="tbl"><h3 class="sell">who's selling</h3><table id="sellers"></table></div>
-    <div class="tbl"><h3 class="buy">who's buying</h3><table id="buyers"></table></div>
-  </div>
-
-  <div class="foot" id="foot">Signal, not proof — reconstructed from public chain data, reproducible. Not financial advice.</div>
+  <div id="root"><div class="state">Loading the dossier…</div></div>
+  <div class="foot"><b>Signal, not proof — never a buy recommendation.</b> Every number is reconstructed from public Robinhood-Chain transfer data and is reproducible. Risk is a transparent composite of concentration, snipers, bundles, live insider-dumping and the deployer's bag. Blueprint fit and the valuation ladder place this token against the biggest past graduations — a pattern, not a promise. Prices are swap-implied reconstructions (no oracle), smoothed; treat exact figures as estimates.</div>
 </div>
 
-<script type="module">
-import { renderChart, mountChart } from "./chart.js";
+<script>
+const $=(s,r=document)=>r.querySelector(s);
+const short=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"—";
+const mcT=(x)=>x==null?"—":x>=1e6?"$"+(x/1e6).toFixed(2)+"M":x>=1e3?"$"+(x/1e3).toFixed(0)+"k":"$"+Math.round(x||0);
+const kT=(x)=>{const n=Math.abs(x),s=x<0?"-":"";return n>=1e9?s+(n/1e9).toFixed(2)+"B":n>=1e6?s+(n/1e6).toFixed(2)+"M":n>=1e3?s+(n/1e3).toFixed(1)+"k":s+Math.round(n);};
+const pxUsd=(x)=>x==null?"—":x>=1?"$"+x.toFixed(3):"$"+x.toPrecision(3);
+const band=(r)=>r>=66?"var(--coral)":r>=45?"var(--amber)":r>=25?"var(--cyan)":"var(--lime)";
+const sev=(v)=>v>=60?"var(--coral)":v>=30?"var(--amber)":v>=12?"var(--cyan)":"var(--lime)";
+const HUES=["#c8ff4d","#35e6e0","#ff5cf0","#ffd23d","#ff8a5c","#7ee787","#8ab4ff","#ff7ab6"];
+const q=new URLSearchParams(location.search), ADDR=(q.get("address")||"").toLowerCase();
 
-const $ = (s) => document.querySelector(s);
-const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
-const k = (x) => { const n = Math.abs(x); const s = x < 0 ? "-" : ""; return n >= 1e6 ? s + (n/1e6).toFixed(2)+"M" : n >= 1e3 ? s + (n/1e3).toFixed(1)+"k" : s + n.toFixed(0); };
-const ES = (a) => `https://etherscan.io/address/${a}`;
+function icon(r){const sym=r.sym||"?";let h=0;for(let i=0;i<sym.length;i++)h=(h*31+sym.charCodeAt(i))|0;
+  const bg=HUES[Math.abs(h)%HUES.length],ini=sym.replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?";
+  return r.logo?`<div class="ic" style="background:${bg}"><img src="${r.logo}" alt="" onerror="this.parentNode.textContent='${ini}'"></div>`:`<div class="ic" style="background:${bg}">${ini}</div>`;}
 
-let windowBlocks = 1200, es = null, chart = mountChart($("#cv"), $("#tip"));
+function meter(k,v,detail){const c=sev(v);return `<div class="fac"><div class="fh"><span class="fk">${k}</span><span class="fv" style="color:${c}">${v}</span></div>
+  <div class="ftrack"><div class="ffill" style="width:${Math.max(3,Math.min(100,v))}%;background:${c}"></div></div><div class="fd">${detail}</div></div>`;}
 
-function scoreTiles(r){
-  const s = r.scores, sell = s.pressure === "sell";
-  const tiles = [
-    { cls: sell?"sell":"buy", v: sell?"SELL":"BUY", k: `net pressure ${k(s.netVol)} (${s.buys} buys · ${s.sells} sells)` },
-    { cls: "cy", v: s.holders, k: "holders right now" },
-    { cls: s.top10Share>60?"warn":"", v: s.top10Share+"%", k: "held by top 10 wallets" },
-    { cls: s.snipers?"warn":"", v: s.snipers, k: `snipers · hold ${s.sniperHeldShare}%` },
-    { cls: s.bundles?"warn":"", v: s.bundles, k: "same-block bundles" },
-    { cls: "", v: (r.mode==="full"?"FULL":"~"+s.spanHours+"h"), k: r.mode==="full"?"whole history (exact)":"trailing window" },
-  ];
-  $("#scores").innerHTML = tiles.map(t=>`<div class="sc ${t.cls}"><div class="v">${t.v}</div><div class="k">${t.k}</div></div>`).join("");
+const DRV={concentration:"top-heavy — a few wallets hold the float",dumping:"insiders are selling into the market now",
+  bundles:"coordinated same-block buying at launch",snipers:"heavy block-0 sniping",deployer:"the deployer still holds a big bag"};
+
+function placement(r){
+  if(r.graduated){
+    return `<div class="place"><div class="pcard" style="grid-column:1/-1">
+      <div class="ph">graduated token</div>
+      <div class="pl" style="color:var(--cyan)">This token completed the bonding curve.</div>
+      <div class="psub">The blueprint & launch-corridor signals grade a token's <i>path to graduation</i> — they no longer apply once it's out. The forensic verdict above (concentration, dumping, distribution) is the live read for a graduated coin; the history below shows how its score and valuation evolved.</div></div></div>`;
+  }
+  const bp=r.blueprint||0, bpc=bp>=75?"var(--lime)":bp>=55?"var(--cyan)":bp>=35?"var(--amber)":"var(--mute)";
+  const cor=r.corridor, CS={"on-track":"var(--lime)","behind":"var(--amber)","failing":"var(--coral)"},
+    CSL={"on-track":"on winner pace","behind":"behind winner pace","failing":"stalling — off pace"};
+  const p=r.path, pre=r.precedent;
+  const PC={ahead:"var(--amber)","on-path":"var(--lime)",lagging:"var(--cyan)","off-path":"var(--mute)"},
+    PL={ahead:"ahead of the winner band",lagging:"lagging the winners","on-path":"inside the winner band","off-path":"below the winner band"};
+  let ladder="";
+  if(p&&pre){
+    const lo=pre.p25,hi=pre.p75,med=pre.med,cur=r.mcapUsd||0;
+    const axLo=Math.min(lo,cur)*0.6||1, axHi=Math.max(hi,cur)*1.25||1;
+    const X=(v)=>Math.max(0,Math.min(100,(Math.log10(v)-Math.log10(axLo))/(Math.log10(axHi)-Math.log10(axLo))*100));
+    ladder=`<div class="ladbar"><div class="band" style="left:${X(lo)}%;right:${100-X(hi)}%"></div><div class="you" style="left:${X(cur)}%"></div></div>
+      <div class="ladlab"><span>${mcT(axLo)}</span><span>winner band ${mcT(lo)}–${mcT(hi)}</span><span>${mcT(axHi)}</span></div>`;
+  }
+  return `<div class="place">
+    <div class="pcard"><div class="ph">◆ Blueprint fit</div><div class="pv" style="color:${bpc}">${bp}<span class="u">/100</span></div>
+      <div class="pl" style="color:${bpc}">${r.blueprintLabel||""}</div>
+      <div class="psub">How well this launch matches the winner fingerprint from the 10 biggest graduations: no bundles, an opening float, a settled score, real adoption.</div></div>
+    <div class="pcard"><div class="ph">▸ Launch corridor</div>${cor?`<div class="pv" style="color:${CS[cor.status]}">${cor.traj}<span class="u">/100</span></div>
+      <div class="pl" style="color:${CS[cor.status]}">${CSL[cor.status]||""}</div>
+      <div class="psub">Its live trajectory score vs the healthy zone winners sat in at ${r.ageH}h old (${cor.zoneLo}–${cor.zoneHi}). Combines distribution health with real wallet inflow.</div>`:`<div class="pv" style="color:var(--mute)">—</div><div class="psub">not enough history yet</div>`}</div>
+    <div class="pcard"><div class="ph">Valuation ladder · where the winners were at ${(r.wallets||0).toLocaleString()} wallets</div>
+      ${pre?`<div class="pv" style="color:var(--cyan)">${mcT(pre.med)}<span class="u">precedent mcap</span></div>
+      <div class="pl" style="color:${p?PC[p.pos]:'var(--mute)'}">${p?`${PL[p.pos]} · ${p.ratio}× the median`:""}</div>${ladder}
+      <div class="psub">Now at <b style="color:var(--tx)">${mcT(r.mcapUsd)}</b> with ${(r.wallets||0).toLocaleString()} unique buyer wallets. The band is the 25th–75th percentile mcap winners carried at this wallet count.</div>`
+      :`<div class="pv" style="color:var(--mute)">—</div><div class="psub">need more unique wallets to place on the ladder</div>`}</div>
+  </div>`;
 }
-function tbl(el, rows, dir){
-  el.innerHTML = rows.map(w=>`<tr><td><a href="${ES(w.a)}" target="_blank" rel="noreferrer">${short(w.a)}</a>${w.sniper?'<span class="snipe">⚡</span>':''}</td><td class="num ${dir}">${dir==="neg"?"":"+"}${k(w.net)}</td><td class="num" style="color:var(--mute)">bag ${k(w.bal)}</td></tr>`).join("") || `<tr><td style="color:var(--mute)">—</td></tr>`;
+
+function tableRows(rows,dir){
+  if(!rows||!rows.length) return `<tr><td class="empty">no wallets ${dir==='top'?'':'moving'} right now</td></tr>`;
+  return rows.map(w=>{
+    const val = dir==="top" ? `<td class="num" style="color:var(--dim)">${kT(w.bal)}</td>`
+      : `<td class="num ${dir==='buy'?'pos':'neg'}">${w.net>0?"+":""}${kT(w.net)}</td>`;
+    return `<tr><td>${short(w.a)}${w.sniper?'<span class="snipe">⚡</span>':''}</td>${val}</tr>`;}).join("");
 }
 
-async function scan(){
-  const address = $("[name=address]").value.trim();
-  const decimals = $("[name=decimals]").value || 18;
-  if(!/^0x[0-9a-fA-F]{40}$/.test(address)){ $("#state").innerHTML = '<span class="err">that doesn\'t look like a contract address</span>'; return; }
-  $("#state").textContent = "scanning… pulling transfers from chain";
-  if(es){ es.close(); es = null; }
+function render(r){
+  const c=band(r.risk), f=r.flags, p=r.parts||{};
+  const facs=[
+    meter("Snipers",p.snipers||0,f.snipers?`${f.snipers} wallet${f.snipers>1?'s':''} · hold ${f.sniperHeldPct}%`:"none at launch"),
+    meter("Bundles",p.bundles||0,f.bundles?`${f.bundles} group${f.bundles>1?'s':''} · ${f.bundleWallets} wallets · ${f.bundleHeldPct}%`:"none detected"),
+    meter("Concentration",p.concentration||0,`top 10 hold ${f.top10Pct}%`),
+    meter("Dumping now",p.dumping||0,f.insiderSellersNow?`${f.insiderSellersNow} insider${f.insiderSellersNow>1?'s':''} · ${f.insiderDumpNowPct}%`:"none selling"),
+    meter("Deployer",p.deployer||0,f.creatorPct>0?`holds ${f.creatorPct}%`:"empty / distributed"),
+  ].join("");
+  const badge=r.graduated?'<span class="badge grad">graduated</span>':'<span class="badge cook">cooking</span>';
+  const prog=(!r.graduated&&r.progress!=null)?`<div class="prog"><div class="lab"><span>bonding-curve progress to graduation</span><b>${r.progress}%</b></div><div class="track"><div class="fill" style="width:${Math.min(100,r.progress)}%"></div></div></div>`:"";
+  const heat=r.momentum>3?'▲ heating':r.momentum<-3?'▼ cooling':'– flat';
+  $("#root").innerHTML=`
+    <div class="top">
+      <div class="idn">${icon(r)}<div class="who">
+        <div class="sym">${r.sym} ${badge}</div>
+        ${r.name?`<div class="name">${r.name}</div>`:""}
+        <div class="addr" title="click to copy" onclick="navigator.clipboard&&navigator.clipboard.writeText('${r.address}')">${r.address}</div>
+        <div class="facts">
+          <div class="fact"><div class="v" style="color:var(--cyan)">${mcT(r.mcapUsd)}</div><div class="k">market cap</div></div>
+          <div class="fact"><div class="v">${(f.holders||0).toLocaleString()}</div><div class="k">holders</div></div>
+          <div class="fact"><div class="v">${(r.wallets||0).toLocaleString()}</div><div class="k">unique buyers</div></div>
+          <div class="fact"><div class="v">${r.ageH<48?r.ageH+"h":Math.round(r.ageH/24)+"d"}</div><div class="k">age</div></div>
+          <div class="fact"><div class="v">${heat}</div><div class="k">momentum</div></div>
+        </div>
+      </div></div>
+      <div class="verdict"><div class="n" style="color:${c}">${r.risk}</div><div class="l" style="color:${c}">${r.label}</div>
+        <div class="drv">${r.topFactor?DRV[r.topFactor]:"no single dominant risk driver"}</div></div>
+      ${prog}
+    </div>
+
+    <h2 class="sec">What's under the hood</h2>
+    <div class="facs">${facs}</div>
+
+    <h2 class="sec">${r.graduated?"Status":"Where it stands vs the winners"}</h2>
+    ${placement(r)}
+
+    <h2 class="sec">History — valuation &amp; score over time</h2>
+    <div class="chartwrap">
+      <div class="ch-h">
+        <div class="views" id="views">
+          <button class="view on" data-v="mcap">Market cap</button>
+          <button class="view" data-v="price">Price</button>
+          <button class="view" data-v="wallets">Unique wallets</button>
+          <button class="view" data-v="volUsd">Volume</button>
+        </div>
+        <div class="legend"><span id="pmlabel"><i style="background:var(--cyan)"></i>market cap</span><span><i style="background:var(--lime)"></i>risk score (0–100, right)</span></div>
+      </div>
+      <div style="position:relative"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
+      <div class="chnote" id="chnote" hidden></div>
+    </div>
+
+    <h2 class="sec">Who's in it</h2>
+    <div class="tables">
+      <div class="tbl"><h3 class="buy">Adding now <span>net 30m</span></h3><table>${tableRows(r.buyers,"buy")}</table></div>
+      <div class="tbl"><h3 class="sell">Shedding now <span>net 30m</span></h3><table>${tableRows(r.sellers,"sell")}</table></div>
+      <div class="tbl"><h3>Biggest bags <span>balance</span></h3><table>${tableRows(r.topHolders,"top")}</table></div>
+    </div>`;
+  loadHistory(r);
+}
+
+/* ---------------- history chart (canvas, no deps) ---------------- */
+let SERIES=null, VIEW="mcap", CV, TIP, DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+const VMETA={mcap:{lab:"market cap",fmt:mcT,col:"#35e6e0"},price:{lab:"price",fmt:pxUsd,col:"#35e6e0"},
+  wallets:{lab:"unique wallets",fmt:(x)=>Math.round(x).toLocaleString(),col:"#ff5cf0"},volUsd:{lab:"volume / bucket",fmt:mcT,col:"#ffd23d"}};
+
+async function loadHistory(r){
+  CV=$("#cv"); TIP=$("#tip");
+  const note=$("#chnote");
   try{
-    const r = await fetch(`/api/scan?address=${address}&decimals=${decimals}&window=${windowBlocks}`).then(x=>x.json());
-    if(r.error){ $("#state").innerHTML = `<span class="err">${r.error}</span>`; return; }
-    $("#state").innerHTML = `<span class="live-dot"></span><span class="live">live</span> · ${r.mode} scan · ${r.scores.transfers} transfers in ${r.pullMs}ms · pool ${short(r.pool)} · block ${r.latestBlock}`;
-    scoreTiles(r);
-    tbl($("#sellers"), r.sellers, "neg");
-    tbl($("#buyers"), r.buyers, "pos");
-    chart.load(r.events);
-    // open the live tail
-    es = new EventSource(`/api/stream?address=${address}&decimals=${decimals}`);
-    es.addEventListener("tx", (e)=>{ const d = JSON.parse(e.data); chart.push(d); });
-    es.addEventListener("head", (e)=>{ const d = JSON.parse(e.data); if(d.n) $("#state").innerHTML = `<span class="live-dot"></span><span class="live">live</span> · block ${d.block} · +${d.n} new`; });
-    es.onerror = ()=>{ /* auto-reconnects */ };
-  }catch(err){ $("#state").innerHTML = `<span class="err">scan failed: ${err.message}</span>`; }
+    const bt=await fetch(`/api/backtest?token=${r.address}`).then(x=>x.json());
+    if(bt.error||!bt.series||bt.series.length<3){ CV.style.display="none"; note.hidden=false; note.textContent="Not enough trade history to reconstruct a timeline for this token yet."; return; }
+    SERIES=bt.series.map(s=>({t:s.t,risk:s.risk,label:s.label,mcap:s.mcap,price:s.price,wallets:s.wallets,volUsd:s.volUsd,holders:s.holders,top10:s.top10}));
+    drawChart(); wireChart();
+  }catch(e){ CV.style.display="none"; note.hidden=false; note.textContent="History is still reconstructing — reload in a moment."; }
+}
+function wireChart(){
+  $("#views").addEventListener("click",(e)=>{const b=e.target.closest(".view");if(!b)return;VIEW=b.dataset.v;
+    document.querySelectorAll("#views .view").forEach(x=>x.classList.toggle("on",x===b));
+    const m=VMETA[VIEW];$("#pmlabel").innerHTML=`<i style="background:${m.col}"></i>${m.lab}`;drawChart();});
+  CV.addEventListener("pointermove",onHover); CV.addEventListener("pointerleave",()=>{TIP.style.display="none";drawChart();});
+  addEventListener("resize",()=>drawChart());
+}
+let GEO=null;
+function drawChart(hoverIdx=-1){
+  if(!SERIES) return;
+  const m=VMETA[VIEW], W=CV.clientWidth, H=CV.clientHeight;
+  CV.width=W*DPR; CV.height=H*DPR; const g=CV.getContext("2d"); g.setTransform(DPR,0,0,DPR,0,0); g.clearRect(0,0,W,H);
+  const padL=64,padR=52,padT=16,padB=26, iw=W-padL-padR, ih=H-padT-padB;
+  const pts=SERIES.filter(s=>s[VIEW]!=null && isFinite(s[VIEW]));
+  if(pts.length<2){return;}
+  const t0=SERIES[0].t, t1=SERIES[SERIES.length-1].t, tspan=Math.max(1,t1-t0);
+  const xOf=(t)=>padL+(t-t0)/tspan*iw;
+  // primary axis (log for mcap/price/volume, linear for wallets)
+  const vals=pts.map(s=>s[VIEW]).filter(v=>v>0);
+  const logScale=VIEW!=="wallets";
+  let vmin=Math.min(...vals), vmax=Math.max(...vals);
+  if(!isFinite(vmin)||!isFinite(vmax)||vmin===vmax){vmin=vmin||0;vmax=(vmax||1)*1.2+1;}
+  const yOf=(v)=>{ if(logScale){const a=Math.log10(Math.max(vmin*0.85,1e-9)),b=Math.log10(vmax*1.1);return padT+ih-(Math.log10(Math.max(v,10**a))-a)/(b-a)*ih;}
+    return padT+ih-(v-0)/((vmax*1.15)-0)*ih; };
+  const yRisk=(r)=>padT+ih-(r/100)*ih;
+  // grid + primary y labels
+  g.font="11px Inter,system-ui,sans-serif"; g.textBaseline="middle";
+  g.strokeStyle="rgba(255,255,255,.06)"; g.fillStyle="#7f7f88"; g.lineWidth=1;
+  for(let i=0;i<=4;i++){const yy=padT+ih*i/4; g.beginPath();g.moveTo(padL,yy);g.lineTo(W-padR,yy);g.stroke();
+    const v= logScale? 10**(Math.log10(Math.max(vmin*0.85,1e-9))+(Math.log10(vmax*1.1)-Math.log10(Math.max(vmin*0.85,1e-9)))*(1-i/4)) : (vmax*1.15)*(1-i/4);
+    g.textAlign="right"; g.fillText(m.fmt(v),padL-8,yy);}
+  // right axis (risk 0..100)
+  g.textAlign="left"; for(let i=0;i<=4;i++){const yy=padT+ih*i/4; g.fillStyle="#7f7f88"; g.fillText((100-i*25)+"",W-padR+8,yy);}
+  // x labels (age)
+  g.textAlign="center"; g.fillStyle="#7f7f88";
+  for(let i=0;i<=4;i++){const t=t0+tspan*i/4, xx=xOf(t), ageH=(t-t0)/3600;
+    g.fillText(ageH<48?Math.round(ageH)+"h":Math.round(ageH/24)+"d",xx,H-10);}
+  // risk score — filled ribbon + line (the "score evolution"), colored by its own band via gradient segments
+  g.lineWidth=2;
+  for(let i=1;i<SERIES.length;i++){const a=SERIES[i-1],b=SERIES[i];
+    g.strokeStyle= b.risk>=66?"#ff3b5c":b.risk>=45?"#ffd23d":b.risk>=25?"#35e6e0":"#c8ff4d";
+    g.beginPath();g.moveTo(xOf(a.t),yRisk(a.risk));g.lineTo(xOf(b.t),yRisk(b.risk));g.stroke();}
+  // primary series line
+  g.strokeStyle=m.col; g.lineWidth=2.4; g.beginPath(); let started=false;
+  for(const s of SERIES){ const v=s[VIEW]; if(v==null||!isFinite(v)){continue;} const x=xOf(s.t),y=yOf(v);
+    if(!started){g.moveTo(x,y);started=true;}else g.lineTo(x,y);} g.stroke();
+  // area fill under primary
+  if(started){g.lineTo(xOf(t1),padT+ih);g.lineTo(xOf(t0),padT+ih);g.closePath();
+    const grd=g.createLinearGradient(0,padT,0,padT+ih);grd.addColorStop(0,m.col+"33");grd.addColorStop(1,m.col+"00");g.fillStyle=grd;g.fill();}
+  // hover marker
+  if(hoverIdx>=0&&hoverIdx<SERIES.length){const s=SERIES[hoverIdx],x=xOf(s.t);
+    g.strokeStyle="rgba(255,255,255,.22)";g.lineWidth=1;g.beginPath();g.moveTo(x,padT);g.lineTo(x,padT+ih);g.stroke();
+    if(s[VIEW]!=null){g.fillStyle=m.col;g.beginPath();g.arc(x,yOf(s[VIEW]),4,0,7);g.fill();}
+    g.fillStyle="#fff";g.beginPath();g.arc(x,yRisk(s.risk),3.5,0,7);g.fill();}
+  GEO={padL,padR,padT,padB,iw,ih,t0,t1,tspan,xOf};
+}
+function onHover(e){
+  if(!SERIES||!GEO) return;
+  const rect=CV.getBoundingClientRect(), mx=e.clientX-rect.left;
+  const t=GEO.t0+Math.max(0,Math.min(1,(mx-GEO.padL)/GEO.iw))*GEO.tspan;
+  let idx=0,best=1e18; for(let i=0;i<SERIES.length;i++){const d=Math.abs(SERIES[i].t-t);if(d<best){best=d;idx=i;}}
+  const s=SERIES[idx]; drawChart(idx);
+  const m=VMETA[VIEW], ageH=(s.t-GEO.t0)/3600;
+  const rc=s.risk>=66?"var(--coral)":s.risk>=45?"var(--amber)":s.risk>=25?"var(--cyan)":"var(--lime)";
+  TIP.innerHTML=`<div class="d">${ageH<48?ageH.toFixed(1)+"h old":Math.round(ageH/24)+"d old"}</div>
+    <b style="color:${m.col}">${m.fmt(s[VIEW]??0)}</b> ${m.lab}<br>
+    <b style="color:${rc}">risk ${s.risk}</b> ${s.label}<br>
+    <span style="color:var(--mute)">${(s.wallets||0).toLocaleString()} wallets · top10 ${s.top10}% · ${s.holders} holders</span>`;
+  TIP.style.display="block";
+  const x=GEO.xOf(s.t), tw=TIP.offsetWidth;
+  TIP.style.left=Math.max(6,Math.min(CV.clientWidth-tw-6,x-tw/2))+"px"; TIP.style.top="14px";
 }
 
-$("#f").addEventListener("submit",(e)=>{ e.preventDefault(); scan(); });
-$("#tf").addEventListener("click",(e)=>{ const b = e.target.closest("[data-w]"); if(!b) return; windowBlocks = +b.dataset.w; document.querySelectorAll("#tf button").forEach(x=>x.classList.toggle("on", x===b)); if($("[name=address]").value.trim()) scan(); });
-addEventListener("resize", ()=>chart.resize());
-// deep-link: /token?address=0x… (from a board card) auto-scans
-const _q=new URLSearchParams(location.search), _a=_q.get("address");
-if(_a){ $("[name=address]").value=_a; if(_q.get("decimals")) $("[name=decimals]").value=_q.get("decimals"); }
-if($("[name=address]").value.trim()) scan();
+async function boot(){
+  if(!/^0x[0-9a-f]{40}$/.test(ADDR)){ $("#root").innerHTML='<div class="state err">No token address in the URL. Open a token from the board.</div>'; return; }
+  try{
+    const r=await fetch(`/api/token?address=${ADDR}`).then(x=>x.json());
+    if(r.error){ $("#root").innerHTML=`<div class="state err">${r.error}</div>`; return; }
+    document.title=`${r.sym} — Block0 dossier`;
+    render(r);
+  }catch(e){ $("#root").innerHTML=`<div class="state err">Couldn't load this token: ${e.message}. The scanner may still be warming up — reload in a moment.</div>`; }
+}
+boot();
 </script>
 </body>
 </html>

@@ -13,6 +13,7 @@ import { latestBlock } from "./rpc.mjs";
 import { watchLogs, WS_ENABLED } from "./ws.mjs";
 import { refreshBoard, getBoard, ensureFresh } from "./board.mjs";
 import { backtest } from "./backtest.mjs";
+import { tokenDossier } from "./dossier.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
@@ -94,6 +95,14 @@ createServer(async (req, res) => {
       const out = await _btCache.get(key);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(out));
+    }
+
+    if (u.pathname === "/api/token") {
+      const address = (u.searchParams.get("address") || "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(address)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?address=0x…"}'); }
+      const r = await tokenDossier(address);
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify(r));
     }
 
     if (u.pathname === "/api/board") {

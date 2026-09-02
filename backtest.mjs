@@ -8,7 +8,8 @@
 // Alchemy-only (uses the enhanced getAssetTransfers to keep tx hashes for the receipt lookups).
 import { detectPool, ROUTERS } from "./engine.mjs";
 import { computeRisk } from "./intel.mjs";
-import { rpc, hx } from "./rpc.mjs";
+import { rpc, toNum, PROVIDER, getTransferLogs, latestBlock, findDeployBlock } from "./rpc.mjs";
+import { estimateBlockAt, chainCalibration, parseTs } from "./store.mjs";
 
 const ZERO = "0x0000000000000000000000000000000000000000", DEAD = "0x000000000000000000000000000000000000dead";
 const AMM = "0x8366a39cc670b4001a1121b8f6a443a643e40951"; // RH singleton AMM
@@ -16,23 +17,49 @@ const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73", USDG = "0x5fc5360d040
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
 const big = (h) => BigInt(h && h !== "0x" ? h : "0x0"); // guard empty "0x" data fields
 
-// transfer history from launch WITH tx hashes (needed for receipt-based price). Alchemy enhanced API, paged
-// ascending from block 0. `cap` bounds the pull to the launch window for fast cohort profiling.
-async function pullWithHash(addr, cap = 400000) {
-  const ev = []; let pageKey, guard = 0;
-  const maxPages = Math.ceil(cap / 1000);
-  do {
-    const p = { fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "asc", withMetadata: true, excludeZeroValue: false, maxCount: "0x3e8" };
-    if (pageKey) p.pageKey = pageKey;
-    const r = await rpc("alchemy_getAssetTransfers", [p]);
-    for (const t of r?.transfers || []) ev.push({
-      from: (t.from || "").toLowerCase(), to: (t.to || "").toLowerCase(),
-      amt: t.rawContract?.value ? Number(big(t.rawContract.value)) / 1e18 : Number(t.value || 0),
-      ts: t.metadata?.blockTimestamp ? Math.floor(Date.parse(t.metadata.blockTimestamp) / 1000) : null,
-      block: Number(big(t.blockNum || "0x0")), hash: t.hash,
+// transfer history from launch WITH tx hashes (needed for receipt-based price). Provider-aware:
+//  • Alchemy → the enhanced getAssetTransfers (range-uncapped, paged, carries hash + blockTimestamp).
+//  • any other RPC (incl. the native RH node) → eth_getLogs from the launch block, keeping transactionHash;
+//    the RH node's logs carry no blockTimestamp, so each transfer's time is derived from its block via a
+//    one-time linear chain calibration. `launchedAt` (Pons) bounds the pull to since-launch so it's not a
+//    genesis-deep scan. `cap` bounds the Alchemy paging for fast cohort profiling.
+async function pullWithHash(addr, cap = 400000, opts = {}) {
+  if (PROVIDER === "alchemy") {
+    const ev = []; let pageKey, guard = 0;
+    const maxPages = Math.ceil(cap / 1000);
+    do {
+      const p = { fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "asc", withMetadata: true, excludeZeroValue: false, maxCount: "0x3e8" };
+      if (pageKey) p.pageKey = pageKey;
+      const r = await rpc("alchemy_getAssetTransfers", [p]);
+      for (const t of r?.transfers || []) ev.push({
+        from: (t.from || "").toLowerCase(), to: (t.to || "").toLowerCase(),
+        amt: t.rawContract?.value ? Number(big(t.rawContract.value)) / 1e18 : Number(t.value || 0),
+        ts: t.metadata?.blockTimestamp ? Math.floor(Date.parse(t.metadata.blockTimestamp) / 1000) : null,
+        block: Number(big(t.blockNum || "0x0")), hash: t.hash,
+      });
+      pageKey = r?.pageKey;
+    } while (pageKey && ++guard < maxPages && ev.length < cap);
+    return ev;
+  }
+  // generic path: eth_getLogs from the launch block, with block→time calibration for the missing timestamps
+  const latest = await latestBlock();
+  const ts0 = parseTs(opts.launchedAt);
+  const from = ts0 != null ? await estimateBlockAt(ts0, latest) : await findDeployBlock(addr, latest);
+  const cal = await chainCalibration(latest);
+  const tsAt = (b) => Math.round(cal.headTs - (cal.headBlock - b) * cal.spb);
+  const logs = await getTransferLogs(addr, from, latest);
+  const ev = [];
+  for (const l of logs) {
+    if (!l.topics || l.topics.length !== 3) continue; // ERC-20 Transfer has 3 topics
+    const block = toNum(l.blockNumber);
+    ev.push({
+      from: "0x" + l.topics[1].slice(26).toLowerCase(), to: "0x" + l.topics[2].slice(26).toLowerCase(),
+      amt: Number(big(l.data || "0x0")) / 1e18,
+      ts: l.blockTimestamp ? toNum(l.blockTimestamp) : tsAt(block),
+      block, hash: l.transactionHash,
     });
-    pageKey = r?.pageKey;
-  } while (pageKey && ++guard < maxPages && ev.length < cap);
+  }
+  ev.sort((a, b) => a.block - b.block);
   return ev;
 }
 
@@ -57,7 +84,7 @@ async function swapPrice(hash, addr, ethUsd, venues) {
 export async function backtest(addr, opts = {}) {
   addr = addr.toLowerCase();
   const points = opts.points || 90, ethUsd = opts.ethUsd || 3000, grad = !!opts.graduated;
-  const ev = await pullWithHash(addr, opts.cap || 400000);
+  const ev = await pullWithHash(addr, opts.cap || 400000, { launchedAt: opts.launchedAt });
   const sorted = ev.filter((e) => e.ts).sort((a, b) => a.ts - b.ts || a.block - b.block);
   if (sorted.length < 8) return { addr, sym: opts.sym, error: "too few timestamped transfers", n: sorted.length };
 
