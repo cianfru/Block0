@@ -14,7 +14,7 @@ const ZERO = "0x0000000000000000000000000000000000000000", DEAD = "0x00000000000
 const AMM = "0x8366a39cc670b4001a1121b8f6a443a643e40951"; // RH singleton AMM
 const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73", USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
-const big = (h) => BigInt(h || "0x0");
+const big = (h) => BigInt(h && h !== "0x" ? h : "0x0"); // guard empty "0x" data fields
 
 // full transfer history WITH tx hashes (needed for receipt-based price). Alchemy enhanced API, paged.
 async function pullWithHash(addr) {
