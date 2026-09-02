@@ -2,9 +2,25 @@
 // cohort, used to place a LIVE token against the winners' precedent in real time. model.json is regenerated
 // from the backtest study (tools/gen-model); if it's missing the helpers no-op so the board still runs.
 import { readFileSync } from "node:fs";
-let LADDER = [];
-try { LADDER = JSON.parse(readFileSync(new URL("./model.json", import.meta.url), "utf8")).ladder || []; } catch { /* no model yet */ }
+let LADDER = [], CORRIDOR = [];
+try { const m = JSON.parse(readFileSync(new URL("./model.json", import.meta.url), "utf8")); LADDER = m.ladder || []; CORRIDOR = m.corridor || []; } catch { /* no model yet */ }
 const log10 = Math.log10;
+const clamp = (x) => Math.max(0, Math.min(100, x));
+
+// live TRAJECTORY score for a token at a given age = distribution health (blueprint) blended with real demand
+// (adoption depth + average wallet inflow over its life) — the same score the launch-corridor study is built on.
+export function liveTrajectory({ blueprint = 0, holders = 0, ageH = 0 }) {
+  const inflow = ageH > 0 ? holders / ageH : holders; // avg unique wallets/hr — a live proxy for the study's trailing rate
+  const demand = clamp(Math.min(55, 18 * log10(holders + 1)) + Math.min(45, inflow * 1.3));
+  return Math.round(0.5 * blueprint + 0.5 * demand);
+}
+// where that score sits vs the winner corridor's healthy zone at this age
+export function corridorStatus(ageH, traj) {
+  if (!CORRIDOR.length) return null;
+  const b = CORRIDOR.find((x) => ageH >= x.lo && ageH < x.hi) || CORRIDOR[CORRIDOR.length - 1];
+  const status = traj < 35 ? "failing" : traj >= b.q1 ? "on-track" : "behind";
+  return { traj, zoneLo: b.q1, zoneHi: b.q3, med: b.med, status };
+}
 
 // winner-precedent market cap at a given unique-wallet count (log-interpolated across the ladder rungs)
 export function precedentValuation(wallets) {

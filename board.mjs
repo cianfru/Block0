@@ -10,7 +10,7 @@
 import { computeIntel, blueprintMatch, blueprintLabel } from "./intel.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { keep, storeStats } from "./store.mjs";
-import { pathPosition } from "./model.mjs";
+import { pathPosition, liveTrajectory, corridorStatus } from "./model.mjs";
 
 export const PONS_FACTORIES = ["0x0c37a24f5d23a486fa692d1500881d698b1f77a4", "0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb"];
 const N_ACTIVE = Number(process.env.BOARD_ACTIVE || 16); // pre-graduation tokens to verdict per refresh
@@ -33,6 +33,11 @@ async function verdict(meta) {
   // current mcap sits vs the winner band at that stage
   r.wallets = r.flags.wallets || r.flags.holders;
   r.path = pathPosition(r.wallets, r.mcapUsd);
+  // age-based trajectory corridor: this token's live score vs the winner healthy-zone at its age
+  const ageH = meta.launchedAt ? (Date.now() - Date.parse(meta.launchedAt)) / 3.6e6 : (r.ageH || 0);
+  r.ageH = +ageH.toFixed(1);
+  r.trajectory = liveTrajectory({ blueprint: r.blueprint, holders: r.flags.holders, ageH });
+  r.corridor = corridorStatus(ageH, r.trajectory);
   const known = FIRST_SEEN.has(r.address); if (!known) FIRST_SEEN.set(r.address, Date.now());
   r.firstSeenAt = FIRST_SEEN.get(r.address); r.isNew = BOOTED && !known;
   return r;
