@@ -9,12 +9,15 @@
 // The ~4.2M dead-dust launches never appear — we only verdict what the launchpad surfaces as live/graduated.
 import { computeIntel, blueprintMatch, blueprintLabel } from "./intel.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
+import { recentDexTokens } from "./dex.mjs";
 import { keep, storeStats } from "./store.mjs";
 import { pathPosition, liveTrajectory, corridorStatus } from "./model.mjs";
 
 export const PONS_FACTORIES = ["0x0c37a24f5d23a486fa692d1500881d698b1f77a4", "0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb"];
 const N_ACTIVE = Number(process.env.BOARD_ACTIVE || 16); // pre-graduation tokens to verdict per refresh
 const N_GRAD = Number(process.env.BOARD_GRAD || 24);     // graduated (higher-MC) tokens to verdict per refresh
+const N_DEX = Number(process.env.BOARD_DEX || 10);       // non-Pons DEX-listed tokens to verdict per refresh
+const DEX_MIN_HOLDERS = Number(process.env.DEX_MIN_HOLDERS || 5); // spam floor for a discovered DEX token
 const NEW_MS = 150000;
 
 let CACHE = { updated: 0, scanning: false, cooking: [], graduated: [], stats: {} };
@@ -55,10 +58,29 @@ export async function refreshBoard() {
     for (const m of gradPick) { try { graduated.push(await verdict(m)); } catch { /* skip */ } }
     cooking.sort((a, b) => (b.progress || 0) - (a.progress || 0) || a.risk - b.risk);
     graduated.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0));
-    keep([...cooking, ...graduated].map((r) => r.address)); // bound store memory to the live board
+
+    // DEX-listed tokens (non-Pons, discovered on the v4 AMM) — verdicted the SAME way, venue-labeled. Soft-fails so
+    // it can never break the Pons board. Deduped against the whole Pons universe (a graduated Pons token is also on
+    // the AMM) and bounded to protect Alchemy. No bonding curve → these are their own "direct listing" category.
+    let dex = CACHE.dex || [];
+    if (N_DEX > 0) try {
+      const ponsAll = new Set([...(active.items || []), ...(grad.items || [])].map((t) => (t.address || "").toLowerCase()));
+      const cand = await recentDexTokens({ blocks: Number(process.env.DEX_BLOCKS || 80000), limit: N_DEX * 3 });
+      const picks = (cand.tokens || []).filter((m) => !ponsAll.has(m.address)).slice(0, N_DEX);
+      const dnew = [];
+      for (const m of picks) {
+        try {
+          const v = await verdict({ address: m.address, sym: m.symbol, name: m.name || null, pool: null, graduated: false, launchedAt: null });
+          if ((v.flags?.holders || 0) >= DEX_MIN_HOLDERS) { v.venue = m.venue; v.dexBlock = m.block; dnew.push(v); }
+        } catch { /* skip */ }
+      }
+      if (dnew.length) { dnew.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0)); dex = dnew; }
+    } catch { /* keep last DEX set on failure */ }
+
+    keep([...cooking, ...graduated, ...dex].map((r) => r.address)); // bound store memory to the live board
     BOOTED = true;
-    CACHE = { updated: Date.now(), scanning: false, cooking, graduated,
-      stats: { launchTotal: active.launchTotal, activeTotal: active.total, graduatedTotal: grad.total, store: storeStats() } };
+    CACHE = { updated: Date.now(), scanning: false, cooking, graduated, dex,
+      stats: { launchTotal: active.launchTotal, activeTotal: active.total, graduatedTotal: grad.total, dexTotal: dex.length, store: storeStats() } };
   } finally { CACHE = { ...CACHE, scanning: false }; }
   return CACHE;
 }

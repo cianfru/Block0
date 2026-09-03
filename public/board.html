@@ -110,6 +110,7 @@
     <div class="tab on" data-f="cooking">About to graduate</div>
     <div class="tab" data-f="blueprint">◆ Blueprint fit</div>
     <div class="tab" data-f="graduated">Graduated</div>
+    <div class="tab" data-f="dex">◇ DEX listings</div>
     <div class="tab" data-f="heating">Heating</div>
     <div class="tab" data-f="safe">Safest</div>
     <div class="tab" data-f="avoid">Avoid</div>
@@ -154,7 +155,7 @@ function card(r){const f=r.flags,p=r.parts||{},c=band(r.risk);
     <div class="row1"><div class="idn">${icon(r)}<div><div class="tk">${r.sym}${isNew(r)?'<span class="newbadge">NEW</span>':""}</div><div class="mc">${mcT(r.mcapUsd)} mcap</div></div></div>
     <div class="rk"><div class="n" style="color:${c}">${r.risk}</div><div class="l" style="color:${c}">${r.label}</div></div></div>
     ${prog}
-    <div class="meta"><span>${f.holders} holders</span><span>·</span><span>${r.momentum>3?'▲ heating':r.momentum<-3?'▼ cooling':'– flat'}</span></div>
+    <div class="meta"><span>${f.holders} holders</span><span>·</span><span>${r.momentum>3?'▲ heating':r.momentum<-3?'▼ cooling':'– flat'}</span>${r.venue?`<span>·</span><span style="color:var(--magenta)">◇ ${r.venue.replace('uniswap-','uni ')}</span>`:''}</div>
     <div class="facs">${facs}</div>
     ${chips}
     ${pathline}
@@ -164,10 +165,10 @@ function section(title,n,rows){return `<div class="bkt"><div class="bkt-h"><span
 function render(){
   const b=LAST; if(!b||((!b.cooking||!b.cooking.length)&&(!b.graduated||!b.graduated.length))){
     $("#board").innerHTML='<div class="state">'+(b&&b.scanning?"Scanning the launch universe — the first pass takes a moment…":"Waiting for the first scan…")+'</div>';return;}
-  const cooking=(b.cooking||[]).slice(), grad=(b.graduated||[]).slice();
+  const cooking=(b.cooking||[]).slice(), grad=(b.graduated||[]).slice(), dexl=(b.dex||[]).slice();
   if(SEARCH){
     const q=SEARCH.toLowerCase();
-    const hits=cooking.concat(grad).filter(r=>((r.sym||"").toLowerCase().includes(q)||(r.name||"").toLowerCase().includes(q)));
+    const hits=cooking.concat(grad,dexl).filter(r=>((r.sym||"").toLowerCase().includes(q)||(r.name||"").toLowerCase().includes(q)));
     $("#board").innerHTML=hits.length?section(`Search · "${SEARCH}"`,`${hits.length} match${hits.length>1?'es':''} in the tracked set`,hits)
       :`<div class="state">No tracked launch matches "${SEARCH}". The board tracks the most active + graduated tokens — paste a full contract address to scan any token directly.</div>`;
     return;}
@@ -179,6 +180,10 @@ function render(){
     if(strong.length)html+=section("Strong fit — fits the winner pattern",`${strong.length}`,strong);
     html+=section(strong.length?"The rest":"Blueprint fit","ranked by match",rest);
     $("#board").innerHTML=html;return;}
+  if(FILTER==="dex"){
+    $("#board").innerHTML='<p style="color:var(--dim);font-size:.9rem;margin:0 0 16px;max-width:78ch">Tokens listed <b style="color:var(--tx)">directly on the Uniswap-v4 AMM</b>, not via the Pons launchpad — discovered on-chain and verdicted by the same engine. No bonding curve, so no "graduation"; these are live from block one. Cleanest first.</p>'+
+      (dexl.length?section("Direct DEX listings",`${dexl.length} · non-Pons`,dexl.slice().sort((a,b)=>a.risk-b.risk)):'<div class="state">No DEX listings verdicted yet — the discovery pass runs alongside the board scan.</div>');
+    return;}
   if(FILTER==="graduated"){
     const tiers=[[1e8,"$100M+"],[1e7,"$10M – $100M"],[1e6,"$1M – $10M"],[0,"under $1M"]];
     let html="";
@@ -186,7 +191,7 @@ function render(){
       const rows=grad.filter(r=>(r.mcapUsd||0)>=lo&&(r.mcapUsd||0)<hi);
       if(rows.length)html+=section(tiers[i][1],`${rows.length} coin${rows.length>1?'s':''}`,rows);}
     $("#board").innerHTML=html||section("Graduated","none yet",[]);return;}
-  let all=cooking.concat(grad);
+  let all=cooking.concat(grad,dexl);
   if(FILTER==="heating") all.sort((a,b)=>(b.momentum||0)-(a.momentum||0));
   if(FILTER==="safe") all.sort((a,b)=>a.risk-b.risk||(b.ape||0)-(a.ape||0));
   if(FILTER==="avoid") all.sort((a,b)=>b.risk-a.risk||(b.flags.insiderSellersNow||0)-(a.flags.insiderSellersNow||0));
