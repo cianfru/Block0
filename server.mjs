@@ -22,6 +22,7 @@ import { PROVIDER } from "./rpc.mjs";
 import { traceEvents, discoverDex, recentDexTokens, DEX_CONFIG } from "./dex.mjs";
 import { walletIntel } from "./wallet.mjs";
 import { buildLeaderboard } from "./leaderboard.mjs";
+import { buildGraph } from "./graph.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -267,6 +268,18 @@ createServer(async (req, res) => {
       if (!out) { out = await walletIntel(address); setJSON(key, { at: Date.now(), data: out }).catch(() => {}); }
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(out));
+    }
+
+    if (u.pathname === "/api/graph") { // wallet-relationship bubble map for one token: nodes/edges/clusters (bundles)
+      const address = (u.searchParams.get("address") || "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(address)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?address=0x…"}'); }
+      const topN = Math.max(10, Math.min(300, Number(u.searchParams.get("n") || 80)));
+      const meta = await ponsMeta(address).catch(() => null);
+      const st = await getTransfers(address, 18, { pool: meta?.pool, launchedAt: meta?.launchedAt }).catch(() => ({ ev: null, pool: null }));
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      if (!st.ev || !st.ev.length) return res.end(JSON.stringify({ address, sym: meta?.sym || null, nodes: [], edges: [], clusters: [], stats: { nodes: 0, edges: 0, clusters: 0 }, note: "no transfer history yet" }));
+      const g = buildGraph(st.ev, { pool: st.pool || meta?.pool, topN });
+      return res.end(JSON.stringify({ address, sym: meta?.sym || null, name: meta?.name || null, transfers: st.ev.length, ...g }));
     }
 
     if (u.pathname === "/api/token") {
