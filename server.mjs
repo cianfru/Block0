@@ -19,7 +19,7 @@ import { KV_BACKEND, getJSON, setJSON } from "./store/kv.mjs";
 import { getTransfers } from "./store.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { PROVIDER } from "./rpc.mjs";
-import { traceEvents, discoverDex, DEX_CONFIG } from "./dex.mjs";
+import { traceEvents, discoverDex, recentDexTokens, DEX_CONFIG } from "./dex.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -177,6 +177,11 @@ createServer(async (req, res) => {
       const blocks = Number(u.searchParams.get("blocks") || 40000);
       const address = (u.searchParams.get("address") || DEX_CONFIG.amm).toLowerCase();
       const out = await traceEvents({ blocks, address });
+      res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify(out));
+    }
+    if (u.pathname === "/api/dex/candidates") { // recent DEX-listed tokens with on-chain metadata (native RPC)
+      const blocks = Number(u.searchParams.get("blocks") || 60000), limit = Number(u.searchParams.get("limit") || 30);
+      const out = await recentDexTokens({ blocks, limit });
       res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify(out));
     }
     if (u.pathname === "/api/dex/discover") { // list tokens listed on the DEX over the last N blocks

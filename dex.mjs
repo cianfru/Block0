@@ -14,11 +14,14 @@ const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73", USDG = "0x5fc5360d040
 const QUOTES = new Set([WETH, USDG, "0x0000000000000000000000000000000000000000"]);
 const RANGE = Number(process.env.DEX_LOGS_RANGE || 9000), GAP = Number(process.env.DEX_LOGS_GAP_MS || 120);
 
-// Known Uniswap pool-creation topic0s (same across chains — the event ABI is fixed). v4's Initialize varies by
-// release, so it's discovered via traceEvents rather than assumed.
+// Confirmed on the RH chain (via traceEvents 2026): the singleton AMM at 0x8366… is Uniswap v4 and pool creation
+// is Initialize(id indexed, currency0 indexed, currency1 indexed, …) → topics [topic0, id, currency0, currency1],
+// so the two tokens are topics 2 and 3. v2/v3 factory sigs are included for any future factory-based DEX on the chain.
+export const V4_INIT = "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438";
 const KNOWN = {
-  "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9": { dex: "uniswap-v2", ev: "PairCreated", tokenTopics: [1, 2] }, // (token0,token1 indexed)
-  "0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118": { dex: "uniswap-v3", ev: "PoolCreated", tokenTopics: [1, 2] }, // (token0,token1 indexed; fee indexed)
+  [V4_INIT]: { dex: "uniswap-v4", ev: "Initialize", tokenTopics: [2, 3] },
+  "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9": { dex: "uniswap-v2", ev: "PairCreated", tokenTopics: [1, 2] },
+  "0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118": { dex: "uniswap-v3", ev: "PoolCreated", tokenTopics: [1, 2] },
 };
 
 let rid = 1;
@@ -79,7 +82,7 @@ export async function traceEvents({ blocks = 40000, address = AMM } = {}) {
 // DISCOVER: scan for pool-creation events (known v2/v3 topic0s + any topic0s passed in `initTopics` for the v4
 // singleton once identified), decode the two token addresses from indexed topics, strip quote assets → the set of
 // tokens listed on the DEX. Returns candidates with the block/time they were listed.
-export async function discoverDex({ blocks = 200000, address = AMM, initTopics = [] } = {}) {
+export async function discoverDex({ blocks = 200000, address = AMM, initTopics = [V4_INIT] } = {}) {
   const topicSet = new Set([...Object.keys(KNOWN), ...initTopics.map((t) => t.toLowerCase())]);
   const latest = await latestBlock();
   const from = Math.max(0, latest - blocks);
@@ -99,4 +102,34 @@ export async function discoverDex({ blocks = 200000, address = AMM, initTopics =
   return { fromBlock: from, latestBlock: latest, scannedBlocks: blocks, count: tokens.size, tokens: [...tokens.values()] };
 }
 
-export const DEX_CONFIG = { rpc: DEX_RPC, amm: AMM, range: RANGE };
+// --- token metadata straight from the contract (native RPC, no Alchemy) — for non-Pons tokens that have no API ---
+const ethCall = (to, data) => rpc("eth_call", [{ to, data }, "latest"]).catch(() => null);
+function decodeStr(hex) { // ABI dynamic string
+  if (!hex || hex === "0x") return null;
+  try { const h = hex.slice(2); const len = parseInt(h.slice(64, 128), 16); if (!len || len > 128) return null;
+    const s = Buffer.from(h.slice(128, 128 + len * 2), "hex").toString("utf8").replace(/\0+$/, ""); return s || null; } catch { return null; }
+}
+function decodeBytes32(hex) { // some tokens return a bytes32 symbol
+  if (!hex || hex === "0x") return null;
+  try { const s = Buffer.from(hex.slice(2, 66), "hex").toString("utf8").replace(/\0+$/, "").replace(/[^\x20-\x7e]/g, ""); return s || null; } catch { return null; }
+}
+export async function tokenMeta(addr) {
+  const [sym, name, sup] = await Promise.all([ethCall(addr, "0x95d89b41"), ethCall(addr, "0x06fdde03"), ethCall(addr, "0x18160ddd")]);
+  return { symbol: decodeStr(sym) || decodeBytes32(sym), name: decodeStr(name) || decodeBytes32(name), supply: sup ? Number(BigInt(sup || "0x0")) / 1e18 : 0 };
+}
+
+// Recent DEX-listed tokens with metadata, newest first, spam-filtered to ones that at least name themselves and
+// have a supply. Uses ONLY the native RPC (discovery + contract reads) — no Alchemy — so it's rate-limit-safe; the
+// expensive verdict (Alchemy transfer replay) is done later by the board on a bounded subset.
+export async function recentDexTokens({ blocks = 60000, limit = 40 } = {}) {
+  const { tokens, latestBlock: head } = await discoverDex({ blocks });
+  const recent = tokens.sort((a, b) => b.block - a.block).slice(0, limit * 4);
+  const out = [];
+  for (const t of recent) {
+    try { const m = await tokenMeta(t.address); if (m.symbol && m.supply > 0) out.push({ ...t, ...m, venue: t.dex }); } catch { /* skip */ }
+    if (out.length >= limit) break;
+  }
+  return { head, count: out.length, tokens: out };
+}
+
+export const DEX_CONFIG = { rpc: DEX_RPC, amm: AMM, range: RANGE, v4Init: V4_INIT };
