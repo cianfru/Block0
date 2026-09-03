@@ -118,9 +118,23 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .precedent b{color:var(--cyan);font-weight:600}
 .precedent .m{color:var(--mute)}
 .alert{margin-top:8px;font-size:.76rem}
+/* every card rises + settles in on load — the staggered cascade (animation-delay is set per-card inline) */
+.tcard{animation:cardin .5s cubic-bezier(.2,.8,.3,1) both}
+@keyframes cardin{0%{opacity:0;transform:translateY(10px) scale(.99)}60%{transform:translateY(-2px) scale(1.003)}100%{opacity:1;transform:none}}
 .tcard.new{animation:shakein .5s cubic-bezier(.2,.8,.3,1) both;border-color:rgba(200,255,77,.5);box-shadow:0 0 0 1px rgba(200,255,77,.5),0 0 28px rgba(200,255,77,.18)}
 .newbadge{font-size:.6rem;font-weight:700;letter-spacing:.1em;color:#08080b;background:var(--lime);padding:2px 6px;border-radius:6px;margin-left:8px;vertical-align:middle}
 @keyframes shakein{0%{opacity:0;transform:translateY(8px) scale(.985)}60%{transform:translateY(-2px) scale(1.004)}100%{opacity:1;transform:none}}
+/* LIVE DANGER — a card being actively dumped buzzes to catch the eye (settles in first, then vibrates forever) */
+.tcard.live{animation:cardin .5s cubic-bezier(.2,.8,.3,1) both,buzz 3.4s ease-in-out .55s infinite;will-change:transform}
+.tcard.live:hover{animation-play-state:paused}
+@keyframes buzz{
+  0%,11%,100%{transform:translate(0,0) rotate(0)}
+  1%{transform:translate(-2px,1px) rotate(-.4deg)}   2%{transform:translate(2px,-1px) rotate(.4deg)}
+  3%{transform:translate(-1.8px,-.9px) rotate(-.34deg)} 4%{transform:translate(1.8px,1px) rotate(.34deg)}
+  5%{transform:translate(-1.5px,.9px) rotate(-.28deg)}  6%{transform:translate(1.5px,-.9px) rotate(.28deg)}
+  7%{transform:translate(-1.1px,.5px) rotate(-.2deg)}   8%{transform:translate(1.1px,-.5px) rotate(.2deg)}
+  9%{transform:translate(-.6px,0) rotate(-.1deg)}      10%{transform:translate(.6px,0) rotate(.1deg)}}
+@media(prefers-reduced-motion:reduce){.tcard,.tcard.new,.tcard.live{animation:none}}
 
 /* ---- caveat / states ---- */
 .caveat{margin-top:24px;font-size:.78rem;line-height:1.6;color:var(--mute);max-width:80ch}

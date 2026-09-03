@@ -42,7 +42,8 @@ const B0 = (() => {
     const al = r.alert ? `<p class="alert" style="color:${r.alert.tone === "good" ? "#c8ff4d" : r.alert.tone === "warn" ? "#ffd23d" : "#ff3b5c"}">${r.alert.tone === "bad" ? "▼ " : r.alert.tone === "good" ? "✓ " : "! "}${r.alert.text}</p>`
       : f.insiderSellersNow ? `<p class="alert" style="color:#ff3b5c">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
         : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#c8ff4d">✓ no snipers · no bundles</p>` : "";
-    return `<a class="panel panel-hover tcard${isNew(r) ? " new" : ""}" href="/token?address=${r.address}" style="animation-delay:${Math.min(i * 60, 600)}ms">
+    const liveDanger = (r.alert && r.alert.tone === "bad") || f.insiderSellersNow;   // actively being dumped → the card buzzes
+    return `<a class="panel panel-hover tcard${isNew(r) ? " new" : ""}${liveDanger ? " live" : ""}" href="/token?address=${r.address}" style="animation-delay:${Math.min(i * 60, 600)}ms">
       <div class="body">
         <div class="top">${icon(r)}
           <div style="min-width:0">
