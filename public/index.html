@@ -138,6 +138,12 @@
   .bm-legend{display:flex;gap:14px;flex-wrap:wrap;padding:11px 16px;border-top:1px solid var(--line);font-size:.72rem;color:var(--mute)}
   .bm-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
   .bmtip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;font-size:.74rem;z-index:6;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
+  /* the "now" beacon on the winner cone — a steady core that pulses a halo, showing the live position */
+  #corbeacon{position:absolute;width:9px;height:9px;border-radius:50%;background:#5ff0ea;transform:translate(-50%,-50%);pointer-events:none;display:none;z-index:4;
+    box-shadow:0 0 10px 2px rgba(53,230,224,.9)}
+  #corbeacon::after{content:"";position:absolute;inset:-3px;border-radius:50%;box-shadow:0 0 0 0 rgba(53,230,224,.55);animation:beacon 1.9s cubic-bezier(.35,0,.35,1) infinite}
+  @keyframes beacon{0%{box-shadow:0 0 0 0 rgba(53,230,224,.55)}70%{box-shadow:0 0 0 13px rgba(53,230,224,0)}100%{box-shadow:0 0 0 0 rgba(53,230,224,0)}}
+  @media(prefers-reduced-motion:reduce){#corbeacon::after{animation:none}}
   @media(max-width:860px){.top{grid-template-columns:1fr}.verdict{text-align:left}.verdict .drv{margin-left:0}
     .facs{grid-template-columns:repeat(2,1fr)}.place{grid-template-columns:1fr}.tables{grid-template-columns:1fr}}
 </style>
@@ -309,9 +315,9 @@ function render(r){
         <div style="font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim)">winner corridor · trajectory by age</div>
         <div class="legend"><span><span class="zswatch"></span>winner zone</span><span><i style="background:var(--cyan)"></i>this token</span></div>
       </div>
-      <div style="position:relative"><canvas id="cvcor" style="height:340px"></canvas><div class="tip" id="tipcor"></div></div>
+      <div style="position:relative"><canvas id="cvcor" style="height:340px"></canvas><div class="tip" id="tipcor"></div><div id="corbeacon"></div></div>
       <div class="chnote" id="chnotecor" hidden></div>
-      <div class="corcap"><span id="corverdict"></span> The green cone is the winners' <b style="color:var(--dim)">trajectory</b> score (0–100 — clean distribution + real wallet adoption) as a <b style="color:var(--lime)">mean ± 1 standard deviation</b> band by age, with the concrete <b style="color:var(--lime)">wallet count</b> and <b style="color:var(--dim)">market cap</b> those winners carried at each stage along the bottom. Inside the cone = tracking the winners; below it = drifting; near the floor = dying. Hover to compare this token to the winner target at any age.</div>
+      <div class="corcap"><span id="corverdict"></span> The green cone is the winners' <b style="color:var(--dim)">trajectory</b> score (0–100 — clean distribution + real wallet adoption) as a <b style="color:var(--lime)">mean ± 1 standard deviation</b> band by age; the faint boxes behind it are the raw winner spread the cone was fitted from. Each <b style="color:var(--cyan)">gate</b> is a checkpoint — the value a winner should hit by that age — with the concrete <b style="color:var(--lime)">wallet count</b> and market cap along the bottom; the lit-up gate is where this token is <b>now</b>. Inside the cone = on the path; below it = drifting; near the floor = dying. Hover to compare at any age.</div>
     </div>
 
     <h2 class="sec">History — valuation &amp; score over time</h2>
@@ -424,48 +430,69 @@ function drawCorridorChart(hoverIdx=-1){
   if(!CORR||!CORR.length||!SERIES) return;
   CVC=$("#cvcor"); const W=CVC.clientWidth,H=CVC.clientHeight;
   CVC.width=W*DPR;CVC.height=H*DPR;const g=CVC.getContext("2d");g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);
-  const padL=44,padR=16,padT=16,padB=50,iw=W-padL-padR,ih=H-padT-padB;
+  const padL=44,padR=16,padT=22,padB=52,iw=W-padL-padR,ih=H-padT-padB;
+  const cl=(v)=>Math.max(0,Math.min(100,v));
   const tokMax=(SERIES[SERIES.length-1].ageH)||1, AGE_LO=0.15, maxBinHi=CORR[CORR.length-1].hi;
   const AGE_HI=Math.min(maxBinHi,Math.max(tokMax*1.4,4));
   const lx=(a)=>Math.log10(Math.max(AGE_LO,a)), x0=lx(AGE_LO), x1=lx(AGE_HI);
-  const xOf=(a)=>padL+(lx(a)-x0)/(x1-x0)*iw, yOf=(t)=>padT+ih-(Math.max(0,Math.min(100,t))/100)*ih;
-  // y grid
-  g.font="11px Inter,system-ui,sans-serif";g.textBaseline="middle";g.fillStyle="#7f7f88";g.strokeStyle="rgba(255,255,255,.06)";g.lineWidth=1;
+  const xOf=(a)=>padL+(lx(a)-x0)/(x1-x0)*iw, yOf=(t)=>padT+ih-(cl(t)/100)*ih;
+  const inR=(a)=>a>=AGE_LO&&a<=AGE_HI;
+  const pts=SERIES.filter(s=>s.ageH>=AGE_LO&&s.ageH<=AGE_HI&&s.traj!=null);
+  const nowAge=(DOSSIER&&DOSSIER.ageH)||(pts.length?pts[pts.length-1].ageH:0);
+  // y grid (very subtle)
+  g.font="11px Inter,system-ui,sans-serif";g.textBaseline="middle";g.fillStyle="#6b6b73";g.strokeStyle="rgba(255,255,255,.04)";g.lineWidth=1;
   for(let i=0;i<=4;i++){const yy=padT+ih*i/4;g.beginPath();g.moveTo(padL,yy);g.lineTo(W-padR,yy);g.stroke();g.textAlign="right";g.fillText((100-i*25)+"",padL-6,yy);}
-  // THE WINNER CONE — a smooth mean ± 1σ band of how past winners' trajectory scores ran by age (replaces the old
-  // discrete boxes). Built from the bin centres; clamped to the visible age range.
+  // 1) PROVENANCE BOXES — the raw q1–q3 winner spread per bin the cone was fitted from, kept faint behind the cone
+  for(const b of CORR){const bl=Math.max(b.lo,AGE_LO);if(bl>=AGE_HI)continue;const bh=Math.min(b.hi,AGE_HI);
+    const x=xOf(bl),xw=Math.max(2,xOf(bh)-x),yT=yOf(b.q3),yB=yOf(b.q1);
+    g.fillStyle="rgba(200,255,77,.045)";g.strokeStyle="rgba(200,255,77,.09)";g.lineWidth=1;
+    g.beginPath();g.rect(x+0.5,yT+0.5,xw-1,Math.max(1,yB-yT));g.fill();g.stroke();}
+  // 2) THE CONE — smooth mean ± 1σ band, refined thin lines
   const cb=CORR.filter(b=>b.band&&b.mean!=null&&(b.mid??(b.lo+b.hi)/2)<=AGE_HI).map(b=>{const a=Math.max(AGE_LO,Math.min(AGE_HI,b.mid??(b.lo+b.hi)/2));return {x:xOf(a),top:yOf(b.band[1]),bot:yOf(b.band[0]),mid:yOf(b.mean)};});
   if(cb.length>=2){
-    // extend the first/last band point flat to the plot edges so the cone fills the width cleanly
     const top=[{x:padL,y:cb[0].top},...cb.map(p=>({x:p.x,y:p.top})),{x:W-padR,y:cb[cb.length-1].top}];
     const bot=[{x:padL,y:cb[0].bot},...cb.map(p=>({x:p.x,y:p.bot})),{x:W-padR,y:cb[cb.length-1].bot}];
     const mid=[{x:padL,y:cb[0].mid},...cb.map(p=>({x:p.x,y:p.mid})),{x:W-padR,y:cb[cb.length-1].mid}];
-    // filled ribbon (top forward, bottom back) with a soft vertical gradient
     g.beginPath();g.moveTo(top[0].x,top[0].y);smoothFwd(g,top);const botR=bot.slice().reverse();g.lineTo(botR[0].x,botR[0].y);smoothFwd(g,botR);g.closePath();
-    const grd=g.createLinearGradient(0,padT,0,padT+ih);grd.addColorStop(0,"rgba(200,255,77,.16)");grd.addColorStop(1,"rgba(200,255,77,.05)");g.fillStyle=grd;g.fill();
-    // band edges + mean centre-line
-    g.strokeStyle="rgba(200,255,77,.28)";g.lineWidth=1;g.beginPath();g.moveTo(top[0].x,top[0].y);smoothFwd(g,top);g.stroke();g.beginPath();g.moveTo(bot[0].x,bot[0].y);smoothFwd(g,bot);g.stroke();
-    g.strokeStyle="rgba(200,255,77,.6)";g.lineWidth=1.5;g.setLineDash([5,4]);g.beginPath();g.moveTo(mid[0].x,mid[0].y);smoothFwd(g,mid);g.stroke();g.setLineDash([]);
+    const grd=g.createLinearGradient(0,padT,0,padT+ih);grd.addColorStop(0,"rgba(200,255,77,.15)");grd.addColorStop(1,"rgba(200,255,77,.045)");g.fillStyle=grd;g.fill();
+    g.strokeStyle="rgba(200,255,77,.22)";g.lineWidth=0.8;g.beginPath();g.moveTo(top[0].x,top[0].y);smoothFwd(g,top);g.stroke();g.beginPath();g.moveTo(bot[0].x,bot[0].y);smoothFwd(g,bot);g.stroke();
+    g.strokeStyle="rgba(200,255,77,.5)";g.lineWidth=1;g.setLineDash([5,5]);g.beginPath();g.moveTo(mid[0].x,mid[0].y);smoothFwd(g,mid);g.stroke();g.setLineDash([]);
   }
-  // concrete winner stage targets (wallets + market cap) along the bottom at each bin centre
+  // 3) GATES — the checkpoints on the path to success: at each age a target band to hit, the CURRENT gate lit up
+  const curBin=CORR.find(b=>nowAge>=b.lo&&nowAge<b.hi)||null;
   g.textAlign="center";
-  for(const b of CORR){ const a=b.mid??(b.lo+b.hi)/2; if(a<AGE_LO||a>AGE_HI) continue; const cx=xOf(a);
-    g.fillStyle="#9aa091";g.font="10px Inter,system-ui,sans-serif";g.fillText("by "+ageLab(b.hi),cx,H-36);
-    if(b.tw){ g.fillStyle="#c8ff4d";g.font="600 10.5px Inter,system-ui,sans-serif";g.fillText("~"+wShort(b.tw)+" wallets",cx,H-21);
-      g.fillStyle="#8f9a86";g.font="10px Inter,system-ui,sans-serif";g.fillText(mcT(b.tm),cx,H-7); }
+  for(const b of CORR){ const gx=xOf(b.hi); if(!inR(b.hi)) { /* still label the current/last */ }
+    const isCur=b===curBin; const ga=Math.min(b.hi,AGE_HI); const gxc=xOf(ga);
+    if(inR(b.hi)&&!isCur){ g.strokeStyle="rgba(255,255,255,.05)";g.lineWidth=1;g.setLineDash([2,4]);g.beginPath();g.moveTo(gx,padT);g.lineTo(gx,padT+ih);g.stroke();g.setLineDash([]); }
+    // target-band bracket at the gate (where a winner should sit by this age)
+    if(b.band&&inR(ga)){ const yT=yOf(b.band[1]),yB=yOf(b.band[0]);
+      g.strokeStyle=isCur?"rgba(53,230,224,.9)":"rgba(200,255,77,.35)";g.lineWidth=isCur?1.6:1;
+      g.beginPath();g.moveTo(gxc,yT);g.lineTo(gxc,yB);g.stroke();
+      for(const yy of [yT,yB]){g.beginPath();g.moveTo(gxc-3,yy);g.lineTo(gxc+3,yy);g.stroke();} }
+    // bottom stage target (wallets + mcap) at each bin centre
+    const a=b.mid??(b.lo+b.hi)/2; if(inR(a)){ const cx=xOf(a);
+      g.fillStyle=isCur?"#cfe8ff":"#8b9184";g.font=(isCur?"600 ":"")+"10px Inter,system-ui,sans-serif";g.fillText("by "+ageLab(b.hi),cx,H-36);
+      if(b.tw){ g.fillStyle=isCur?"#5ff0ea":"#c8ff4d";g.font="600 10.5px Inter,system-ui,sans-serif";g.fillText("~"+wShort(b.tw)+" wallets",cx,H-21);
+        g.fillStyle=isCur?"#a9d9e6":"#8f9a86";g.font="10px Inter,system-ui,sans-serif";g.fillText(mcT(b.tm),cx,H-7); } }
   }
-  // token trajectory line through the cone, coloured by inside / below / failing
-  g.lineWidth=2.6;
-  const pts=SERIES.filter(s=>s.ageH>=AGE_LO&&s.ageH<=AGE_HI&&s.traj!=null);
-  for(let i=1;i<pts.length;i++){g.strokeStyle=CORCOL[corStatus(pts[i])];g.beginPath();g.moveTo(xOf(pts[i-1].ageH),yOf(pts[i-1].traj));g.lineTo(xOf(pts[i].ageH),yOf(pts[i].traj));g.stroke();}
-  // current position marker
-  if(pts.length){const last=pts[pts.length-1],cx=xOf(last.ageH),cy=yOf(last.traj);
-    g.fillStyle="#35e6e0";g.strokeStyle="#08080b";g.lineWidth=2;g.beginPath();g.arc(cx,cy,5.5,0,7);g.fill();g.stroke();
-    g.fillStyle="#35e6e0";g.font="600 11px Inter,system-ui,sans-serif";g.textAlign=cx>W-70?"right":"left";
-    g.fillText(DOSSIER&&DOSSIER.graduated?"graduated":"now",cx+(cx>W-70?-9:9),cy);}
+  // current gate: a "next gate" target pill at the top
+  if(curBin&&curBin.band&&inR(nowAge)){ const gx=xOf(nowAge);
+    g.fillStyle="#5ff0ea";g.font="600 10.5px Inter,system-ui,sans-serif";g.textAlign=gx>W-120?"right":"left";
+    g.fillText(`gate · hit ${curBin.band[0]}–${curBin.band[1]} by ${ageLab(curBin.hi)}`,gx+(gx>W-120?-10:10),padT+8); }
+  // 4) TOKEN TRAJECTORY — thin, soft-glow, coloured by inside / below / failing
+  g.lineWidth=1.6;g.lineJoin="round";g.lineCap="round";
+  for(let i=1;i<pts.length;i++){const col=CORCOL[corStatus(pts[i])];g.strokeStyle=col;g.shadowColor=col;g.shadowBlur=5;
+    g.beginPath();g.moveTo(xOf(pts[i-1].ageH),yOf(pts[i-1].traj));g.lineTo(xOf(pts[i].ageH),yOf(pts[i].traj));g.stroke();}
+  g.shadowBlur=0;
+  // hover crosshair
   if(hoverIdx>=0&&hoverIdx<pts.length){const s=pts[hoverIdx],x=xOf(s.ageH);
-    g.strokeStyle="rgba(255,255,255,.22)";g.lineWidth=1;g.beginPath();g.moveTo(x,padT);g.lineTo(x,padT+ih);g.stroke();
-    g.fillStyle="#fff";g.beginPath();g.arc(x,yOf(s.traj),3.5,0,7);g.fill();}
+    g.strokeStyle="rgba(255,255,255,.2)";g.lineWidth=1;g.beginPath();g.moveTo(x,padT);g.lineTo(x,padT+ih);g.stroke();
+    g.fillStyle="#fff";g.beginPath();g.arc(x,yOf(s.traj),3,0,7);g.fill();}
+  // 5) the NOW BEACON — a blinking illuminated marker at the live position (CSS-animated overlay)
+  const bc=$("#corbeacon");
+  if(pts.length&&bc){const last=pts[pts.length-1];bc.style.left=xOf(last.ageH)+"px";bc.style.top=yOf(last.traj)+"px";bc.style.display="block";
+    bc.style.background=DOSSIER&&DOSSIER.graduated?"#5ff0ea":"#5ff0ea";}
+  else if(bc){bc.style.display="none";}
   GEOC={padL,iw,AGE_LO,AGE_HI,x0,x1,xOf,pts};
 }
 function onHoverCor(e){
