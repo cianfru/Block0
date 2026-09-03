@@ -72,6 +72,15 @@
   .hdots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.18);cursor:pointer;transition:background .2s}
   .hdots i.on{background:var(--lime)}
 
+  /* the winner corridor — a side-profile of the model: a price line threading the stage gates */
+  .corridor{position:relative;border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-top:20px;
+    background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.006));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 70px -40px rgba(0,0,0,.7)}
+  .corridor canvas{display:block;width:100%;height:440px}
+  @media(max-width:700px){.corridor canvas{height:330px}}
+  .corr-legend{position:absolute;left:20px;bottom:16px;display:flex;gap:18px;flex-wrap:wrap;font-size:.72rem;color:var(--dim);pointer-events:none}
+  .corr-legend .k{display:inline-flex;align-items:center;gap:7px}
+  .corr-legend .ln{width:18px;height:3px;border-radius:2px}
+
   /* what it checks — concrete signals, not prose */
   .signals{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
   @media(max-width:820px){.signals{grid-template-columns:1fr 1fr}}
@@ -139,6 +148,18 @@
       </div>
     </div>
     <div class="ticker"><div class="run" id="ticker"></div></div>
+  </section>
+
+  <!-- THE WINNER CORRIDOR — lateral profile, price threading the gates -->
+  <section class="sec">
+    <div class="stitle"><p class="micro eye">the winner corridor</p><h2>Most fall out in the first hour. We track the ones that don't.</h2><p class="sub">Every launch starts in the same place. The model draws the lane past winners travelled — and watches, gate by gate, whether this one is still inside it. Clear every gate and it's carrying the fingerprint.</p></div>
+    <div class="corridor">
+      <canvas id="corr" aria-label="A price line threading the winner corridor's stage gates while weaker launches fall out"></canvas>
+      <div class="corr-legend">
+        <span class="k"><span class="ln" style="background:#c8ff4d"></span> stayed in the lane → winner</span>
+        <span class="k"><span class="ln" style="background:#ff3b5c"></span> fell out early → faded</span>
+      </div>
+    </div>
   </section>
 
   <!-- WHAT IT CHECKS -->
@@ -308,6 +329,89 @@ async function loadProof(){
   }catch(e){}
 }
 loadBoard();loadProof();setInterval(loadBoard,30000);
+
+/* ============ the winner corridor — lateral profile ============ */
+(function(){
+  const cv=$("#corr"); if(!cv) return; const g=cv.getContext("2d");
+  const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
+  let W=0,H=0,dpr=1,lastW=-1,lastH=-1;
+  // measure the CONTAINER (reliably full-width) and set the canvas pixel size explicitly — don't depend on the
+  // canvas's own width:100% resolving, which left the drawing half-width.
+  function ensureSize(){ const cw=Math.round(cv.parentElement.clientWidth), ch=window.matchMedia("(max-width:700px)").matches?330:440;
+    if(cw===lastW&&ch===lastH)return; lastW=cw;lastH=ch;dpr=Math.min(2,window.devicePixelRatio||1);W=cw;H=ch;
+    cv.style.width=cw+"px";cv.style.height=ch+"px";cv.width=Math.round(cw*dpr);cv.height=Math.round(ch*dpr);g.setTransform(dpr,0,0,dpr,0,0); }
+
+  const smooth=(t)=>t*t*(3-2*t), clamp=(v,a,b)=>v<a?a:v>b?b:v, mix=(a,b,t)=>a+(b-a)*t;
+  const GATES=[{u:.17,l:"first hour"},{u:.43,l:"100 holders"},{u:.69,l:"graduation"},{u:.93,l:"real market"}];
+  const LOSERS=[{drop:.09,s:1.7},{drop:.20,s:4.1},{drop:.34,s:2.3},{drop:.55,s:5.6}];
+  // corridor geometry (v: 0 bottom → 1 top)
+  const cvv=(u)=>0.15+0.66*smooth(u);           // centreline rises as a token proves itself
+  const hw=(u)=>0.155*(1-0.35*u);               // lane narrows a touch over time
+  const winV=(u)=>clamp(cvv(u)+0.055*Math.sin(u*9+0.6)+0.02*Math.sin(u*23),cvv(u)-hw(u)+0.03,cvv(u)+hw(u)-0.03);
+  const loseV=(ls,u)=>{ if(u<=ls.drop) return cvv(u)-0.02+0.03*Math.sin(u*30+ls.s);
+    const t=clamp((u-ls.drop)/0.35,0,1); return mix(cvv(ls.drop)-0.02,0.02,t*t); };
+
+  function frame(hu){
+    ensureSize();
+    const PL=44,PR=88,PT=40,PB=48; const yT=PT,yB=H-PB,hh=yB-yT;
+    const X=(u)=>PL+u*(W-PL-PR), Y=(v)=>yB-clamp(v,0,1)*hh;
+    g.clearRect(0,0,W,H);
+    // faint grid
+    g.strokeStyle="rgba(255,255,255,.04)"; g.lineWidth=1;
+    for(let i=0;i<=6;i++){const x=PL+i/6*(W-PL-PR);g.beginPath();g.moveTo(x,yT-8);g.lineTo(x,yB+8);g.stroke();}
+    // corridor band (the lane)
+    const N=80;
+    g.beginPath();
+    for(let i=0;i<=N;i++){const u=i/N;const x=X(u),y=Y(cvv(u)+hw(u));i?g.lineTo(x,y):g.moveTo(x,y);}
+    for(let i=N;i>=0;i--){const u=i/N;g.lineTo(X(u),Y(cvv(u)-hw(u)));}
+    g.closePath();
+    const bg=g.createLinearGradient(0,yT,0,yB); bg.addColorStop(0,"rgba(200,255,77,.10)"); bg.addColorStop(.6,"rgba(53,230,224,.05)"); bg.addColorStop(1,"rgba(53,230,224,.02)");
+    g.fillStyle=bg; g.fill();
+    // band edges
+    for(const sgn of [1,-1]){ g.beginPath(); for(let i=0;i<=N;i++){const u=i/N;const x=X(u),y=Y(cvv(u)+sgn*hw(u));i?g.lineTo(x,y):g.moveTo(x,y);} g.strokeStyle="rgba(255,255,255,.10)"; g.lineWidth=1; g.stroke(); }
+    // launch marker (left)
+    g.fillStyle="rgba(255,255,255,.5)"; g.font="12px ui-monospace,Menlo,monospace"; g.textAlign="center";
+    g.fillText("launch", X(0), yB+22);
+    // gates
+    for(const gt of GATES){ const x=X(gt.u), yt=Y(cvv(gt.u)+hw(gt.u))-8, yb=Y(cvv(gt.u)-hw(gt.u))+8; const lit=hu>=gt.u;
+      const col=lit?"#c8ff4d":"rgba(255,255,255,.16)";
+      g.strokeStyle=col; g.lineWidth=lit?2.4:1.6;
+      if(lit){g.shadowColor="rgba(200,255,77,.55)";g.shadowBlur=12;}
+      // bracket posts
+      g.beginPath(); g.moveTo(x-9,yt); g.lineTo(x,yt); g.lineTo(x,yb); g.lineTo(x-9,yb); g.stroke();
+      g.beginPath(); g.moveTo(x+9,yt); g.lineTo(x,yt); g.moveTo(x+9,yb); g.lineTo(x,yb); g.stroke();
+      g.shadowBlur=0;
+      g.fillStyle=lit?"#c8ff4d":"rgba(255,255,255,.42)"; g.font="12px ui-monospace,Menlo,monospace"; g.textAlign="center";
+      g.fillText(gt.l, x, yb+22);
+    }
+    // losers (coral), animated + fading as they fall out
+    for(const ls of LOSERS){ const end=Math.min(hu,1); if(end<0.02) continue;
+      g.beginPath(); let started=false;
+      for(let i=0;i<=N;i++){ const u=i/N; if(u>end) break; const x=X(u),y=Y(loseV(ls,u)); started?g.lineTo(x,y):(g.moveTo(x,y),started=true); }
+      const fell=Math.max(0,Math.min(1,(end-ls.drop)/0.35));
+      g.strokeStyle=`rgba(255,59,92,${(0.75*(1-0.6*fell)).toFixed(2)})`; g.lineWidth=2; g.stroke();
+    }
+    // winner line (lime) with comet head
+    g.beginPath(); for(let i=0;i<=N;i++){ const u=i/N; if(u>hu) break; const x=X(u),y=Y(winV(u)); i?g.lineTo(x,y):g.moveTo(x,y); }
+    g.strokeStyle="#c8ff4d"; g.lineWidth=3; g.lineJoin="round";
+    g.save(); g.shadowColor="rgba(200,255,77,.6)"; g.shadowBlur=14; g.stroke(); g.restore();
+    // head
+    if(hu<1||reduce){ const hx=X(hu),hy=Y(winV(hu)); g.beginPath(); g.arc(hx,hy,5.5,0,7); g.fillStyle="#eaffb0"; g.save(); g.shadowColor="#c8ff4d"; g.shadowBlur=16; g.fill(); g.restore(); }
+    // WINNER badge above the end point (fades in near completion; above so it never clips the right edge)
+    const wa=clamp((hu-0.82)/0.18,0,1);
+    if(wa>0){ const ex=X(1),ey=Y(winV(1)); g.globalAlpha=wa;
+      g.beginPath(); g.arc(ex,ey,7,0,7); g.fillStyle="#c8ff4d"; g.save(); g.shadowColor="#c8ff4d"; g.shadowBlur=18; g.fill(); g.restore();
+      g.font="700 14px Inter,system-ui,sans-serif"; g.textAlign="center"; g.fillStyle="#c8ff4d";
+      g.save(); g.shadowColor="rgba(200,255,77,.5)"; g.shadowBlur=10; g.fillText("WINNER", ex, ey-16); g.restore(); g.globalAlpha=1; }
+  }
+
+  if(reduce){ requestAnimationFrame(()=>frame(1)); return; }
+  const DUR=3600, HOLD=1600, CYCLE=DUR+HOLD; let t0=null, vis=true;
+  const io=new IntersectionObserver((es)=>{vis=es[0].isIntersecting;},{threshold:.15}); io.observe(cv);
+  function loop(t){ if(t0==null)t0=t; const e=(t-t0)%CYCLE; const hu=e<DUR?smooth(clamp(e/DUR,0,1)):1;
+    if(vis) frame(hu); requestAnimationFrame(loop); }
+  requestAnimationFrame(loop);
+})();
 </script>
 </body>
 </html>
