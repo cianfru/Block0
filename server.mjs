@@ -15,7 +15,7 @@ import { refreshBoard, getBoard, ensureFresh } from "./board.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON } from "./alerts.mjs";
-import { KV_BACKEND } from "./store/kv.mjs";
+import { KV_BACKEND, getJSON, setJSON } from "./store/kv.mjs";
 import { getTransfers } from "./store.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { PROVIDER } from "./rpc.mjs";
@@ -46,6 +46,27 @@ function anchorToPons(r, ponsMcap) {
     if (s.price != null) s.price = s.price * ratio;
     if (s.volUsd != null) s.volUsd = Math.round(s.volUsd * ratio);
   }
+  return r;
+}
+
+// Compute (or serve a durable-cached) backtest. The board's incremental store caps transfers at ~25k for
+// memory, so it holds the FULL history only for smaller tokens — for those we reuse it and the series is instant
+// and exact. For a high-volume token the store is incomplete, so we self-pull the full history (slower, but
+// correct); the result is cached in KV keyed by token so that expensive pull happens once, not on every redeploy.
+const BT_TTL = Number(process.env.BT_TTL_MS || 30 * 60 * 1000); // serve a cached backtest for 30 min before recomputing
+const STORE_CAP = 25000;
+async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym }) {
+  const kvKey = `bt:${key}`;
+  const cached = await getJSON(kvKey).catch(() => null);
+  if (cached && cached.data && Date.now() - cached.at < BT_TTL) return cached.data;
+  const meta = await ponsMeta(token);
+  const st = await getTransfers(token, 18, { pool: meta?.pool, launchedAt: meta?.launchedAt }).catch(() => ({ ev: null }));
+  const complete = st.ev && st.ev.length > 0 && st.ev.length < STORE_CAP - 1000; // store holds the whole history
+  const r = anchorToPons({
+    ...(await backtest(token, { sym: meta?.sym || sym || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd, noPrice, cap, ev: complete ? st.ev : null })),
+    name: meta?.name, logo: meta?.logo, mcapUsd: meta?.mcapUsd, priceUsd: meta?.priceUsd,
+  }, meta?.mcapUsd);
+  setJSON(kvKey, { at: Date.now(), data: r }).catch(() => {});
   return r;
 }
 
@@ -137,12 +158,7 @@ createServer(async (req, res) => {
       const noPrice = u.searchParams.get("price") === "0", cap = Number(u.searchParams.get("cap") || 400000);
       const key = `${token}:${points}:${ethUsd}:${noPrice}:${cap}`;
       if (!_btCache.has(key)) {
-        const meta = await ponsMeta(token);
-        // reuse the incremental store's cached transfers (instant for board tokens) so the backtest doesn't
-        // re-pull the whole history — the fix for the 40s latency that left charts blank.
-        const st = await getTransfers(token, 18, { pool: meta?.pool, launchedAt: meta?.launchedAt }).catch(() => ({ ev: null }));
-        _btCache.set(key, backtest(token, { sym: meta?.sym || u.searchParams.get("sym") || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd, noPrice, cap, ev: st.ev })
-          .then((r) => anchorToPons({ ...r, name: meta?.name, logo: meta?.logo, mcapUsd: meta?.mcapUsd, priceUsd: meta?.priceUsd }, meta?.mcapUsd))
+        _btCache.set(key, computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym: u.searchParams.get("sym") })
           .catch((e) => { _btCache.delete(key); throw e; }));
       }
       const out = await _btCache.get(key);
