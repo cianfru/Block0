@@ -63,6 +63,25 @@ test("riding: a diamond-hand with big unrealized on a REAL-MARKET token qualifie
   assert.equal(lb.rows.find((r) => r.a === "paperhands"), undefined); // mirage gated out
 });
 
+test("contract wallets (bots/routers/pools) are checked and excluded, and the count is reported", async () => {
+  // w4 (top of the board) is a contract → dropped; w1 stays. isContract only called for ranked candidates.
+  const seen = [];
+  const isContract = async (a) => { seen.push(a); return a === "w4"; };
+  const lb = await buildLeaderboard(tokens, computeBt, { isContract });
+  assert.equal(lb.contractsChecked, true);
+  assert.equal(lb.contractsFiltered, 1);
+  assert.equal(lb.rows.find((r) => r.a === "w4"), undefined); // the contract is gone
+  assert.equal(lb.rows[0].a, "w1");                            // next-ranked human takes the top
+  assert.ok(seen.includes("w4") && seen.includes("w1"));
+});
+
+test("no isContract probe → old behaviour, nothing filtered", async () => {
+  const lb = await buildLeaderboard(tokens, computeBt);
+  assert.equal(lb.contractsChecked, false);
+  assert.equal(lb.contractsFiltered, 0);
+  assert.ok(lb.rows.find((r) => r.a === "w4"));
+});
+
 test("a token that fails to backtest is skipped, not fatal", async () => {
   const lb = await buildLeaderboard(
     [...tokens, { address: "0xbad", sym: "BAD" }],

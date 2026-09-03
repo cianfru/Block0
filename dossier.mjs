@@ -73,11 +73,10 @@ export async function tokenDossier(address) {
   r.topHolders = whales.slice().sort((a, b) => b.bal - a.bal).slice(0, 12);
   r.deployer = deployerReputation(all, meta); // deployer track record (other launches by the same wallet)
   r.explorer = (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null; // when set, wallet/contract links activate
-  // Wallet identity links for the front-end cards. Zerion supports the Robinhood chain, so a wallet address opens
-  // a real portfolio page — the UI renders a Zerion preview card (bag/PnL we already know) that clicks through to it.
-  r.links = {
-    zerion: (process.env.ZERION_URL || "https://app.zerion.io").replace(/\/$/, ""), // wallet: `${zerion}/${addr}`
-    explorer: r.explorer,
-  };
+  // Wallet identity links for the front-end cards. We deliberately DON'T link a third-party portfolio service:
+  // Zerion (and the other aggregators) don't index the Robinhood Chain, so every wallet returned "unsupported
+  // address". The PnL we show is our own engine's reconstruction; a wallet links to the chain's own block
+  // explorer when EXPLORER_URL is configured, otherwise the address is click-to-copy in the UI.
+  r.links = { explorer: r.explorer };
   return r;
 }

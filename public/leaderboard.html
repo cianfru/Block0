@@ -41,7 +41,7 @@
       </div>
       <div class="statchips" id="statchips"></div>
     </div>
-    <p class="sub" style="color:var(--dim);max-width:70ch;margin-top:12px;font-size:.92rem;line-height:1.6">Every wallet's realised profit summed across the graduated and DEX winners — who bought low and sold high, across how many launches, and whether they're still holding. Ranked by realised cash taken out, not paper gains. Click through to the full Zerion portfolio.</p>
+    <p class="sub" style="color:var(--dim);max-width:70ch;margin-top:12px;font-size:.92rem;line-height:1.6">Every wallet's realised profit summed across the graduated and DEX winners — who bought low and sold high, across how many launches, and whether they're still holding. Ranked by realised cash taken out, not paper gains — every figure reconstructed by our own engine from public transfers. Contract addresses (bots, routers, pools) are labelled and never counted as traders.</p>
 
     <div class="lb" id="lb"><div class="state">Building the leaderboard…</div></div>
 
@@ -67,15 +67,14 @@
 <script>
 const $=(s)=>document.querySelector(s);
 B0GATE.mount({gated:true});
-const ZERION="https://app.zerion.io";
 async function load(){try{
   const d=await fetch("/api/leaderboard?n=100").then(r=>r.json());
-  const zb=(d.links&&d.links.zerion)||ZERION;
+  const ex=(d.links&&d.links.explorer)||"";
   const rows=d.rows||[];
   if(d.computing&&!rows.length){$("#lb").innerHTML='<div class="state">Crunching the winners\' trade histories — the first build takes a few minutes. Check back shortly.</div>';setTimeout(load,30000);return;}
   if(!rows.length){$("#lb").innerHTML='<div class="state">No proven-PnL wallets yet — the board needs more graduated winners to aggregate over.</div>';return;}
-  $("#statchips").innerHTML=`<span class="chip"><span class="live-dot"></span> ${rows.length} wallets</span>`+(d.tokensScanned?`<span class="chip tnum">${d.tokensScanned} winners scanned</span>`:"");
-  $("#lb").innerHTML=rows.map((w,i)=>B0.leaderRow(w,i+1,zb)).join("");
+  $("#statchips").innerHTML=`<span class="chip"><span class="live-dot"></span> ${rows.length} wallets</span>`+(d.tokensScanned?`<span class="chip tnum">${d.tokensScanned} winners scanned</span>`:"")+(d.contractsFiltered?`<span class="chip tnum" title="contracts (bots, routers, pools) checked with eth_getCode and excluded — this is a list of humans you could follow">${d.contractsFiltered} bots filtered</span>`:"");
+  $("#lb").innerHTML=rows.map((w,i)=>B0.leaderRow(w,i+1,ex)).join("");
 }catch(e){$("#lb").innerHTML='<div class="state">Leaderboard unavailable — retrying…</div>';setTimeout(load,10000);}}
 load();
 </script>

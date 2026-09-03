@@ -136,7 +136,7 @@
   .snipe{color:var(--amber);margin-left:5px;font-size:.72rem}
   .empty{color:var(--mute);padding:16px 15px;font-size:.8rem}
   .foot{color:var(--mute);font-size:.8rem;margin-top:30px;line-height:1.55;max-width:88ch}
-  /* clean wallet rows (no raw hex — avatar + codename + Zerion) */
+  /* clean wallet rows (no raw hex — avatar + codename + explorer / copy) */
   .wrow{display:flex;align-items:center;gap:11px;padding:9px 15px;border-top:1px solid var(--line)}
   .wrow:first-child{border-top:none}
   .wrow .wid{display:flex;flex-direction:column;gap:1px;min-width:0}
@@ -144,6 +144,9 @@
   .wrow .wm{font-size:.66rem;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
   .wrow .wv{margin-left:auto;text-align:right;font-family:ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:.82rem}
   .wrow .zl{font-size:.68rem;color:var(--lime);white-space:nowrap;margin-left:8px}
+  .wrow .zl.addr{color:var(--mute);font-family:ui-monospace,monospace;cursor:copy}
+  .wrow .zl.addr:hover{color:var(--dim)}
+  .wrow .ctag{font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px;vertical-align:middle}
   .wrow:hover{background:rgba(255,255,255,.02)}
   /* bubble map */
   .bmwrap{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));overflow:hidden}
@@ -216,6 +219,12 @@ const HUES=["#c8ff4d","#35e6e0","#ff5cf0","#ffd23d","#ff8a5c","#7ee787","#8ab4ff
 const q=new URLSearchParams(location.search), ADDR=(q.get("address")||"").toLowerCase();
 let EXPLORER=null;
 const exHref=(a)=>EXPLORER?`${EXPLORER}/address/${a}`:null;
+const shortA=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"";
+// A wallet row links to the chain explorer when EXPLORER_URL is configured; otherwise it is a
+// non-navigating row whose address is click-to-copy. No third-party wallet service (Zerion doesn't index this chain).
+function wGo(a){const h=exHref(a);
+  return h?{tag:"a",attrs:` href="${h}" target="_blank" rel="noopener"`,go:`<span class="zl">Explorer ↗</span>`}
+          :{tag:"div",attrs:"",go:`<span class="zl addr" title="${a}" onclick="event.preventDefault();navigator.clipboard&&navigator.clipboard.writeText('${a}')">${shortA(a)}</span>`};}
 const addrLink=(a,cls="")=>{const h=exHref(a);return h?`<a href="${h}" target="_blank" rel="noreferrer" class="${cls}">${short(a)}</a>`:`<span class="${cls}">${short(a)}</span>`;};
 
 function icon(r){const sym=r.sym||"?";let h=0;for(let i=0;i<sym.length;i++)h=(h*31+sym.charCodeAt(i))|0;
@@ -279,15 +288,16 @@ function placement(r){
   </div>`;
 }
 
-let ZBASE="https://app.zerion.io";
 function walletRows(rows,dir){
   if(!rows||!rows.length) return `<div class="empty">no wallets ${dir==='top'?'':'moving'} right now</div>`;
   return rows.map(w=>{
     const val = dir==="top" ? `<span class="wv" style="color:var(--dim)">${kT(w.bal)}</span>`
       : `<span class="wv ${dir==='buy'?'pos':'neg'}">${w.net>0?"+":""}${kT(w.net)}</span>`;
-    return `<a class="wrow" href="${ZBASE}/${w.a}" target="_blank" rel="noopener">${B0.avatar(w.a,30)}
-      <span class="wid"><span class="wn">${B0.codename(w.a)}${w.sniper?` <span class="snipe" title="sniper">${B0.ico("bolt")}</span>`:''}</span><span class="wm">${dir==='top'?'holder':dir==='buy'?'accumulating':'distributing'}</span></span>
-      ${val}<span class="zl">Zerion ↗</span></a>`;}).join("");
+    const g=wGo(w.a);
+    const ct=w.contract?` <span class="ctag" title="a contract — bot, router or pool, not a trader">contract</span>`:'';
+    return `<${g.tag} class="wrow"${g.attrs}>${B0.avatar(w.a,30)}
+      <span class="wid"><span class="wn">${B0.codename(w.a)}${ct}${w.sniper?` <span class="snipe" title="sniper">${B0.ico("bolt")}</span>`:''}</span><span class="wm">${dir==='top'?'holder':dir==='buy'?'accumulating':'distributing'}</span></span>
+      ${val}${g.go}</${g.tag}>`;}).join("");
 }
 
 function smartPanel(sm){
@@ -298,9 +308,10 @@ function smartPanel(sm){
     const ride=w.kind==="riding";
     const rec=[w.tokensWon?`${w.tokensWon} win${w.tokensWon>1?"s":""}`:null,w.winRate!=null?`${w.winRate}% hit`:null,w.realized?`+$${Math.round(w.realized).toLocaleString()} realised`:null].filter(Boolean).join(" · ");
     const tag=`<span class="kind ${ride?'ride':'prov'}">${ride?B0.ico("trend"):B0.ico("check")} ${ride?"riding":"proven"}</span>`;
-    return `<a class="wrow" href="${ZBASE}/${w.a}" target="_blank" rel="noopener">${B0.avatar(w.a,30)}
+    const g=wGo(w.a);
+    return `<${g.tag} class="wrow"${g.attrs}>${B0.avatar(w.a,30)}
       <span class="wid"><span class="wn">${B0.codename(w.a)} ${tag}</span><span class="wm">${rec||(ride?"riding a winner":"proven wallet")}</span></span>
-      <span class="wv" style="color:var(--dim)">${kT(w.bal)}</span><span class="zl">Zerion ↗</span></a>`;}).join("");
+      <span class="wv" style="color:var(--dim)">${kT(w.bal)}</span>${g.go}</${g.tag}>`;}).join("");
   return `<div class="smartpanel${conv?" conv":""}">
     <div class="sph">${B0.ico("target")} <b>${sm.count}</b> smart-money wallet${sm.count>1?"s":""} positioned${conv?' <span class="cvt">· converging</span>':''}${brk}
       <span class="spsub"><b>Proven</b> = realised profit on past launches. <b>Riding</b> = large unrealised gains on a real-market token they still hold. A confidence signal reconstructed from on-chain holdings — not a recommendation.</span></div>
@@ -308,8 +319,7 @@ function smartPanel(sm){
 }
 
 function render(r){
-  EXPLORER=r.explorer||null;
-  ZBASE=(r.links&&r.links.zerion)||ZBASE;
+  EXPLORER=r.explorer||(r.links&&r.links.explorer)||null;
   const c=band(r.risk), f=r.flags, p=r.parts||{};
   const facs=[
     meter("Snipers",p.snipers||0,f.snipers?`${f.snipers} wallet${f.snipers>1?'s':''} · hold ${f.sniperHeldPct}%`:"none at launch"),
@@ -709,7 +719,8 @@ function wireBM(){
     BMTIP.style.display="block"; const rect=GBM.getBoundingClientRect(); const x=e.clientX-rect.left, tw=BMTIP.offsetWidth;
     BMTIP.style.left=Math.max(6,Math.min(GBM.clientWidth-tw-6,x-tw/2))+"px"; BMTIP.style.top=Math.max(6,(e.clientY-rect.top)-52)+"px";});
   GBM.addEventListener("pointerleave",()=>{BMTIP.style.display="none";drawBM();});
-  GBM.addEventListener("click",(e)=>{const i=bmHit(e);if(i>=0)window.open(`${ZBASE}/${GNODES[i].a}`,"_blank","noopener");});
+  GBM.addEventListener("click",(e)=>{const i=bmHit(e);if(i<0)return;const h=exHref(GNODES[i].a);
+    if(h)window.open(h,"_blank","noopener");else if(navigator.clipboard)navigator.clipboard.writeText(GNODES[i].a);});
   addEventListener("resize",()=>drawBM());
   $("#bmColor").addEventListener("click",()=>{BMMODE=BMMODE==="flow"?"role":"flow";
     $("#bmColor").textContent=BMMODE==="flow"?"colour: buying / selling":"colour: wallet role"; drawBM();});

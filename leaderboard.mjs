@@ -61,7 +61,7 @@ export async function buildLeaderboard(tokens, computeBt, opts = {}) {
   }
   const isProven = (e) => e.realized >= minRealized && e.tokensWon >= 1;   // cash actually taken out
   const isRiding = (e) => e.riding >= minRiding && e.tokensRiding >= 1;     // unrealized on a real-market runner
-  const rows = [...wallets.values()]
+  const ranked = [...wallets.values()]
     .filter((e) => isProven(e) || isRiding(e))
     .map((e) => {
       const traded = e.tokensWon + e.tokensLost;
@@ -86,8 +86,30 @@ export async function buildLeaderboard(tokens, computeBt, opts = {}) {
       };
     })
     // rank by a blend: proven cash first, unrealized on real runners counts half (paper < cash), wins as tiebreak
-    .sort((x, y) => (y.realized + rideWeight * y.riding) - (x.realized + rideWeight * x.riding) || y.tokensWon - x.tokensWon)
-    .slice(0, topN);
+    .sort((x, y) => (y.realized + rideWeight * y.riding) - (x.realized + rideWeight * x.riding) || y.tokensWon - x.tokensWon);
+
+  // CONTRACT FILTER (the user's "are these just bots?" concern): a "follow the smart money" board is a list of
+  // HUMANS you could plausibly copy. A contract that made money is an AMM pool, router or MEV bot — not a trader.
+  // When an isContract() probe is supplied we walk the ranked list in order, eth_getCode each candidate, and drop
+  // contracts until we've filled topN real wallets — bounded to ~topN+filtered probes, each cached forever. The
+  // count we removed is reported openly (contractsFiltered), never silently. No probe → keep the old behaviour.
+  let rows, contractsFiltered = 0, contractsChecked = false;
+  if (typeof opts.isContract === "function") {
+    contractsChecked = true;
+    const kept = [];
+    for (const r of ranked) {
+      if (kept.length >= topN) break;
+      if (budgetMs && Date.now() - startMs > budgetMs * 2) { partial = true; break; }
+      let isC = false;
+      try { isC = await opts.isContract(r.a); } catch { isC = false; }
+      if (isC) { contractsFiltered++; continue; }
+      kept.push(r);
+    }
+    rows = kept;
+  } else {
+    rows = ranked.slice(0, topN);
+  }
   return { updated: Date.now(), tokensScanned: scanned, tokensRequested: tokens.length, partial, wallets: rows.length, rough: true,
+    contractsChecked, contractsFiltered,
     proven: rows.filter((r) => r.proven).length, riding: rows.filter((r) => r.riding && !r.proven).length, rows };
 }

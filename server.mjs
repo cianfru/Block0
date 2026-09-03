@@ -27,7 +27,7 @@ import { walletIntel } from "./wallet.mjs";
 import { buildLeaderboard } from "./leaderboard.mjs";
 import { buildGraph } from "./graph.mjs";
 import { resolveFunders, funderLinks } from "./funders.mjs";
-import { rpc } from "./rpc.mjs";
+import { rpc, isContract } from "./rpc.mjs";
 import { track, readIntel } from "./analytics.mjs";
 
 const readBody = (req, cap = 8192) => new Promise((resolve) => { let d = ""; req.on("data", (c) => { d += c; if (d.length > cap) req.destroy(); }); req.on("end", () => { try { resolve(JSON.parse(d || "{}")); } catch { resolve({}); } }); req.on("error", () => resolve({})); });
@@ -134,7 +134,7 @@ async function refreshLeaderboard() {
     if (!tokens.length) return;
     // time-budgeted so a slow/rate-limited cold start yields PARTIAL smart money rather than running past the next cycle
     const budgetMs = Number(process.env.LEADERBOARD_BUDGET_MS || Math.min(LB_REFRESH_MS * 0.8, 12 * 60 * 1000));
-    const lb = await buildLeaderboard(tokens, (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 }), { budgetMs });
+    const lb = await buildLeaderboard(tokens, (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 }), { budgetMs, isContract });
     _leaderboard = lb;
     setSmartMoney(smartMoneyFrom(lb));   // feed proven wallets to the board so every verdict flags smart-money holders
     setJSON("leaderboard", lb).catch(() => {});
@@ -288,7 +288,7 @@ createServer(async (req, res) => {
     if (u.pathname === "/api/leaderboard") { // proven-PnL wallets to follow — aggregated across graduated + DEX winners
       const lb = _leaderboard || await getJSON("leaderboard").catch(() => null);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-      const links = { zerion: (process.env.ZERION_URL || "https://app.zerion.io").replace(/\/$/, ""), explorer: (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null };
+      const links = { explorer: (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null };
       if (!lb) return res.end(JSON.stringify({ computing: true, rows: [], links })); // first build not finished yet
       const n = Math.max(1, Math.min(200, Number(u.searchParams.get("n") || 100)));
       return res.end(JSON.stringify({ ...lb, links, rows: (lb.rows || []).slice(0, n) }));
@@ -373,7 +373,7 @@ createServer(async (req, res) => {
         g = buildGraph(st.ev, { ...gopts, extraEdges: fedges }); // re-cluster with the funder links
         funderMeta = { resolved: funders.size, calls, funderGroups: groups.length };
       }
-      const links = { zerion: (process.env.ZERION_URL || "https://app.zerion.io").replace(/\/$/, ""), explorer: (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null };
+      const links = { explorer: (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null };
       return res.end(JSON.stringify({ address, sym: meta?.sym || null, name: meta?.name || null, transfers: st.ev.length, links, funders: funderMeta, ...g }));
     }
 

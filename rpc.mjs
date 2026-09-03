@@ -40,6 +40,22 @@ export const hx = (n) => "0x" + n.toString(16);
 
 export async function latestBlock() { return toNum(await rpc("eth_blockNumber", [])); }
 
+// Is `address` a contract (has deployed bytecode)? Contract-ness is immutable for our purposes, so cache
+// forever. Used to keep bots/routers/pools off the "smart money" leaderboard (a contract is not a trader you
+// can follow) and to label contract holders on a dossier. Fails OPEN (returns false) so an RPC hiccup never
+// wrongly brands a real trader a contract — and a failed lookup is not cached, so it retries next time.
+const _codeCache = new Map();
+export async function isContract(address) {
+  const a = (address || "").toLowerCase();
+  if (!a) return false;
+  if (_codeCache.has(a)) return _codeCache.get(a);
+  let out;
+  try { const code = await rpc("eth_getCode", [a, "latest"], 3); out = !!code && code !== "0x" && code !== "0x0"; }
+  catch { return false; }
+  _codeCache.set(a, out);
+  return out;
+}
+
 // binary-search the first block where the contract has code = its deploy block
 export async function findDeployBlock(address, latest) {
   let lo = 0, hi = latest, ans = latest;
