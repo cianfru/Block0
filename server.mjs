@@ -18,7 +18,7 @@ import { tick as trackTick, trackRecord } from "./track-record.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON } from "./alerts.mjs";
-import { KV_BACKEND, getJSON, setJSON } from "./store/kv.mjs";
+import { KV_BACKEND, getJSON, setJSON, kvPing } from "./store/kv.mjs";
 import { getTransfers } from "./store.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { PROVIDER } from "./rpc.mjs";
@@ -258,6 +258,7 @@ createServer(async (req, res) => {
       const healthy = !!b.updated && ageMs < BOARD_REFRESH_MS * 3;
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       const lh = leaderboardHealth();
+      const store = await kvPing().catch(() => ({ backend: KV_BACKEND, ok: false }));
       return res.end(JSON.stringify({
         ok: healthy, uptimeS: Math.round(process.uptime()),
         board: { updated: b.updated || null, ageSeconds: ageMs == null ? null : Math.round(ageMs / 1000), scanning: !!b.scanning,
@@ -266,7 +267,8 @@ createServer(async (req, res) => {
           wallets: lh.wallets || 0, proven: lh.proven || 0, riding: lh.riding || 0, tokensScanned: lh.tokensScanned || 0,
           tokensRequested: lh.tokensRequested || 0, partial: !!lh.partial, buildSeconds: lh.buildMs ? Math.round(lh.buildMs / 1000) : null,
           ok: !!lh.ok, error: lh.error || null },
-        rpc: { provider: PROVIDER }, alerts: { on: ALERTS_ON }, storage: { backend: KV_BACKEND },
+        rpc: { provider: PROVIDER }, alerts: { on: ALERTS_ON },
+        storage: { backend: store.backend || KV_BACKEND, mode: store.mode || null, connected: !!store.ok, error: store.error || null },
       }));
     }
 

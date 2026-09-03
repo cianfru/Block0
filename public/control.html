@@ -122,7 +122,9 @@ async function loadOps(){
   try{
     const [st,tr]=await Promise.all([fetch("/api/status").then(r=>r.json()),fetch("/api/track-record").then(r=>r.json())]);
     const lb=st.leaderboard||{}; const lbBad=!lb.ok;
+    const sto=st.storage||{}; const stoBad=sto.backend!=="file"&&!sto.connected;
     const pills=[
+      `<span class="hpill ${sto.backend==='file'?'warn':stoBad?'warn':'ok'}">store <b>${sto.backend||'?'}${sto.mode?' · '+sto.mode:''}</b>${sto.backend!=='file'?(sto.connected?' · connected':' · NOT connected'):' · ephemeral'}${sto.error?' ⚠':''}</span>`,
       `<span class="hpill ${lbBad?'warn':'ok'}">leaderboard <b>${lb.wallets||0}</b> wallets · <b>${lb.tokensScanned||0}/${lb.tokensRequested||0}</b> scanned${lb.buildSeconds!=null?` · ${lb.buildSeconds}s`:''}${lb.partial?' · partial':''}${lb.ageSeconds!=null?` · ${ago(lb.ageSeconds)} ago`:''}${lb.error?` · ⚠`:''}</span>`,
       tr.ready
         ? `<span class="hpill ok">track record <b>${Math.round((tr.promising.winRate||0)*100)}%</b> promising win · <b>${tr.resolved}</b> resolved${tr.lift?` · ${tr.lift}× lift`:''}</span>`

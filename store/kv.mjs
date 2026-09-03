@@ -1,23 +1,34 @@
-// Durable key/value + small collections — dependency-free, with two backends:
-//   • redis  — Upstash / Vercel KV REST API (set KV_REST_API_URL + KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_*).
-//              Survives Railway restarts AND redeploys. This is the production choice.
-//   • file   — a JSON file under DATA_DIR (default ./data). Zero-config; durable only within a deploy (or across
-//              redeploys if DATA_DIR is a mounted volume). Good for dev and a single persistent container.
-// No SDK — Redis is spoken over its REST command API with fetch. Everything degrades safely: a store error never
-// throws into the caller (reads return null/[], writes best-effort), so the scanner runs even if the store is down.
+// Durable key/value + small collections — dependency-free, with THREE backends (auto-selected):
+//   • redis (REST) — Upstash / Vercel KV REST API (KV_REST_API_URL + KV_REST_API_TOKEN, or UPSTASH_REDIS_REST_*).
+//   • redis (TCP)  — a native redis:// / rediss:// service (Railway, Redis Cloud, …) via REDIS_URL. No SDK: RESP
+//                    over a raw socket (store/redis-tcp.mjs). This is what Railway's managed Redis gives you.
+//   • file         — a JSON file under DATA_DIR (default ./data). Zero-config; durable only within a deploy (or
+//                    across redeploys if DATA_DIR is a mounted volume). Dev / single persistent container.
+// Everything degrades safely: a store error never throws into the caller (reads return null/[], writes best-effort),
+// so the scanner runs even if the store is down. Precedence: REST > TCP > file.
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
+import { redisCmd, HAS_REDIS_URL } from "./redis-tcp.mjs";
 
 const R_URL = (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "").replace(/\/$/, "");
 const R_TOK = process.env.KV_REST_API_TOKEN || process.env.UPSTASH_REDIS_REST_TOKEN || "";
-export const KV_BACKEND = R_URL && R_TOK ? "redis" : "file";
+const MODE = (R_URL && R_TOK) ? "rest" : HAS_REDIS_URL ? "tcp" : "file";
+export const KV_BACKEND = MODE === "file" ? "file" : "redis";   // public label ("redis" covers both REST + TCP)
 
-// ---- redis REST: POST the command as a JSON array, read {result} ----
+// ---- unified command: REST (fetch a JSON array → {result}) or TCP (RESP over a socket) ----
 async function rcmd(...args) {
+  if (MODE === "tcp") return redisCmd(args);
   const r = await fetch(R_URL, { method: "POST", headers: { authorization: `Bearer ${R_TOK}`, "content-type": "application/json" }, body: JSON.stringify(args) });
   if (!r.ok) throw new Error("kv " + r.status);
   const j = await r.json();
   return j.result;
+}
+
+// Live connectivity check — did the app ACTUALLY connect, or is it silently on the file backend? Used by /api/status.
+export async function kvPing() {
+  if (MODE === "file") return { backend: "file", mode: "file", ok: true };
+  try { const r = await rcmd("PING"); return { backend: "redis", mode: MODE, ok: String(r).toUpperCase().includes("PONG") }; }
+  catch (e) { return { backend: "redis", mode: MODE, ok: false, error: String((e && e.message) || e).slice(0, 100) }; }
 }
 
 // ---- file backend: one JSON doc mirrored in memory, debounced to disk ----
