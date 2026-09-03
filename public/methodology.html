@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
 <style>
   :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
     --tx:#fff;--dim:#c2c2c9;--mute:#8b8b94;--lime:#c8ff4d;--cyan:#35e6e0;--magenta:#ff5cf0;--amber:#ffd23d;--coral:#ff3b5c;
@@ -46,12 +47,13 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <a class="brand" href="/">block<b>0</b></a>
-    <div class="chain"><i></i> Robinhood Chain</div>
-    <a class="back" href="/">← all launches</a>
-  </header>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+<header class="hd"><div class="hd-in">
+  <a href="/" class="wordmark">block<b>0</b></a>
+  <nav class="nav"><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Dossier</a><a href="/methodology" class="on">Methodology</a></nav>
+  <div class="hd-r"><a class="chip chainchip" href="/board">← all launches</a></div>
+</div></header>
+<div class="wrap" style="max-width:900px;padding-top:32px">
 
   <h1>How Block0 <em>works</em></h1>
   <p class="lede">Every score here is reconstructed from public Robinhood-Chain transfer data and is reproducible — no black box, no proprietary feed. This page is the whole method, and an honest measurement of how well it actually separates winners from the rest.</p>
@@ -106,6 +108,10 @@
 
   <div class="foot">Block0 reconstructs everything from public Robinhood-Chain data and the Pons launchpad's own market data. It is a research and forensic tool — a position read, <b>signal not proof</b>, never a buy recommendation, and not financial advice. You are responsible for your own decisions.</div>
 </div>
+<footer class="ft"><div class="ft-in"><div class="ft-top">
+  <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p></div>
+  <div class="ft-cols"><div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a></div><div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a></div></div>
+</div><p class="fine">Not financial advice. You are responsible for your own decisions.</p></div></footer>
 
 <script>
 const $=(s)=>document.querySelector(s);

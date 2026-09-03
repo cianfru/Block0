@@ -41,7 +41,7 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 @keyframes pulsering{0%{box-shadow:0 0 0 0 rgba(200,255,77,.45)}70%{box-shadow:0 0 0 10px rgba(200,255,77,0)}100%{box-shadow:0 0 0 0 rgba(200,255,77,0)}}
 
 /* ---- header / nav ---- */
-.hd{position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line);background:rgba(8,8,11,.8);backdrop-filter:blur(20px)}
+.hd{display:block;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line);background:rgba(8,8,11,.8);backdrop-filter:blur(20px);padding:0}
 .hd-in{display:flex;align-items:center;gap:16px;height:56px;max-width:1120px;margin:0 auto;padding:0 20px}
 .wordmark{font-family:var(--serif);font-size:1.35rem;line-height:1;letter-spacing:-.02em}
 .wordmark b{font-style:italic;color:var(--lime);font-weight:400}

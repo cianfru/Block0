@@ -7,6 +7,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
 <style>
   :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--tx:#fff;--dim:#c2c2c9;--mute:#8b8b94;--lime:#c8ff4d;--cyan:#35e6e0;
     --serif:"Instrument Serif",Georgia,serif;--sans:"Inter",system-ui,sans-serif;}
@@ -29,11 +30,13 @@
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <a class="brand" href="/">block<b>0</b></a>
-    <a class="back" href="/">← all launches</a>
-  </header>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+<header class="hd"><div class="hd-in">
+  <a href="/" class="wordmark">block<b>0</b></a>
+  <nav class="nav"><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Dossier</a><a href="/methodology">Methodology</a></nav>
+  <div class="hd-r"><a class="chip chainchip" href="/board">← all launches</a></div>
+</div></header>
+<div class="wrap" style="max-width:820px;padding-top:32px">
 
   <h1>Terms &amp; privacy</h1>
   <div class="upd">Last updated: 2026</div>
@@ -75,5 +78,9 @@
 
   <div class="foot">Questions? Reach the project on its public channels. By using Block0 you agree to these terms. See also <a href="/methodology">how it works &amp; how well it works</a>.</div>
 </div>
+<footer class="ft"><div class="ft-in"><div class="ft-top">
+  <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p></div>
+  <div class="ft-cols"><div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a></div><div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a></div></div>
+</div><p class="fine">Not financial advice. You are responsible for your own decisions.</p></div></footer>
 </body>
 </html>

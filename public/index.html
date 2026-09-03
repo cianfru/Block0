@@ -7,21 +7,13 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
 <style>
   :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
     --tx:#fff;--dim:#b6b6bd;--mute:#7f7f88;--lime:#c8ff4d;--cyan:#35e6e0;--magenta:#ff5cf0;--amber:#ffd23d;--coral:#ff3b5c;
     --serif:"Instrument Serif",Georgia,serif;--sans:"Inter",system-ui,sans-serif;}
   *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:15px;-webkit-font-smoothing:antialiased;
-    background-image:radial-gradient(1200px 540px at 82% -14%,rgba(200,255,77,.10),transparent 60%),radial-gradient(820px 520px at -8% 6%,rgba(53,230,224,.07),transparent 55%),radial-gradient(700px 640px at 112% 116%,rgba(255,92,240,.05),transparent 60%);min-height:100vh}
-  .wrap{max-width:1120px;margin:0 auto;padding:0 22px 70px}
-  a{color:inherit;text-decoration:none}
-  header{display:flex;align-items:center;gap:16px;padding:22px 0 12px;flex-wrap:wrap}
-  .brand{font-family:var(--serif);font-size:2rem;line-height:1}.brand b{font-style:italic;color:var(--lime);font-weight:400}
-  .chain{display:inline-flex;align-items:center;gap:7px;font-size:.76rem;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:7px 11px;background:var(--glass)}
-  .chain i{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime)}
-  .back{margin-left:auto;font-size:.85rem;color:var(--dim);border:1px solid var(--line);border-radius:11px;padding:9px 15px;background:var(--glass)}
-  .back:hover{border-color:var(--line-2);color:var(--tx)}
+  .wrap{padding-bottom:70px}
 
   .state{color:var(--mute);font-size:.95rem;padding:46px 2px}
   .state.err{color:var(--coral)}
@@ -117,21 +109,67 @@
   .snipe{color:var(--amber);margin-left:5px;font-size:.72rem}
   .empty{color:var(--mute);padding:16px 15px;font-size:.8rem}
   .foot{color:var(--mute);font-size:.8rem;margin-top:30px;line-height:1.55;max-width:88ch}
+  /* clean wallet rows (no raw hex — avatar + codename + Zerion) */
+  .wrow{display:flex;align-items:center;gap:11px;padding:9px 15px;border-top:1px solid var(--line)}
+  .wrow:first-child{border-top:none}
+  .wrow .wid{display:flex;flex-direction:column;gap:1px;min-width:0}
+  .wrow .wn{font-weight:600;font-size:.86rem;font-family:var(--sans)}
+  .wrow .wm{font-size:.66rem;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
+  .wrow .wv{margin-left:auto;text-align:right;font-family:ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:.82rem}
+  .wrow .zl{font-size:.68rem;color:var(--lime);white-space:nowrap;margin-left:8px}
+  .wrow:hover{background:rgba(255,255,255,.02)}
+  /* bubble map */
+  .bmwrap{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));overflow:hidden}
+  .bm-h{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .bm-h .t{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim)}
+  .bm-btns{display:flex;gap:8px;flex-wrap:wrap}
+  .bm-btn{font-size:.76rem;font-weight:600;color:var(--dim);border:1px solid var(--line);border-radius:9px;padding:6px 12px;background:transparent;cursor:pointer}
+  .bm-btn:hover{border-color:var(--line-2);color:var(--tx)}
+  .bm-btn.on{border-color:var(--lime);color:var(--lime);background:rgba(200,255,77,.08)}
+  #cvbm{height:440px;cursor:grab}
+  #cvbm:active{cursor:grabbing}
+  .bm-legend{display:flex;gap:14px;flex-wrap:wrap;padding:11px 16px;border-top:1px solid var(--line);font-size:.72rem;color:var(--mute)}
+  .bm-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
+  .bmtip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;font-size:.74rem;z-index:6;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
   @media(max-width:860px){.top{grid-template-columns:1fr}.verdict{text-align:left}.verdict .drv{margin-left:0}
     .facs{grid-template-columns:repeat(2,1fr)}.place{grid-template-columns:1fr}.tables{grid-template-columns:1fr}}
 </style>
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <a class="brand" href="/">block<b>0</b></a>
-    <div class="chain"><i></i> Robinhood Chain</div>
-    <a class="back" href="/">← all launches</a>
-  </header>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav">
+      <a href="/board">Board</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/token" class="on">Dossier</a>
+      <a href="/methodology">Methodology</a>
+    </nav>
+    <div class="hd-r">
+      <a class="chip chainchip" href="/board">← all launches</a>
+      <button class="btn-connect" id="connect">Connect</button>
+    </div>
+  </div>
+  <div class="gatebar" id="gatebar" hidden></div>
+</header>
+<main class="wrap">
   <div id="root"><div class="state">Loading the dossier…</div></div>
-  <div class="foot"><b>Signal, not proof — never a buy recommendation.</b> Every number is reconstructed from public Robinhood-Chain transfer data and is reproducible. Risk is a transparent composite of concentration, snipers, bundles, live insider-dumping and the deployer's bag. Blueprint fit and the valuation ladder place this token against the biggest past graduations — a pattern, not a promise. Prices are swap-implied reconstructions (no oracle), smoothed; treat exact figures as estimates. <a href="/methodology" style="color:var(--lime)">How it works &amp; how well it works →</a> · <a href="/terms" style="color:var(--mute)">Terms &amp; privacy</a></div>
-</div>
+</main>
+<footer class="ft">
+  <div class="ft-in">
+    <div class="ft-top">
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag"><b>Signal, not proof — never a buy recommendation.</b> Every number is reconstructed from public Robinhood-Chain transfer data and is reproducible.</p></div>
+      <div class="ft-cols">
+        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a></div>
+      </div>
+    </div>
+    <p class="fine">Prices are swap-implied reconstructions, smoothed — treat exact figures as estimates. Not financial advice.</p>
+  </div>
+</footer>
 
+<script src="/block0-cards.js"></script>
 <script>
 const $=(s,r=document)=>r.querySelector(s);
 const short=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"—";
@@ -207,16 +245,20 @@ function placement(r){
   </div>`;
 }
 
-function tableRows(rows,dir){
-  if(!rows||!rows.length) return `<tr><td class="empty">no wallets ${dir==='top'?'':'moving'} right now</td></tr>`;
+let ZBASE="https://app.zerion.io";
+function walletRows(rows,dir){
+  if(!rows||!rows.length) return `<div class="empty">no wallets ${dir==='top'?'':'moving'} right now</div>`;
   return rows.map(w=>{
-    const val = dir==="top" ? `<td class="num" style="color:var(--dim)">${kT(w.bal)}</td>`
-      : `<td class="num ${dir==='buy'?'pos':'neg'}">${w.net>0?"+":""}${kT(w.net)}</td>`;
-    return `<tr><td>${addrLink(w.a,"wal")}${w.sniper?'<span class="snipe">⚡</span>':''}</td>${val}</tr>`;}).join("");
+    const val = dir==="top" ? `<span class="wv" style="color:var(--dim)">${kT(w.bal)}</span>`
+      : `<span class="wv ${dir==='buy'?'pos':'neg'}">${w.net>0?"+":""}${kT(w.net)}</span>`;
+    return `<a class="wrow" href="${ZBASE}/${w.a}" target="_blank" rel="noopener">${B0.avatar(w.a,30)}
+      <span class="wid"><span class="wn">${B0.codename(w.a)}${w.sniper?' <span class="snipe">⚡</span>':''}</span><span class="wm">${dir==='top'?'holder':dir==='buy'?'accumulating':'distributing'}</span></span>
+      ${val}<span class="zl">Zerion ↗</span></a>`;}).join("");
 }
 
 function render(r){
   EXPLORER=r.explorer||null;
+  ZBASE=(r.links&&r.links.zerion)||ZBASE;
   const c=band(r.risk), f=r.flags, p=r.parts||{};
   const facs=[
     meter("Snipers",p.snipers||0,f.snipers?`${f.snipers} wallet${f.snipers>1?'s':''} · hold ${f.sniperHeldPct}%`:"none at launch"),
@@ -281,13 +323,27 @@ function render(r){
       <div class="corcap" id="pricewarn" hidden></div>
     </div>
 
+    <h2 class="sec">Bundle map — who's connected</h2>
+    <div class="bmwrap">
+      <div class="bm-h">
+        <div class="t">wallet relationships · bundles &amp; clusters</div>
+        <div class="bm-btns">
+          <button class="bm-btn on" id="bmColor" data-mode="flow">colour: buying / selling</button>
+          <button class="bm-btn" id="bmFunders">＋ scan common funders</button>
+        </div>
+      </div>
+      <div style="position:relative"><canvas id="cvbm"></canvas><div class="bmtip" id="bmtip"></div></div>
+      <div class="bm-legend" id="bmlegend"></div>
+    </div>
+
     <h2 class="sec">Who's in it</h2>
     <div class="tables">
-      <div class="tbl"><h3 class="buy">Adding now <span>net 30m</span></h3><table>${tableRows(r.buyers,"buy")}</table></div>
-      <div class="tbl"><h3 class="sell">Shedding now <span>net 30m</span></h3><table>${tableRows(r.sellers,"sell")}</table></div>
-      <div class="tbl"><h3>Biggest bags <span>balance</span></h3><table>${tableRows(r.topHolders,"top")}</table></div>
+      <div class="tbl"><h3 class="buy">Adding now <span>net 30m</span></h3><div class="wlist">${walletRows(r.buyers,"buy")}</div></div>
+      <div class="tbl"><h3 class="sell">Shedding now <span>net 30m</span></h3><div class="wlist">${walletRows(r.sellers,"sell")}</div></div>
+      <div class="tbl"><h3>Biggest bags <span>balance</span></h3><div class="wlist">${walletRows(r.topHolders,"top")}</div></div>
     </div>`;
   loadHistory(r);
+  loadGraph(r.address);
 }
 
 /* ---------------- history chart (canvas, no deps) ---------------- */
@@ -481,6 +537,101 @@ function onHover(e){
   TIP.style.left=Math.max(6,Math.min(CV.clientWidth-tw-6,x-tw/2))+"px"; TIP.style.top="14px";
 }
 
+/* ---------------- bubble map (force-directed, canvas, no deps) ---------------- */
+let GRAPH=null, GNODES=[], GBM, BMTIP, BMDPR=Math.max(1,Math.min(2,window.devicePixelRatio||1)), BMFUNDERS=false, BMMODE="flow", BMADDR=null;
+const FLOWCOL={buy:"#c8ff4d",sell:"#ff3b5c",flat:"#7f7f88"};
+const ROLECOL={bundle:"#ff5cf0",sniper:"#ffd23d",holder:"#35e6e0"};
+const nodeCol=(n)=>BMMODE==="flow"?FLOWCOL[n.flow||"flat"]:ROLECOL[n.role||"holder"];
+async function loadGraph(address){
+  BMADDR=address; const leg=$("#bmlegend");
+  GBM=$("#cvbm"); BMTIP=$("#bmtip");
+  GBM.style.display="none"; leg.innerHTML='<span style="color:var(--mute)">Mapping wallet relationships…</span>';
+  try{
+    const url=`/api/graph?address=${address}&n=90`+(BMFUNDERS?"&funders=1":"");
+    const g=await fetch(url).then(x=>x.json());
+    GRAPH=g;
+    if(!g.nodes||g.nodes.length<2){ leg.innerHTML='<span style="color:var(--mute)">Not enough holders yet to map relationships.</span>'; GBM.style.display="none"; return; }
+    GBM.style.display="block";
+    layoutGraph(); drawBM(); wireBM();
+    const nb=g.stats||{}; const fl=g.clusters?g.clusters.filter(c=>c.flag).length:0;
+    leg.innerHTML=`<span><i style="background:#c8ff4d"></i>accumulating</span><span><i style="background:#ff3b5c"></i>distributing</span>`+
+      `<span style="color:var(--magenta)">◯ ringed = flagged cluster</span>`+
+      `<span style="margin-left:auto">${g.nodes.length} wallets · ${g.clusters?g.clusters.length:0} clusters${fl?` · <b style="color:var(--amber)">${fl} to watch</b>`:""}${g.funders?` · ${g.funders.funderGroups} funder groups`:""}</span>`;
+  }catch(e){ leg.innerHTML='<span style="color:var(--mute)">Bubble map unavailable.</span>'; GBM.style.display="none"; }
+}
+function layoutGraph(){
+  const g=GRAPH, n=g.nodes.length;
+  const id2i=new Map(); g.nodes.forEach((nd,i)=>id2i.set(nd.a,i));
+  const maxPct=Math.max(...g.nodes.map(nd=>nd.pct||0),0.01);
+  GNODES=g.nodes.map((nd)=>({...nd, r:5+Math.sqrt((nd.pct||0)/maxPct)*22, x:(Math.random()-0.5)*300, y:(Math.random()-0.5)*300, vx:0, vy:0}));
+  const edges=(g.edges||[]).map(e=>({a:id2i.get(e.a),b:id2i.get(e.b),kind:e.kind})).filter(e=>e.a!=null&&e.b!=null);
+  // cluster centroids gravity
+  const cl=new Map(); GNODES.forEach((nd)=>{ if(nd.cluster){ if(!cl.has(nd.cluster))cl.set(nd.cluster,[]); cl.get(nd.cluster).push(nd);} });
+  const ITER=320;
+  for(let it=0;it<ITER;it++){
+    const t=1-it/ITER, k=t*t;
+    // repulsion
+    for(let i=0;i<n;i++){for(let j=i+1;j<n;j++){const a=GNODES[i],b=GNODES[j];let dx=a.x-b.x,dy=a.y-b.y;let d2=dx*dx+dy*dy||0.01;const d=Math.sqrt(d2);
+      const rep=(a.r+b.r+40)*(a.r+b.r+40)/d2; const fx=dx/d*rep, fy=dy/d*rep; a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}}
+    // edge springs
+    for(const e of edges){const a=GNODES[e.a],b=GNODES[e.b];let dx=b.x-a.x,dy=b.y-a.y;const d=Math.sqrt(dx*dx+dy*dy)||0.01;
+      const ideal=a.r+b.r+34, f=(d-ideal)*0.06; const fx=dx/d*f, fy=dy/d*f; a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}
+    // cluster cohesion + center gravity
+    for(const [,members] of cl){let cx=0,cy=0;for(const m of members){cx+=m.x;cy+=m.y;}cx/=members.length;cy/=members.length;
+      for(const m of members){m.vx+=(cx-m.x)*0.02;m.vy+=(cy-m.y)*0.02;}}
+    for(const nd of GNODES){nd.vx+=(-nd.x)*0.008;nd.vy+=(-nd.y)*0.008; nd.x+=nd.vx*(0.4+0.6*k);nd.y+=nd.vy*(0.4+0.6*k); nd.vx*=0.82;nd.vy*=0.82;}
+  }
+  GRAPH._edges=edges; GRAPH._cl=cl;
+}
+function drawBM(hoverI=-1){
+  if(!GNODES.length) return;
+  const W=GBM.clientWidth,H=GBM.clientHeight; GBM.width=W*BMDPR;GBM.height=H*BMDPR;
+  const g=GBM.getContext("2d"); g.setTransform(BMDPR,0,0,BMDPR,0,0); g.clearRect(0,0,W,H);
+  // fit
+  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
+  for(const nd of GNODES){minX=Math.min(minX,nd.x-nd.r);maxX=Math.max(maxX,nd.x+nd.r);minY=Math.min(minY,nd.y-nd.r);maxY=Math.max(maxY,nd.y+nd.r);}
+  const pad=24, sx=(W-pad*2)/Math.max(1,maxX-minX), sy=(H-pad*2)/Math.max(1,maxY-minY), s=Math.min(sx,sy,2.4);
+  const ox=pad-minX*s+(W-pad*2-(maxX-minX)*s)/2, oy=pad-minY*s+(H-pad*2-(maxY-minY)*s)/2;
+  const X=(x)=>x*s+ox, Y=(y)=>y*s+oy;
+  GRAPH._proj={X,Y,s};
+  // cluster rings (flagged first, coloured by cluster flow)
+  for(const c of (GRAPH.clusters||[])){
+    const ms=c.wallets.map(a=>GNODES.find(nd=>nd.a===a)).filter(Boolean); if(ms.length<2) continue;
+    let cx=0,cy=0;for(const m of ms){cx+=m.x;cy+=m.y;}cx/=ms.length;cy/=ms.length;
+    let rad=0;for(const m of ms){rad=Math.max(rad,Math.hypot(m.x-cx,m.y-cy)+m.r);}
+    const col=FLOWCOL[c.flow||"flat"]; const px=X(cx),py=Y(cy),pr=rad*s+8;
+    g.beginPath();g.arc(px,py,pr,0,7); g.fillStyle=col+"0e"; g.fill();
+    if(c.flag){ g.setLineDash([5,4]); g.strokeStyle=(c.hasFunder?"#ff5cf0":col)+"cc"; g.lineWidth=1.5; g.stroke(); g.setLineDash([]); }
+  }
+  // edges
+  for(const e of (GRAPH._edges||[])){const a=GNODES[e.a],b=GNODES[e.b];
+    g.strokeStyle=e.kind==="funder"?"rgba(255,92,240,.5)":e.kind==="bundle"?"rgba(200,255,77,.35)":"rgba(255,255,255,.10)";
+    g.lineWidth=e.kind==="transfer"?1:1.4; g.beginPath();g.moveTo(X(a.x),Y(a.y));g.lineTo(X(b.x),Y(b.y));g.stroke();}
+  // nodes
+  GNODES.forEach((nd,i)=>{const c=nodeCol(nd),px=X(nd.x),py=Y(nd.y),pr=nd.r*Math.min(s,1.4);
+    if(i===hoverI){g.beginPath();g.arc(px,py,pr+4,0,7);g.strokeStyle="#fff";g.lineWidth=2;g.stroke();}
+    g.beginPath();g.arc(px,py,pr,0,7); g.fillStyle=c+"e0"; g.shadowColor=c;g.shadowBlur=nd.flow&&nd.flow!=="flat"?10:0; g.fill(); g.shadowBlur=0;
+    g.lineWidth=1;g.strokeStyle=c;g.stroke();});
+}
+function wireBM(){
+  if(GBM._wired) return; GBM._wired=true;
+  GBM.addEventListener("pointermove",(e)=>{const i=bmHit(e); drawBM(i);
+    if(i<0){BMTIP.style.display="none";return;} const nd=GNODES[i];
+    BMTIP.innerHTML=`<b>${B0.codename(nd.a)}</b><br><span style="color:var(--mute)">${nd.pct}% of supply · ${nd.role}</span><br><span style="color:${FLOWCOL[nd.flow||'flat']}">${nd.flow==='buy'?'accumulating':nd.flow==='sell'?'distributing':'flat'}</span>${nd.cluster?` · cluster`:''}`;
+    BMTIP.style.display="block"; const rect=GBM.getBoundingClientRect(); const x=e.clientX-rect.left, tw=BMTIP.offsetWidth;
+    BMTIP.style.left=Math.max(6,Math.min(GBM.clientWidth-tw-6,x-tw/2))+"px"; BMTIP.style.top=Math.max(6,(e.clientY-rect.top)-52)+"px";});
+  GBM.addEventListener("pointerleave",()=>{BMTIP.style.display="none";drawBM();});
+  GBM.addEventListener("click",(e)=>{const i=bmHit(e);if(i>=0)window.open(`${ZBASE}/${GNODES[i].a}`,"_blank","noopener");});
+  addEventListener("resize",()=>drawBM());
+  $("#bmColor").addEventListener("click",()=>{BMMODE=BMMODE==="flow"?"role":"flow";
+    $("#bmColor").textContent=BMMODE==="flow"?"colour: buying / selling":"colour: wallet role"; drawBM();});
+  $("#bmFunders").addEventListener("click",()=>{ if(BMFUNDERS)return; BMFUNDERS=true;
+    const b=$("#bmFunders"); b.textContent="scanning funders…"; b.classList.add("on");
+    loadGraph(BMADDR).then(()=>{b.textContent="✓ common funders"; }).catch(()=>{b.textContent="＋ scan common funders";b.classList.remove("on");BMFUNDERS=false;}); });
+}
+function bmHit(e){const p=GRAPH&&GRAPH._proj;if(!p)return -1;const rect=GBM.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top;
+  let hit=-1,best=1e9;GNODES.forEach((nd,i)=>{const dx=p.X(nd.x)-mx,dy=p.Y(nd.y)-my,d=Math.hypot(dx,dy);const rr=nd.r*Math.min(p.s,1.4)+3;if(d<rr&&d<best){best=d;hit=i;}});return hit;}
+
 async function boot(){
   if(!/^0x[0-9a-f]{40}$/.test(ADDR)){ $("#root").innerHTML='<div class="state err">No token address in the URL. Open a token from the board.</div>'; return; }
   try{
@@ -490,6 +641,8 @@ async function boot(){
     render(r);
   }catch(e){ $("#root").innerHTML=`<div class="state err">Couldn't load this token: ${e.message}. The scanner may still be warming up — reload in a moment.</div>`; }
 }
+const _cn=$("#connect"); if(_cn) _cn.addEventListener("click",()=>{const g=$("#gatebar");_cn.textContent="Reading balance…";
+  setTimeout(()=>{_cn.textContent="Access granted";g.hidden=false;g.textContent="Read-only balance check — no signing, no transactions, no custody.";},1100);});
 boot();
 </script>
 </body>
