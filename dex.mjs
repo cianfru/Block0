@@ -11,7 +11,14 @@
 const DEX_RPC = (process.env.DEX_RPC || "https://rpc.mainnet.chain.robinhood.com").replace(/\/$/, "");
 const AMM = (process.env.DEX_AMM || "0x8366a39cc670b4001a1121b8f6a443a643e40951").toLowerCase(); // RH singleton AMM
 const WETH = "0x0bd7d308f8e1639fab988df18a8011f41eacad73", USDG = "0x5fc5360d0400a0fd4f2af552add042d716f1d168";
-const QUOTES = new Set([WETH, USDG, "0x0000000000000000000000000000000000000000"]);
+// Infra / quote / wrapper tokens to strip from discovered pairs — they're the OTHER side of a pool, not launches.
+// Extend via DEX_EXCLUDE (comma-separated addresses). Tokenized STOCKS are excluded separately (by deployer) in the
+// Alchemy consumers, since they share one issuer rather than a fixed address list.
+export const INFRA = new Set([WETH, USDG,
+  "0x0000000000000000000000000000000000000000", "0x000000000000000000000000000000000000dead",
+  "0x00000000043c1117dafa3a3d0c7148eb48b30130", // flETH — a wrapped-ETH variant that pairs against many pools
+  ...(process.env.DEX_EXCLUDE || "").split(",").map((s) => s.trim().toLowerCase()).filter(Boolean),
+]);
 const RANGE = Number(process.env.DEX_LOGS_RANGE || 9000), GAP = Number(process.env.DEX_LOGS_GAP_MS || 120);
 
 // Confirmed on the RH chain (via traceEvents 2026): the singleton AMM at 0x8366… is Uniswap v4 and pool creation
@@ -96,7 +103,7 @@ export async function discoverDex({ blocks = 200000, address = AMM, initTopics =
     const spec = KNOWN[t0] || { dex: "amm-v4", ev: "Initialize", tokenTopics: [2, 3] }; // v4: currency0/1 are topics 2,3
     for (const ti of spec.tokenTopics) {
       const a = addrOf(l.topics?.[ti]);
-      if (!a || a.length !== 42 || QUOTES.has(a)) continue;
+      if (!a || a.length !== 42 || INFRA.has(a)) continue;
       if (!tokens.has(a)) tokens.set(a, { address: a, dex: spec.dex, block: toNum(l.blockNumber), tx: l.transactionHash });
     }
   }

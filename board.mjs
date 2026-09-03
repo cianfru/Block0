@@ -7,7 +7,7 @@
 //                 The "get in before it graduates" zone. (Active tokens cap ~$40k and graduate at 4.2 ETH.)
 //   • graduated — the ~510 tokens that completed the curve: the investable universe, ranked by market cap.
 // The ~4.2M dead-dust launches never appear — we only verdict what the launchpad surfaces as live/graduated.
-import { computeIntel, blueprintMatch, blueprintLabel } from "./intel.mjs";
+import { computeIntel, blueprintMatch, blueprintLabel, isTokenizedStock } from "./intel.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { recentDexTokens } from "./dex.mjs";
 import { keep, storeStats } from "./store.mjs";
@@ -83,6 +83,7 @@ export async function refreshDex() {
     const dnew = [];
     for (const m of picks) {
       try {
+        if (await isTokenizedStock(m.address)) continue; // exclude tokenized equities/ETFs (structural 99% concentration, not a rug)
         const v = await verdict({ address: m.address, sym: m.symbol, name: m.name || null, pool: null, graduated: false, launchedAt: null });
         if ((v.flags?.holders || 0) >= DEX_MIN_HOLDERS) { v.venue = m.venue; v.dexBlock = m.block; dnew.push(v); }
       } catch { /* skip */ }

@@ -17,6 +17,7 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { fetchActive, fetchGraduated } from "../pons.mjs";
 import { backtest } from "../backtest.mjs";
 import { discoverDex, tokenMeta } from "../dex.mjs";
+import { isTokenizedStock } from "../intel.mjs";
 
 const arg = Object.fromEntries(process.argv.slice(2).map((a) => { const [k, v] = a.replace(/^--/, "").split("="); return [k, v ?? true]; }));
 const N_WIN = Number(arg.winners || 12), N_LOSE = Number(arg.losers || 30);
@@ -78,6 +79,7 @@ if (arg.dex) {
   for (const t of cand) {
     let m; try { m = await tokenMeta(t.address); } catch { continue; }
     if (!m.symbol || !(m.supply > 0)) continue;
+    try { if (await isTokenizedStock(t.address)) continue; } catch { /* keep on lookup error */ } // drop tokenized equities/ETFs
     let r; try { r = await backtest(t.address, { sym: m.symbol, graduated: false, points: POINTS }); } catch { continue; }
     if (r.error || !r.series?.length) continue;
     prof++;
