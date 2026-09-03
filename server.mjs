@@ -27,6 +27,7 @@ import { walletIntel } from "./wallet.mjs";
 import { buildLeaderboard } from "./leaderboard.mjs";
 import { walletPnlReport } from "./wallet-pnl.mjs";
 import { buildCards } from "./cards.mjs";
+import { emptyState, applySocial, cadence } from "./social.mjs";
 import { buildGraph } from "./graph.mjs";
 import { resolveFunders, funderLinks } from "./funders.mjs";
 import { rpc, isContract } from "./rpc.mjs";
@@ -34,6 +35,7 @@ import { track, readIntel } from "./analytics.mjs";
 
 const readBody = (req, cap = 8192) => new Promise((resolve) => { let d = ""; req.on("data", (c) => { d += c; if (d.length > cap) req.destroy(); }); req.on("end", () => { try { resolve(JSON.parse(d || "{}")); } catch { resolve({}); } }); req.on("error", () => resolve({})); });
 const CONTROL_PW = process.env.CONTROL_PASSWORD || "";
+const newUid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -204,6 +206,7 @@ async function serveStatic(res, urlPath) {
     : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html"
     : (urlPath === "/control" || urlPath === "/control.html") ? "control.html"
     : (urlPath === "/desk" || urlPath === "/desk.html") ? "desk.html"
+    : (urlPath === "/post" || urlPath === "/post.html") ? "post.html"
     : (urlPath === "/terms" || urlPath === "/terms.html") ? "terms.html" : null;
   const file = route || urlPath.replace(/^\//, "");
   try {
@@ -254,6 +257,26 @@ createServer(async (req, res) => {
       const smartMoney = { tokens: convergence({ cooking: b.cooking, dex: b.dex, graduated: b.graduated }, { minCount: 2 }) };
       const leaderboard = _leaderboard || await getJSON("leaderboard").catch(() => null);
       return res.end(JSON.stringify(buildCards({ board: b, validation, track, smartMoney, leaderboard })));
+    }
+
+    if (u.pathname === "/api/social") { // POST desk workspace: persistent queue + posted log (CONTROL_PASSWORD-gated)
+      const body = req.method === "POST" ? await readBody(req) : {};
+      const pw = body.pw || u.searchParams.get("pw") || "";
+      res.writeHead(CONTROL_PW && pw === CONTROL_PW ? 200 : 401, { "content-type": "application/json", "cache-control": "no-store" });
+      if (!CONTROL_PW) return res.end(JSON.stringify({ error: "CONTROL_PASSWORD not set on the server" }));
+      if (pw !== CONTROL_PW) return res.end(JSON.stringify({ error: "unauthorized" }));
+      let state = (await getJSON("social").catch(() => null)) || emptyState();
+      const action = body.action || null;
+      if (action && action.type) {
+        // the server mints ids for NEW items (queue, or an ad-hoc "posted" straight from Today) — keeps the reducer pure
+        if ((action.type === "queue" || (action.type === "posted" && !action.uid)) && action.item) {
+          action.item = { ...action.item, uid: action.item.uid || newUid(), createdAt: action.item.createdAt || Date.now() };
+        }
+        action.now = Date.now();
+        state = applySocial(state, action);
+        await setJSON("social", state).catch(() => {});
+      }
+      return res.end(JSON.stringify({ ok: true, queue: state.queue, log: state.log, cadence: cadence(state) }));
     }
 
     if (u.pathname === "/api/gate") { // token-gated access: config + a read-only balance check (no signing, no custody)

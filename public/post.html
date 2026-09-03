@@ -1,0 +1,241 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>Block0 — post control</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+<style>
+  .login{max-width:380px;margin:14vh auto 0;text-align:center}
+  .login input{min-height:46px;width:100%;border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:12px;padding:0 16px;font-family:var(--mono);color:var(--tx);outline:none;margin:18px 0 12px}
+  .btn-lime{min-height:46px;border:none;border-radius:12px;background:var(--lime);color:#08080b;font-weight:700;cursor:pointer;font-family:var(--sans)}
+  .muted{color:var(--mute);font-size:.85rem}
+  .phead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px}
+  .sect{margin-top:34px}
+  .sect > h2{font-size:1.5rem;display:flex;align-items:baseline;gap:10px}
+  .sect > h2 .c{font-family:var(--mono);font-size:.8rem;color:var(--mute)}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(330px,1fr));gap:20px;margin-top:16px}
+  .cardbox{border:1px solid var(--line);border-radius:16px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012))}
+  .cardbox canvas{width:100%;height:auto;display:block;background:#08080b}
+  .cbody{padding:12px 14px 14px}
+  .tweet{width:100%;min-height:118px;resize:vertical;border:1px solid var(--line);background:rgba(0,0,0,.28);border-radius:12px;padding:10px 12px;color:var(--tx);font-family:var(--sans);font-size:.85rem;line-height:1.5;outline:none}
+  .tweet:focus{border-color:var(--line-2)}
+  .acts{display:flex;flex-wrap:wrap;gap:7px;align-items:center;margin-top:9px}
+  .acts button{min-height:34px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);border-radius:9px;padding:0 11px;font-size:.76rem;font-family:var(--sans);cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+  .acts button:hover{border-color:var(--line-2);color:var(--tx)}
+  .acts button.prime{background:var(--lime);color:#08080b;border-color:var(--lime);font-weight:600}
+  .acts button.warn:hover{border-color:var(--coral);color:var(--coral)}
+  .acts .cc{margin-left:auto;font-family:var(--mono);font-size:.7rem;color:var(--mute)}
+  .cc.over{color:var(--coral)}
+  .flash{color:var(--lime);font-size:.74rem;font-family:var(--mono)}
+  .empty{color:var(--mute);font-size:.88rem;padding:22px;border:1px dashed var(--line);border-radius:14px;text-align:center}
+  /* log */
+  .log{margin-top:16px;display:flex;flex-direction:column;gap:8px}
+  .lrow{display:grid;grid-template-columns:auto 1fr auto;gap:12px;align-items:center;padding:11px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02)}
+  .lrow .when{font-family:var(--mono);font-size:.72rem;color:var(--mute);white-space:nowrap}
+  .lrow .snip{min-width:0;font-size:.84rem;color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lrow .snip b{color:var(--tx);font-weight:600}
+  .lrow .la{display:flex;gap:6px}
+  .lrow .la button{min-height:30px;border:1px solid var(--line);background:transparent;color:var(--mute);border-radius:8px;padding:0 9px;font-size:.72rem;cursor:pointer}
+  .lrow .la button:hover{color:var(--tx);border-color:var(--line-2)}
+  .lrow a.url{color:var(--lime);font-size:.74rem}
+  /* composer */
+  .composer{margin-top:16px;border:1px solid var(--line);border-radius:16px;padding:16px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))}
+  .composer textarea{width:100%;min-height:100px;resize:vertical;border:1px solid var(--line);background:rgba(0,0,0,.28);border-radius:12px;padding:11px 12px;color:var(--tx);font-family:var(--sans);font-size:.9rem;line-height:1.5;outline:none}
+  .kind-tag{display:inline-block;font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--mute);border:1px solid var(--line);border-radius:6px;padding:2px 7px}
+</style>
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav">
+      <a href="/board">Board</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/desk">Desk</a>
+      <a href="/control">Control</a>
+      <a href="/post" class="on">Post</a>
+    </nav>
+    <div class="hd-r"><span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="login" class="login" hidden>
+    <p class="micro eye">post control</p>
+    <h2 style="font-size:1.6rem;margin-top:6px">Social management</h2>
+    <input id="pw" type="password" placeholder="control password" autocomplete="off">
+    <button class="btn-lime" id="go" style="width:100%">Unlock</button>
+    <p class="muted" id="loginErr" style="margin-top:12px"></p>
+  </div>
+
+  <section id="work" hidden style="padding:28px 0 60px">
+    <div class="phead">
+      <div><p class="micro eye">post control</p><h1 style="font-size:2rem">Your posting desk</h1></div>
+      <div class="statchips" id="cad"></div>
+    </div>
+    <p class="muted" style="max-width:76ch;margin-top:10px">Build today's cards, queue what you'll post, and keep a log of what's gone out — one workspace, saved on the server so it's the same from any device. Nothing auto-posts: download the image + copy the text, post from the account, then mark it posted here.</p>
+
+    <div class="sect">
+      <h2>Today <span class="c" id="todayc"></span> <button class="acts" id="reload" style="min-height:32px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);border-radius:9px;padding:0 11px;font-size:.76rem;cursor:pointer">↻ refresh</button></h2>
+      <div class="cards" id="today"><div class="empty">Building today's cards…</div></div>
+    </div>
+
+    <div class="sect">
+      <h2>Queue <span class="c" id="queuec"></span></h2>
+      <div class="cards" id="queue"></div>
+    </div>
+
+    <div class="sect">
+      <h2>Composer <span class="c">free text → queue</span></h2>
+      <div class="composer">
+        <textarea id="ctext" placeholder="Write a custom post… keep it honest — signal, not proof."></textarea>
+        <div class="acts"><button class="prime" id="cadd">Add to queue</button><span class="cc" id="ccc">0 / 280</span></div>
+      </div>
+    </div>
+
+    <div class="sect">
+      <h2>Posted <span class="c" id="logc"></span></h2>
+      <div class="log" id="log"></div>
+    </div>
+
+    <p class="caveat" style="margin-top:30px">Cards render on your device from live data. The queue and log are stored server-side (behind your control password) so they survive reloads and follow you across devices — but Block0 never posts to X for you. Keep the honest framing intact.</p>
+  </section>
+</main>
+
+<script src="/desk-cards.js"></script>
+<script>
+const $=(s)=>document.querySelector(s);
+let PW=sessionStorage.getItem("b0_ctrl")||"";
+let TODAY=[];
+const esc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,(m)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+const xlen=(s)=>[...String(s||"")].length;
+function show(id){$("#login").hidden=id!=="login";$("#work").hidden=id!=="work";}
+function logout(){show("login");$("#loginErr").textContent="Session expired — unlock again.";sessionStorage.removeItem("b0_ctrl");}
+
+async function social(action){
+  const r=await fetch("/api/social",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({pw:PW,action})});
+  if(r.status===401){logout();return null;}
+  return r.json();
+}
+async function boot(){
+  if(!PW){show("login");return;}
+  const st=await social(null);
+  if(!st){return;}
+  if(st.error){show("login");$("#loginErr").textContent=st.error;return;}
+  show("work");
+  renderState(st);
+  loadToday();
+}
+async function loadToday(){
+  try{
+    const r=await fetch("/api/cards",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({pw:PW})});
+    if(r.status===401){logout();return;}
+    const d=await r.json();
+    TODAY=d.cards||[];
+    await (document.fonts?document.fonts.ready:Promise.resolve());
+    renderToday();
+  }catch(e){$("#today").innerHTML='<div class="empty">Couldn\'t load today\'s cards — refresh.</div>';}
+}
+
+/* ---------- shared card tile ---------- */
+function tile(card,{context}){ // context: "today" | "queue"
+  const box=document.createElement("div"); box.className="cardbox";
+  const isCard=!!card.hero||!!card.viz||card.kind!=="custom";
+  if(isCard){ const cv=document.createElement("canvas"); cv.width=1080;cv.height=1080; box.appendChild(cv); B0DESK.draw(cv,card); box._cv=cv; }
+  const body=document.createElement("div"); body.className="cbody";
+  const editable=context==="today";
+  body.innerHTML=`${isCard?"":`<div style="padding:6px 0 8px"><span class="kind-tag">custom post</span></div>`}
+    <textarea class="tweet" spellcheck="false" ${editable?"":"readonly"}>${esc(card.tweet)}</textarea>
+    <div class="acts" data-acts></div>`;
+  box.appendChild(body);
+  const ta=body.querySelector(".tweet"), acts=body.querySelector("[data-acts]");
+  const flash=document.createElement("span"); flash.className="flash";
+  const cc=document.createElement("span"); cc.className="cc";
+  const say=(m)=>{flash.textContent=m;setTimeout(()=>{if(flash.textContent===m)flash.textContent="";},1600);};
+  const upd=()=>{const n=xlen(ta.value);cc.textContent=n+" / 280";cc.classList.toggle("over",n>280);};
+  ta.addEventListener("input",upd);
+  const mk=(label,cls,fn)=>{const b=document.createElement("button");b.textContent=label;if(cls)b.className=cls;b.addEventListener("click",fn);return b;};
+  const copy=()=>{navigator.clipboard&&navigator.clipboard.writeText(ta.value).then(()=>say("text copied"),()=>say("copy failed"));};
+  const png=()=>{if(!box._cv){say("no image");return;}box._cv.toBlob((b)=>{const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`block0-${card.id||card.kind||"post"}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(u),4000);say("saved");},"image/png");};
+  const copyimg=()=>{if(!box._cv||!(navigator.clipboard&&window.ClipboardItem)){say("use Download");return;}box._cv.toBlob((b)=>{navigator.clipboard.write([new ClipboardItem({"image/png":b})]).then(()=>say("image copied"),()=>say("use Download"));},"image/png");};
+
+  if(context==="today"){
+    acts.append(
+      mk("Queue","prime",async()=>{const st=await social({type:"queue",item:{...card,tweet:ta.value}});if(st){say("queued");renderState(st);}}),
+      mk("Copy",null,copy), mk("PNG",null,png),
+      mk("Posted ✓",null,async()=>{const url=prompt("Post URL (optional):")||null;const st=await social({type:"posted",item:{...card,tweet:ta.value},url});if(st){say("logged");renderState(st);}}),
+      flash, cc );
+  }else{ // queue
+    acts.append(
+      mk("↑",null,async()=>{const st=await social({type:"move",uid:card.uid,dir:-1});if(st)renderState(st);}),
+      mk("↓",null,async()=>{const st=await social({type:"move",uid:card.uid,dir:1});if(st)renderState(st);}),
+      mk("Copy",null,copy),
+      ...(box._cv?[mk("PNG",null,png),mk("Copy img",null,copyimg)]:[]),
+      mk("Posted ✓","prime",async()=>{const url=prompt("Post URL (optional):")||null;const st=await social({type:"posted",uid:card.uid,url});if(st){say("logged");renderState(st);}}),
+      mk("Remove","warn",async()=>{const st=await social({type:"unqueue",uid:card.uid});if(st)renderState(st);}),
+      flash, cc );
+  }
+  upd();
+  return box;
+}
+
+function renderToday(){
+  const wrap=$("#today"); $("#todayc").textContent=TODAY.length?`${TODAY.length} cards`:"";
+  if(!TODAY.length){wrap.innerHTML='<div class="empty">No cards yet — the board and study are still warming up. Refresh in a minute.</div>';return;}
+  wrap.innerHTML=""; TODAY.forEach((c)=>wrap.appendChild(tile(c,{context:"today"})));
+}
+function renderState(st){
+  // cadence chips
+  const cd=st.cadence||{};
+  $("#cad").innerHTML=`<span class="chip"><span class="live-dot"></span> ${cd.queued||0} queued</span>`+
+    `<span class="chip">${cd.week||0} posted this week</span>`+
+    `<span class="chip">${cd.last?("last "+(cd.lastAgoH<1?"<1":cd.lastAgoH)+"h ago"):"nothing posted yet"}</span>`;
+  // queue
+  const q=$("#queue"); $("#queuec").textContent=(st.queue||[]).length?`${st.queue.length} planned`:"";
+  if(!(st.queue||[]).length){q.innerHTML='<div class="empty">Queue is empty. Add cards from Today, or write a custom post below.</div>';}
+  else{q.innerHTML=""; st.queue.forEach((it)=>q.appendChild(tile(it,{context:"queue"})));}
+  // log
+  const lg=$("#log"); $("#logc").textContent=(st.log||[]).length?`${st.log.length} logged`:"";
+  if(!(st.log||[]).length){lg.innerHTML='<div class="empty">Nothing posted yet. Mark a card posted after you ship it and it lands here.</div>';}
+  else{lg.innerHTML=""; st.log.forEach((it)=>lg.appendChild(logRow(it)));}
+}
+function logRow(it){
+  const row=document.createElement("div"); row.className="lrow";
+  const when=new Date(it.postedAt||Date.now());
+  const first=String(it.tweet||"").split("\n")[0];
+  row.innerHTML=`<span class="when">${when.toLocaleDateString(undefined,{month:"short",day:"numeric"})}<br>${when.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"})}</span>
+    <span class="snip"><b>${esc((it.eyebrow||it.kind||"post").split("·")[0].trim())}</b> — ${esc(first)} ${it.url?`· <a class="url" href="${esc(it.url)}" target="_blank" rel="noopener">link ↗</a>`:""}</span>
+    <span class="la"></span>`;
+  const la=row.querySelector(".la");
+  const mk=(t,fn)=>{const b=document.createElement("button");b.textContent=t;b.addEventListener("click",fn);return b;};
+  la.append(
+    mk("copy",()=>{navigator.clipboard&&navigator.clipboard.writeText(it.tweet||"");}),
+    mk("↩ unpost",async()=>{const st=await social({type:"unpost",uid:it.uid});if(st)renderState(st);}),
+    mk("✕",async()=>{if(confirm("Remove from log?")){const st=await social({type:"logRemove",uid:it.uid});if(st)renderState(st);}}) );
+  return row;
+}
+
+// composer
+const ct=$("#ctext"), ccc=$("#ccc");
+ct.addEventListener("input",()=>{const n=xlen(ct.value);ccc.textContent=n+" / 280";ccc.classList.toggle("over",n>280);});
+$("#cadd").addEventListener("click",async()=>{
+  const text=ct.value.trim(); if(!text)return;
+  const st=await social({type:"queue",item:{kind:"custom",eyebrow:"CUSTOM",title:"Custom post",tweet:text}});
+  if(st){ct.value="";ccc.textContent="0 / 280";ccc.classList.remove("over");renderState(st);}
+});
+
+$("#go").addEventListener("click",()=>{PW=$("#pw").value.trim();sessionStorage.setItem("b0_ctrl",PW);$("#loginErr").textContent="";boot();});
+$("#pw").addEventListener("keydown",(e)=>{if(e.key==="Enter")$("#go").click();});
+$("#reload").addEventListener("click",loadToday);
+boot();
+</script>
+</body>
+</html>
