@@ -34,14 +34,14 @@
   <!-- Hero -->
   <section class="hero">
     <p class="micro eye">the launch scanner for the robinhood chain</p>
-    <h1>Should I ape?<br><em>Check before you find out.</em></h1>
-    <p class="lede">Block0 watches every launch on the Robinhood Chain, reconstructs the truth from public on-chain data, and grades it — snipers, bundles, concentration, live insider dumping — so you know what's safe to touch at a glance.</p>
+    <h1>Most launches die on arrival.<br><em>We find the ones that don't.</em></h1>
+    <p class="lede">Nearly every token launched on the Robinhood Chain fades within hours. Block0 reconstructs each one from public on-chain data and grades it — snipers, bundles, concentration, live insider dumping — so you spend your time only on the few that carry a winner's fingerprint.</p>
     <form class="scan" onsubmit="return scan(event)">
       <input id="addr" placeholder="Paste a contract address — or don't, the board is live" autocomplete="off">
       <button class="go" type="submit">Scan it</button>
     </form>
     <div class="herochips">
-      <span class="chip"><span class="live-dot"></span> board updating live</span>
+      <span class="chip" id="cohortstat"><span class="live-dot"></span> board updating live</span>
       <span class="chip">no signing · read-only</span>
       <a class="chip" href="/board">open the board →</a>
     </div>
@@ -128,6 +128,9 @@ async function loadBoard(){try{
 }catch(e){$("#preview").innerHTML='<div class="state">Board unavailable — retrying…</div>';setTimeout(loadBoard,8000);}}
 async function loadAcc(){try{
   const v=await fetch("/api/validation").then(r=>r.json());
+  // honest, checkable hero stat — the real fade rate from the published winner study
+  if(v.cohort&&v.cohort.winners!=null&&v.cohort.losers!=null){const w=v.cohort.winners,l=v.cohort.losers,tot=w+l;
+    if(tot>0)$("#cohortstat").innerHTML=`<span class="live-dot"></span> ${Math.round(l/tot*100)}% of ${tot} studied launches faded`;}
   const bins=v.perBin||[];
   if(!bins.length){$("#acc").innerHTML='<div class="state">Accuracy publishes after the first model build.</div>';return;}
   $("#acc").innerHTML=bins.map(r=>{

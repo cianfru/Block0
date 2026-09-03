@@ -22,9 +22,15 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 
 /* ---- background: faint grid + drifting orbs ---- */
 .glows{position:fixed;inset:0;z-index:-10;pointer-events:none;overflow:hidden}
-.glows .grid{position:absolute;inset:0;opacity:.6;
-  background-image:linear-gradient(rgba(255,255,255,.035) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.035) 1px,transparent 1px);
-  background-size:64px 64px}
+/* two-layer grid (bold 72px lines over a fine 18px weave) faded toward the edges with a radial mask, so it reads
+   sophisticated in the middle without tiling flatly to the corners */
+.glows .grid{position:absolute;inset:0;opacity:.9;
+  background-image:
+    linear-gradient(rgba(255,255,255,.055) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.055) 1px,transparent 1px),
+    linear-gradient(rgba(255,255,255,.02) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.02) 1px,transparent 1px);
+  background-size:72px 72px,72px 72px,18px 18px,18px 18px;
+  -webkit-mask-image:radial-gradient(120% 100% at 50% 0%,#000 35%,transparent 92%);
+  mask-image:radial-gradient(120% 100% at 50% 0%,#000 35%,transparent 92%)}
 .orb{position:absolute;border-radius:50%;filter:blur(120px);animation:orb 16s ease-in-out infinite}
 .orb.a{left:-10rem;top:-10rem;width:38rem;height:38rem;background:rgba(200,255,77,.09)}
 .orb.b{right:-14rem;top:18rem;width:34rem;height:34rem;background:rgba(53,230,224,.07);animation-delay:-6s}
@@ -32,9 +38,12 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 @keyframes orb{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(36px,-44px) scale(1.1)}}
 
 /* ---- panels / chips / labels ---- */
-.panel{background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01));border:1px solid var(--line);border-radius:var(--radius);backdrop-filter:blur(12px)}
-.panel-hover{transition:transform .22s ease,border-color .22s ease}
-.panel-hover:hover{transform:translateY(-3px);border-color:var(--line-2)}
+/* glassmorphism: a frosted pane — soft gradient fill, a bright top inner edge, a real drop shadow, saturated blur */
+.panel{background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.014));border:1px solid rgba(255,255,255,.08);border-radius:16px;
+  backdrop-filter:blur(18px) saturate(1.15);-webkit-backdrop-filter:blur(18px) saturate(1.15);
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.07),inset 0 0 0 1px rgba(255,255,255,.01),0 16px 44px -18px rgba(0,0,0,.6)}
+.panel-hover{transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.panel-hover:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 22px 50px -18px rgba(0,0,0,.7)}
 .chip{display:inline-flex;align-items:center;gap:.375rem;border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:10px;padding:.2rem .55rem;font-size:.72rem;letter-spacing:.02em;white-space:nowrap;color:var(--dim)}
 .micro{font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--mute)}
 .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--lime);animation:pulsering 2.2s cubic-bezier(.4,0,.6,1) infinite}
@@ -87,8 +96,8 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .grid{display:grid;gap:16px;margin-top:24px}
 @media(min-width:760px){.grid{grid-template-columns:1fr 1fr}}
 .tcard{display:block;overflow:hidden}
-.tcard .stripe{height:3px;width:100%}
-.tcard .body{padding:16px}
+.tcard .stripe{display:none} /* no machine-y accent line — the icon tint + risk score carry the colour */
+.tcard .body{padding:18px}
 .tcard .top{display:flex;align-items:flex-start;gap:12px}
 .mono-ic{display:grid;place-items:center;width:40px;height:40px;flex:0 0 auto;border:1px solid var(--line);border-radius:12px;font-family:var(--serif);font-size:1.15rem;overflow:hidden}
 .mono-ic img{width:100%;height:100%;object-fit:cover}
@@ -178,7 +187,8 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 /* ---- wallet leaderboard ---- */
 .w-av{display:inline-block;border-radius:50%;flex:0 0 auto;box-shadow:inset 0 0 0 1px rgba(255,255,255,.15)}
 .lb{margin-top:24px;display:flex;flex-direction:column;gap:10px}
-.lb-row{display:grid;grid-template-columns:28px 38px 1fr auto auto;align-items:center;gap:14px;padding:14px 16px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01));backdrop-filter:blur(12px)}
+.lb-row{display:grid;grid-template-columns:28px 38px 1fr auto auto;align-items:center;gap:14px;padding:15px 18px;border:1px solid rgba(255,255,255,.08);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.014));backdrop-filter:blur(18px) saturate(1.15);-webkit-backdrop-filter:blur(18px) saturate(1.15);box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 16px 44px -20px rgba(0,0,0,.6);transition:transform .18s ease,border-color .18s ease}
+.lb-row:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.16)}
 .lb-rank{font-family:var(--serif);font-size:1.3rem;color:var(--mute);text-align:center}
 .lb-id{display:flex;flex-direction:column;gap:3px;min-width:0}
 .lb-name{font-weight:600;font-size:.95rem}

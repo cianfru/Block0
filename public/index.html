@@ -14,6 +14,13 @@
     --serif:"Instrument Serif",Georgia,serif;--sans:"Inter",system-ui,sans-serif;}
   *{box-sizing:border-box}
   .wrap{padding-bottom:70px}
+  /* unify every dossier card to the shared glassmorphism (frosted pane, top inner-edge highlight, soft shadow) */
+  .top,.fac,.depwrap,.pcard,.chartwrap,.tbl,.bmwrap{
+    background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.014))!important;
+    border:1px solid rgba(255,255,255,.08)!important;
+    backdrop-filter:blur(18px) saturate(1.15);-webkit-backdrop-filter:blur(18px) saturate(1.15);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 16px 44px -18px rgba(0,0,0,.55)}
+  .fac,.pcard{border-radius:16px}
 
   .state{color:var(--mute);font-size:.95rem;padding:46px 2px}
   .state.err{color:var(--coral)}
