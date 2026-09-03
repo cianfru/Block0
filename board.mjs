@@ -78,7 +78,9 @@ export async function refreshDex() {
   if (DEX_SCANNING || N_DEX <= 0) return CACHE;
   DEX_SCANNING = true;
   try {
-    const cand = await recentDexTokens({ blocks: Number(process.env.DEX_BLOCKS || 80000), limit: N_DEX * 3 });
+    // extended horizon (default ~250k blocks ≈ a few days on RH): the old 80k window (~1 day) aged real launches out
+    // before we ever surfaced them. Scans are topic-filtered so a wider window stays cheap. Override via DEX_BLOCKS.
+    const cand = await recentDexTokens({ blocks: Number(process.env.DEX_BLOCKS || 250000), limit: N_DEX * 3 });
     const picks = (cand.tokens || []).filter((m) => !PONS_ADDRS.has(m.address)).slice(0, N_DEX);
     const dnew = [];
     for (const m of picks) {

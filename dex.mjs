@@ -25,11 +25,32 @@ const RANGE = Number(process.env.DEX_LOGS_RANGE || 9000), GAP = Number(process.e
 // is Initialize(id indexed, currency0 indexed, currency1 indexed, …) → topics [topic0, id, currency0, currency1],
 // so the two tokens are topics 2 and 3. v2/v3 factory sigs are included for any future factory-based DEX on the chain.
 export const V4_INIT = "0xdd466e674ea557f56295e2d0218a125ea4b4f0f6f3307b95f85e6110838d6438";
+export const V3_POOLCREATED = "0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118";
+export const V2_PAIRCREATED = "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9";
 const KNOWN = {
   [V4_INIT]: { dex: "uniswap-v4", ev: "Initialize", tokenTopics: [2, 3] },
-  "0x0d3648bd0f6ba80134a33ba9275ac585d9d315f0ad8355cddefde31afa28d0e9": { dex: "uniswap-v2", ev: "PairCreated", tokenTopics: [1, 2] },
-  "0x783cca1c0412dd0d695e784568c96da2e9c22ff989357a2e8b1d9b2b4e6b7118": { dex: "uniswap-v3", ev: "PoolCreated", tokenTopics: [1, 2] },
+  [V2_PAIRCREATED]: { dex: "uniswap-v2", ev: "PairCreated", tokenTopics: [1, 2] },
+  [V3_POOLCREATED]: { dex: "uniswap-v3", ev: "PoolCreated", tokenTopics: [1, 2] },
 };
+
+// ── DISCOVERY SOURCES ─────────────────────────────────────────────────────────────────────────────────────────
+// Every contract that ANNOUNCES a new pool on the RH chain, with which log topics carry the two token addresses.
+// We were scanning ONLY the v4 singleton (Initialize) and were BLIND to the separate Uniswap-v3 factory at
+// 0x1f7d7550…, which has minted 1,100+ pools — many of them real launches (e.g. CHUMP was BORN there, months before
+// it ever got a v4 pool). The forensic engine is launchpad-agnostic, so covering a whole new DEX/launchpad is just
+// one more source here. Add ad-hoc sources without a code change via DEX_FACTORIES="addr:dex:topic0:tok0,tok1; …".
+const V3_FACTORY = (process.env.DEX_V3_FACTORY || "0x1f7d7550b1b028f7571e69a784071f0205fd2efa").toLowerCase();
+function parseFactoriesEnv(s) {
+  return (s || "").split(";").map((x) => x.trim()).filter(Boolean).map((x) => {
+    const [address, dex, topic, toks] = x.split(":");
+    return address && topic ? { address: address.toLowerCase(), dex: dex || "amm", topic: topic.toLowerCase(), tokenTopics: (toks || "1,2").split(",").map(Number) } : null;
+  }).filter(Boolean);
+}
+export const SOURCES = [
+  { address: AMM, dex: "uniswap-v4", topic: V4_INIT, tokenTopics: [2, 3] },        // RH singleton v4 PoolManager — Initialize
+  { address: V3_FACTORY, dex: "uniswap-v3", topic: V3_POOLCREATED, tokenTopics: [1, 2] }, // second DEX/launchpad — v3 PoolCreated
+  ...parseFactoriesEnv(process.env.DEX_FACTORIES),
+];
 
 let rid = 1;
 async function rpc(method, params, tries = 5) {
@@ -89,25 +110,34 @@ export async function traceEvents({ blocks = 40000, address = AMM } = {}) {
 // DISCOVER: scan for pool-creation events (known v2/v3 topic0s + any topic0s passed in `initTopics` for the v4
 // singleton once identified), decode the two token addresses from indexed topics, strip quote assets → the set of
 // tokens listed on the DEX. Returns candidates with the block/time they were listed.
-export async function discoverDex({ blocks = 200000, address = AMM, initTopics = [V4_INIT] } = {}) {
-  const topicSet = new Set([...Object.keys(KNOWN), ...initTopics.map((t) => t.toLowerCase())]);
+export async function discoverDex({ blocks = 200000, address = null, initTopics = null } = {}) {
   const latest = await latestBlock();
   const from = Math.max(0, latest - blocks);
-  // filter to the pool-creation topics so the node returns ONLY those events (hundreds), not every Swap on the AMM
-  // (hundreds of thousands) — the difference between a fast scan and a timeout.
-  const logs = await logsWide({ address, topics: [[...topicSet]] }, from, latest);
+  // sources to scan: default = every configured DEX/launchpad factory; explicit `address` = legacy single-source
+  // path (used by /api/dex-scan and traceEvents), which sweeps all KNOWN creation topics on that one contract.
+  const sources = address
+    ? [{ address: address.toLowerCase(), topics: (initTopics || Object.keys(KNOWN)).map((t) => t.toLowerCase()), tokenTopics: null, dex: null }]
+    : SOURCES.map((s) => ({ address: s.address, topics: [s.topic], tokenTopics: s.tokenTopics, dex: s.dex }));
+  // each token: first block/venue we see it listed (birth-within-window), plus every venue it appears on.
   const tokens = new Map();
-  for (const l of logs) {
-    const t0 = (l.topics && l.topics[0] || "").toLowerCase();
-    if (!topicSet.has(t0)) continue;
-    const spec = KNOWN[t0] || { dex: "amm-v4", ev: "Initialize", tokenTopics: [2, 3] }; // v4: currency0/1 are topics 2,3
-    for (const ti of spec.tokenTopics) {
-      const a = addrOf(l.topics?.[ti]);
-      if (!a || a.length !== 42 || INFRA.has(a)) continue;
-      if (!tokens.has(a)) tokens.set(a, { address: a, dex: spec.dex, block: toNum(l.blockNumber), tx: l.transactionHash });
+  for (const src of sources) {
+    // filter to the pool-creation topics so the node returns ONLY those events (hundreds), not every Swap (millions).
+    const logs = await logsWide({ address: src.address, topics: [src.topics] }, from, latest);
+    for (const l of logs) {
+      const t0 = (l.topics && l.topics[0] || "").toLowerCase();
+      const spec = src.tokenTopics ? { dex: src.dex, tokenTopics: src.tokenTopics } : (KNOWN[t0] || { dex: "amm-v4", tokenTopics: [2, 3] });
+      const blk = toNum(l.blockNumber);
+      for (const ti of spec.tokenTopics) {
+        const a = addrOf(l.topics?.[ti]);
+        if (!a || a.length !== 42 || INFRA.has(a)) continue;
+        const cur = tokens.get(a);
+        if (!cur) tokens.set(a, { address: a, dex: spec.dex, block: blk, lastBlock: blk, tx: l.transactionHash, venues: new Set([spec.dex]) });
+        else { if (blk < cur.block) { cur.block = blk; cur.dex = spec.dex; cur.tx = l.transactionHash; } if (blk > cur.lastBlock) cur.lastBlock = blk; cur.venues.add(spec.dex); }
+      }
     }
   }
-  return { fromBlock: from, latestBlock: latest, scannedBlocks: blocks, count: tokens.size, tokens: [...tokens.values()] };
+  const arr = [...tokens.values()].map((t) => ({ ...t, venues: [...t.venues].filter(Boolean) }));
+  return { fromBlock: from, latestBlock: latest, scannedBlocks: blocks, count: arr.length, tokens: arr };
 }
 
 // --- token metadata straight from the contract (native RPC, no Alchemy) — for non-Pons tokens that have no API ---
@@ -129,15 +159,15 @@ export async function tokenMeta(addr) {
 // Recent DEX-listed tokens with metadata, newest first, spam-filtered to ones that at least name themselves and
 // have a supply. Uses ONLY the native RPC (discovery + contract reads) — no Alchemy — so it's rate-limit-safe; the
 // expensive verdict (Alchemy transfer replay) is done later by the board on a bounded subset.
-export async function recentDexTokens({ blocks = 60000, limit = 40 } = {}) {
+export async function recentDexTokens({ blocks = 200000, limit = 40 } = {}) {
   const { tokens, latestBlock: head } = await discoverDex({ blocks });
-  const recent = tokens.sort((a, b) => b.block - a.block).slice(0, limit * 4);
+  const recent = tokens.sort((a, b) => b.block - a.block).slice(0, limit * 4);   // newest first-listing first
   const out = [];
   for (const t of recent) {
-    try { const m = await tokenMeta(t.address); if (m.symbol && m.supply > 0) out.push({ ...t, ...m, venue: t.dex }); } catch { /* skip */ }
+    try { const m = await tokenMeta(t.address); if (m.symbol && m.supply > 0) out.push({ ...t, ...m, venue: t.dex, venues: t.venues }); } catch { /* skip */ }
     if (out.length >= limit) break;
   }
   return { head, count: out.length, tokens: out };
 }
 
-export const DEX_CONFIG = { rpc: DEX_RPC, amm: AMM, range: RANGE, v4Init: V4_INIT };
+export const DEX_CONFIG = { rpc: DEX_RPC, amm: AMM, range: RANGE, v4Init: V4_INIT, sources: SOURCES.map((s) => ({ address: s.address, dex: s.dex })) };
