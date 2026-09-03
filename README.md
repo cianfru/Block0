@@ -95,21 +95,102 @@ the connect → check → granted/denied states; the gate stays open until the t
 
 ---
 
-## Design language
+## Design system
 
-Robinhood-neon on near-black. Confident, dense where it counts, never half-baked. **Mobile-first** — most traffic
-is a phone from X; every screen must be responsive, tap-target-friendly, no horizontal scroll, and it must hold up
-for a few hundred concurrent users digging into results.
+A **dark, neon-on-near-black terminal** — a trading tool, not a marketing site. Committed dark theme (no light
+mode). Confident and dense where it counts, calm everywhere else: **the data is the drama**, so the chrome stays
+quiet and lets the numbers and colors carry the signal.
 
-- **Ground:** `#08080b` (near-black), soft neon radial glows.
-- **Accents:** lime `#c8ff4d` (primary / good), cyan `#35e6e0` (data / market cap), magenta `#ff5cf0` (wallets /
-  DEX), amber `#ffd23d` (caution), coral `#ff3b5c` (danger / selling).
-- **Risk color scale:** lime (<25 clean) → cyan (25–44 mixed) → amber (45–65 caution) → coral (66+ high risk). Use
-  it consistently on scores, stripes, meters.
-- **Type:** display / headlines in **Instrument Serif** (italic accents); body + data in **Inter**; monospace for
-  addresses and figures. Tabular numerals for anything that lines up.
-- **Feel:** live and reactive (pulses, new-card animation), but calm — the data is the drama. Semantic color only;
-  never color-as-decoration. Encode state in *form* (a chip, a stripe, a meter) as well as number.
+### Principles
+
+1. **Honest by default.** Every number shows its method and caveat nearby. Estimates look like estimates. Never a
+   buy-CTA; the loudest thing on a card is the *risk score*, not a "BUY" button.
+2. **Semantic color only.** Color = meaning (good / caution / danger / data / wallet), never decoration. If a color
+   isn't saying something, it's the wrong color.
+3. **Encode state in form, not just number.** A risk isn't only a digit — it's a colored stripe, a filled meter, a
+   pill. A glance should read the verdict before the eyes parse the figure.
+4. **Live but not busy.** Subtle pulses and a shake-in on new launches signal "this is live." No gratuitous motion;
+   respect `prefers-reduced-motion`.
+5. **Mobile-first, for real.** Most traffic is a phone from X. Every screen: responsive, no horizontal scroll,
+   tap targets ≥ 40px, no hover-only affordances, opaque overlays. Must stay smooth for a few hundred concurrent users.
+6. **Never half-baked.** Consistent spacing, aligned baselines, tabular numerals, no orphaned states — a loading or
+   empty state is designed, not blank.
+
+### Color palette
+
+Ground and neutrals (cool, slightly blue-black):
+
+| Token | Hex / value | Use |
+|---|---|---|
+| `--bg` | `#08080b` | Page ground (near-black). Soft neon radial glows layered on top. |
+| `--glass` | `rgba(255,255,255,.035)` | Card / surface fill (with a subtle top-down gradient to `rgba(255,255,255,.01)`). |
+| `--line` | `rgba(255,255,255,.09)` | Default borders / dividers. |
+| `--line-2` | `rgba(255,255,255,.16)` | Hover / emphasized borders. |
+| `--tx` | `#ffffff` | Primary text. |
+| `--dim` | `#b6b6bd` | Secondary text. |
+| `--mute` | `#7f7f88` | Tertiary / captions / axis labels. |
+
+Neon accents — each has a fixed meaning:
+
+| Token | Hex | Meaning |
+|---|---|---|
+| `--lime` | `#c8ff4d` | **Primary / good.** Brand, "looks clean", buying/accumulating, the Connect button, on-track. |
+| `--cyan` | `#35e6e0` | **Data.** Market cap, prices, neutral-positive metrics, "graduated". |
+| `--magenta` | `#ff5cf0` | **Wallets & DEX.** Unique-wallet series, the DEX/Uniswap venue, wallet views. |
+| `--amber` | `#ffd23d` | **Caution.** Mid risk, "behind pace", warnings, rough-estimate flags. |
+| `--coral` | `#ff3b5c` | **Danger.** High risk, selling/dumping, failing, losses. |
+
+**Risk color scale** (apply everywhere a 0–100 risk appears — the score number, the card top-stripe, meters):
+`< 25` lime (Looks cleaner) → `25–44` cyan (Mixed) → `45–65` amber (Caution) → `66+` coral (High risk).
+
+Glows: accents get a soft `box-shadow` bloom (e.g. `0 0 8px` of the accent) on live dots and key marks — sparingly,
+as emphasis, not on everything.
+
+### Typography
+
+| Role | Family | Notes |
+|---|---|---|
+| Display / headlines | **Instrument Serif** (Google Fonts) | Large numerals, hero lines, section titles. Its *italic* is the signature accent — use for the "0" in block0, emphasis words, section eyebrows. |
+| Body / UI / data | **Inter** (Google Fonts) | Everything functional: labels, copy, table cells, buttons. |
+| Addresses / mono figures | system monospace (`ui-monospace`) | Wallet addresses, hashes, aligned numeric columns. |
+
+- **Tabular numerals** (`font-variant-numeric: tabular-nums`) on anything that lines up in a column or updates live.
+- Uppercase micro-labels (holders, market cap, age…) at small size with letter-spacing — the "terminal" texture.
+- Base body ~15px; risk scores and hero figures large in the serif (2–3.6rem). Keep a real type scale, don't freehand sizes.
+
+### Surfaces, radius & elevation
+
+- **Cards / panels:** 1px `--line` border, `--glass` fill with a subtle vertical gradient, `backdrop-filter: blur(12px)`,
+  **radius 14–16px**. Hover: lift `translateY(-3px)` + border → `--line-2`.
+- **Buttons / inputs / search:** radius **12px**. Primary button = solid `--lime` on `#08080b` text, weight 700.
+- **Chips / pills / meters-detail:** radius **9–11px**, faint fill (`rgba(255,255,255,.03)`) + `--line` border.
+- **Meters (sub-scores):** a 4–5px rounded track (`rgba(255,255,255,.09)`) with a fill colored by severity.
+- **Live dot:** 7–8px circle, `--lime`, pulsing ring (`box-shadow` keyframe).
+- Depth comes from **border + subtle fill + blur**, not heavy drop-shadows. One quiet system, not a shadow on every box.
+
+### Components (patterns to reuse)
+
+- **Verdict card** — top color-stripe (risk scale) · identity row (monogram/logo + symbol + mcap) · big risk score
+  + label · sub-score meters · venue/blueprint/corridor chips · an alert line when relevant.
+- **Sub-score meter** — label + value + colored bar + one plain detail line ("2 wallets · hold 6%").
+- **Chip / pill** — small labeled status (blueprint fit, corridor pace, venue). Icon optional and minimal — no
+  generic emoji soup.
+- **Data table** — mono, tabular-nums, thin row dividers, right-aligned figures, green/red for +/− flow.
+- **Charts** — dark ground, faint gridlines, one accent per series (mcap = cyan, wallets = magenta, risk = the
+  risk-scale color, corridor zone = translucent lime boxes). Labels in `--mute`. Endpoint/"now" marker emphasized.
+
+### Motion
+
+New launch: a brief shake-in + a lingering lime glow, then still. Live dots pulse. Card hover lifts 3px. Typewriter
+reveal on nav labels is on-brand (used on the current landing). Everything gated by `prefers-reduced-motion`.
+
+### Do / Don't
+
+- **Do** keep the risk score the loudest element on a card; **don't** add a buy button.
+- **Do** use the fixed color meanings; **don't** recolor "selling" green or "good" red.
+- **Do** label estimates; **don't** present a reconstructed price as a hard quote.
+- **Do** design the empty/loading/"too early to call" states; **don't** ship a blank box.
+- **Do** treat mobile as the primary layout; **don't** design desktop-first and shrink.
 
 ---
 
