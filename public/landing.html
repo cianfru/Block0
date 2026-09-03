@@ -60,6 +60,22 @@
   .ab-nums{display:flex;align-items:baseline;gap:12px;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
   .ab-nums .g{color:var(--lime);font-weight:700;font-size:1.02rem} .ab-nums .c{color:var(--coral);font-weight:600;font-size:.9rem}
   @media(max-width:640px){.ab-row{grid-template-columns:50px 1fr auto;gap:11px}}
+
+  /* forward, out-of-sample track record — the live proof */
+  .trk{border:1px solid var(--line);border-radius:16px;padding:18px 20px;margin-bottom:16px;
+    background:linear-gradient(180deg,rgba(200,255,77,.05),rgba(200,255,77,.012))}
+  .trk.acc{background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.008))}
+  .trk .thd{display:flex;align-items:center;gap:9px;font-size:.72rem;text-transform:uppercase;letter-spacing:.13em;color:var(--lime);margin-bottom:10px}
+  .trk.acc .thd{color:var(--dim)}
+  .trk .thd .dot{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime)}
+  .trk .trow{display:flex;flex-wrap:wrap;align-items:baseline;gap:8px 26px}
+  .trk .big{font-family:var(--serif);font-size:2.6rem;line-height:1;color:var(--lime)}
+  .trk .big .u{font-size:.9rem;color:var(--dim);font-style:italic;margin-left:6px}
+  .trk .stat{display:flex;flex-direction:column;gap:2px}
+  .trk .stat b{font-family:var(--serif);font-size:1.5rem;line-height:1;color:var(--tx);font-variant-numeric:tabular-nums}
+  .trk .stat span{font-size:.72rem;color:var(--mute)}
+  .trk .note{font-size:.74rem;color:var(--mute);margin-top:11px;line-height:1.55}
+  .trk .accrue{font-family:var(--serif);font-size:1.5rem;color:var(--tx);line-height:1.2}
 </style>
 </head>
 <body>
@@ -151,6 +167,7 @@
   <!-- Accuracy -->
   <section class="sec">
     <div class="stitle"><p class="micro eye">measured, not marketed</p><h2>How often it catches a winner — and how often it's fooled</h2><p class="sub">The model's rule is simple: is a token tracking inside the winner corridor for its age? Here's how that rule scores — each eventual <b style="color:var(--lime)">winner tested against a corridor rebuilt without it</b> (held-out), and every <b style="color:var(--coral)">loser measured against a corridor it never shaped</b>. The gap between the two is the signal.</p></div>
+    <div id="track"></div>
     <div class="panel" id="acc"><div class="state">Loading measured accuracy…</div></div>
     <p class="caveat">Winners are scored leave-one-out; losers are out-of-sample by construction. A small, young cohort — every count is shown, and this is honest separation, not a long-run track record. Full table on the <a href="/methodology">methodology page</a>, re-measured on every rebuild.</p>
   </section>
@@ -236,7 +253,32 @@ async function loadAcc(){try{
   }).join("");
   $("#acc").innerHTML=head+rows;
 }catch(e){$("#acc").innerHTML='<div class="state">Accuracy unavailable.</div>';}}
-loadBoard();loadAcc();setInterval(loadBoard,30000);
+
+// FORWARD, out-of-sample track record — the live proof, accruing as launches mature (real never-seen-it-before test).
+async function loadTrack(){try{
+  const t=await fetch("/api/track-record").then(r=>r.json());
+  const pc=(x)=>x==null?"—":Math.round(x*100)+"%";
+  const el=$("#track"); if(!el) return;
+  if(t.ready){
+    el.innerHTML=`<div class="trk">
+      <div class="thd"><span class="dot"></span> forward track record · live · out-of-sample</div>
+      <div class="trow">
+        <div><span class="big">${pc(t.promising.winRate)}<span class="u">of “promising” young calls went on to win</span></span></div>
+        <div class="stat"><b>${pc(t.baseRate)}</b><span>base rate (all calls)</span></div>
+        ${t.lift?`<div class="stat"><b>${t.lift}×</b><span>lift vs base</span></div>`:''}
+        <div class="stat"><b>${t.resolved}</b><span>launches resolved</span></div>
+      </div>
+      <p class="note">Each launch is scored while young (≤${t.predictMaxAgeH}h), the call is frozen, and the outcome is observed after it matures (${t.horizonH}h) — winner = graduated, ≥$${(t.winMcap/1e6)}M mcap, or ${t.winMult}× its early mcap. This is the real never-seen-it-before test, not in-sample separation.</p>
+    </div>`;
+  } else {
+    el.innerHTML=`<div class="trk acc">
+      <div class="thd">forward track record · accruing live</div>
+      <div class="accrue">${t.predicted||0} launches called young${t.pending?` · ${t.pending} awaiting outcome`:''}${t.resolved?` · ${t.resolved} resolved`:''}.</div>
+      <p class="note">We freeze a call on each launch while it's young (≤${t.predictMaxAgeH}h) and observe what actually happens after ${t.horizonH}h. The out-of-sample hit-rate publishes here once ${t.minShow} launches have matured — building a real track record no one can dispute. Until then, the held-out separation below is the honest read.</p>
+    </div>`;
+  }
+}catch(e){/* leave empty — the LOO panel still shows */}}
+loadBoard();loadAcc();loadTrack();setInterval(loadBoard,30000);setInterval(loadTrack,60000);
 
 /* ============ scroll-cone hero ============ */
 (function(){

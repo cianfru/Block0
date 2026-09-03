@@ -22,6 +22,9 @@ const DEFAULTS = { minInvested: 200, minRealized: 100, topN: 100, perToken: 60,
 
 export async function buildLeaderboard(tokens, computeBt, opts = {}) {
   const { minInvested, minRealized, topN, perToken, minRiding, rideMinMcap, rideMinTraders, rideWeight } = { ...DEFAULTS, ...opts };
+  const budgetMs = opts.budgetMs || 0;          // 0 = no budget; else stop scanning after this long (partial result)
+  const startMs = Date.now();
+  let partial = false;
   const wallets = new Map();
   const get = (a) => {
     let e = wallets.get(a);
@@ -30,6 +33,7 @@ export async function buildLeaderboard(tokens, computeBt, opts = {}) {
   };
   let scanned = 0;
   for (const t of tokens) {
+    if (budgetMs && Date.now() - startMs > budgetMs) { partial = true; break; }   // stop early → partial smart set beats none
     let bt = null;
     try { bt = await computeBt(t.address); } catch { /* skip a token that won't backtest */ }
     if (!bt || !Array.isArray(bt.pnl)) continue;
@@ -84,6 +88,6 @@ export async function buildLeaderboard(tokens, computeBt, opts = {}) {
     // rank by a blend: proven cash first, unrealized on real runners counts half (paper < cash), wins as tiebreak
     .sort((x, y) => (y.realized + rideWeight * y.riding) - (x.realized + rideWeight * x.riding) || y.tokensWon - x.tokensWon)
     .slice(0, topN);
-  return { updated: Date.now(), tokensScanned: scanned, wallets: rows.length, rough: true,
+  return { updated: Date.now(), tokensScanned: scanned, tokensRequested: tokens.length, partial, wallets: rows.length, rough: true,
     proven: rows.filter((r) => r.proven).length, riding: rows.filter((r) => r.riding && !r.proven).length, rows };
 }

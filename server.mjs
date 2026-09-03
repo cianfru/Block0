@@ -14,6 +14,7 @@ import { watchLogs, WS_ENABLED } from "./ws.mjs";
 import { refreshBoard, refreshDex, getBoard, ensureFresh, setSmartMoney } from "./board.mjs";
 import { smartMoneyFrom, convergence } from "./smart-money.mjs";
 import { coverageReport } from "./coverage.mjs";
+import { tick as trackTick, trackRecord } from "./track-record.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON } from "./alerts.mjs";
@@ -71,7 +72,9 @@ function anchorToPons(r, ponsMcap) {
 // memory, so it holds the FULL history only for smaller tokens — for those we reuse it and the series is instant
 // and exact. For a high-volume token the store is incomplete, so we self-pull the full history (slower, but
 // correct); the result is cached in KV keyed by token so that expensive pull happens once, not on every redeploy.
-const BT_TTL = Number(process.env.BT_TTL_MS || 30 * 60 * 1000); // serve a cached backtest for 30 min before recomputing
+// serve a cached backtest for 45 min — deliberately LONGER than the 30-min leaderboard refresh, so steady-state LB
+// rebuilds hit the cache (only the cold start pays the full 100-backtest cost, not every cycle).
+const BT_TTL = Number(process.env.BT_TTL_MS || 45 * 60 * 1000);
 const STORE_CAP = 25000;
 async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym }) {
   const kvKey = `bt:${key}`;
@@ -90,8 +93,13 @@ async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym }
 
 // background discover-board: scan every live launch, verdict + market-cap-bucket, keep a ranked cache
 const BOARD_REFRESH_MS = Number(process.env.BOARD_REFRESH_MS || 180000);
-refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {});
-setInterval(() => refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {}), BOARD_REFRESH_MS);
+// after each board refresh, feed the FORWARD track record: freeze a young call per token, resolve matured outcomes.
+async function boardCycle() {
+  await refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {});
+  try { const b = getBoard(); await trackTick([...(b.cooking || []), ...(b.dex || []), ...(b.graduated || [])]); } catch { /* tracker never blocks the board */ }
+}
+boardCycle();
+setInterval(boardCycle, BOARD_REFRESH_MS);
 
 // launch alert push (Telegram) — dormant unless TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set
 startAlerts();
@@ -108,8 +116,11 @@ if (Number(process.env.BOARD_DEX ?? 10) > 0) {
 const LB_REFRESH_MS = Number(process.env.LEADERBOARD_REFRESH_MS || 30 * 60 * 1000);
 const LB_TOKENS = Number(process.env.LEADERBOARD_TOKENS || 100); // how many winners to aggregate over (wider = catches mid-tier runners)
 let _leaderboard = null, _lbRunning = false;
+let _lbHealth = { updated: 0, wallets: 0, tokensRequested: 0, tokensScanned: 0, buildMs: 0, ok: false };
+export function leaderboardHealth() { return _lbHealth; }
 async function refreshLeaderboard() {
   if (_lbRunning) return; _lbRunning = true;
+  const t0 = Date.now();
   try {
     const b = getBoard();
     // winners only: graduated launchpad tokens + DEX-listed tokens, biggest first, deduped
@@ -120,11 +131,16 @@ async function refreshLeaderboard() {
       .slice(0, LB_TOKENS)
       .map((t) => ({ address: t.address.toLowerCase(), sym: t.sym, mcapUsd: t.mcapUsd || 0, graduated: !!t.graduated }));
     if (!tokens.length) return;
-    const lb = await buildLeaderboard(tokens, (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 }));
+    // time-budgeted so a slow/rate-limited cold start yields PARTIAL smart money rather than running past the next cycle
+    const budgetMs = Number(process.env.LEADERBOARD_BUDGET_MS || Math.min(LB_REFRESH_MS * 0.8, 12 * 60 * 1000));
+    const lb = await buildLeaderboard(tokens, (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 }), { budgetMs });
     _leaderboard = lb;
     setSmartMoney(smartMoneyFrom(lb));   // feed proven wallets to the board so every verdict flags smart-money holders
     setJSON("leaderboard", lb).catch(() => {});
-  } catch { /* transient — next tick retries */ } finally { _lbRunning = false; }
+    _lbHealth = { updated: Date.now(), wallets: lb.wallets || 0, proven: lb.proven || 0, riding: lb.riding || 0,
+      tokensRequested: tokens.length, tokensScanned: lb.tokensScanned || 0, partial: !!lb.partial, buildMs: Date.now() - t0, ok: (lb.wallets || 0) > 0 };
+  } catch (e) { _lbHealth = { ..._lbHealth, updated: Date.now(), buildMs: Date.now() - t0, ok: false, error: String(e && e.message || e).slice(0, 120) }; }
+  finally { _lbRunning = false; }
 }
 if (Number(process.env.LEADERBOARD_ON ?? 1) > 0) {
   getJSON("leaderboard").then((v) => { if (v) _leaderboard = v; }).catch(() => {});
@@ -241,12 +257,22 @@ createServer(async (req, res) => {
       const ageMs = b.updated ? Date.now() - b.updated : null;
       const healthy = !!b.updated && ageMs < BOARD_REFRESH_MS * 3;
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      const lh = leaderboardHealth();
       return res.end(JSON.stringify({
         ok: healthy, uptimeS: Math.round(process.uptime()),
         board: { updated: b.updated || null, ageSeconds: ageMs == null ? null : Math.round(ageMs / 1000), scanning: !!b.scanning,
           cooking: (b.cooking || []).length, graduated: (b.graduated || []).length, dex: (b.dex || []).length, store: b.stats?.store || null },
+        leaderboard: { updated: lh.updated || null, ageSeconds: lh.updated ? Math.round((Date.now() - lh.updated) / 1000) : null,
+          wallets: lh.wallets || 0, proven: lh.proven || 0, riding: lh.riding || 0, tokensScanned: lh.tokensScanned || 0,
+          tokensRequested: lh.tokensRequested || 0, partial: !!lh.partial, buildSeconds: lh.buildMs ? Math.round(lh.buildMs / 1000) : null,
+          ok: !!lh.ok, error: lh.error || null },
         rpc: { provider: PROVIDER }, alerts: { on: ALERTS_ON }, storage: { backend: KV_BACKEND },
       }));
+    }
+
+    if (u.pathname === "/api/track-record") { // forward, out-of-sample hit-rate — accrues live as launches mature
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify(await trackRecord()));
     }
 
     if (u.pathname === "/api/alerts/calls") { // the durable track record of past alerts

@@ -17,7 +17,7 @@ import { getCurrentSmartMoney } from "./smart-money.mjs";
 export const PONS_FACTORIES = ["0x0c37a24f5d23a486fa692d1500881d698b1f77a4", "0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb"];
 const N_ACTIVE = Number(process.env.BOARD_ACTIVE || 16); // pre-graduation tokens to verdict per refresh
 const N_GRAD = Number(process.env.BOARD_GRAD || 24);     // graduated (higher-MC) tokens to verdict per refresh
-const N_DEX = Number(process.env.BOARD_DEX || 10);       // non-Pons DEX-listed tokens to verdict per refresh
+const N_DEX = Number(process.env.BOARD_DEX || 24);       // non-Pons DEX-listed tokens to verdict per refresh (discovery is chain-wide; surface more)
 const DEX_MIN_HOLDERS = Number(process.env.DEX_MIN_HOLDERS || 5); // spam floor for a discovered DEX token
 const NEW_MS = 150000;
 
