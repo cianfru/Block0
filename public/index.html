@@ -313,6 +313,12 @@ async function loadHistory(r){
     CV.style.display="block"; note.hidden=true; $("#cvcor").style.display="block"; noteC.hidden=true;
     SERIES=bt.series.map(s=>({t:s.t,risk:s.risk,label:s.label,mcap:s.mcap,price:s.price,wallets:s.wallets,volUsd:s.volUsd,holders:s.holders,top10:s.top10,ageH:s.ageH,traj:s.traj,blueprint:s.blueprint}));
     CORR=bt.corridor||[];
+    // thin tokens often have no reconstructable price → mcap/price/volUsd are null. Default the chart to a view
+    // that actually has data, and dim the ones that don't, so the user never lands on an empty chart.
+    const avail=(k)=>SERIES.some(s=>s[k]!=null&&isFinite(s[k]));
+    if(!avail(VIEW)) VIEW=["mcap","price","wallets","volUsd"].find(avail)||"wallets";
+    document.querySelectorAll("#views .view").forEach(x=>{const ok=avail(x.dataset.v);x.classList.toggle("on",x.dataset.v===VIEW);x.style.opacity=ok?"":".4";x.title=ok?"":"not reconstructable for this token";});
+    { const m0=VMETA[VIEW]; $("#pmlabel").innerHTML=`<i style="background:${m0.col}"></i>${m0.lab}`; }
     const pw=$("#pricewarn");
     if(bt.priceRough){ pw.hidden=false; pw.innerHTML='⚠ <b style="color:var(--amber)">Rough price reconstruction.</b> The level is pinned to the current market cap, but the shape over time is uncertain for this token — read valuation as approximate.'; }
     else if(bt.priceAnchor){ pw.hidden=false; pw.innerHTML='Price &amp; market cap are swap-implied and <b style="color:var(--dim)">pinned to the live market cap</b> at the latest point; treat exact figures as estimates.'; }
