@@ -356,7 +356,8 @@ createServer(async (req, res) => {
       const b = ensureFresh(BOARD_REFRESH_MS);
       // Tag each verdict with an EXPLICIT section + venue so a front end can bind without inferring from which
       // array it arrived in. Additive only — every existing field (label, corridor.status, …) is untouched.
-      const tag = (arr, section) => (arr || []).map((t) => ({ ...t, section, venue: t.venue || (section === "dex" ? "uniswap-v4" : "pons") }));
+      // venue now comes from discovery (uniswap-v2/v3/v4 or a factory label); factory/venues pass through via ...t.
+      const tag = (arr, section) => (arr || []).map((t) => ({ ...t, section, venue: t.venue || (section === "dex" ? "dex" : "pons") }));
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify({ updated: b.updated, scanning: b.scanning,
         cooking: tag(b.cooking, "cooking"), graduated: tag(b.graduated, "graduated"), dex: tag(b.dex, "dex"), stats: b.stats || {} }));

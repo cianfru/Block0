@@ -96,7 +96,7 @@ function render(){
     const rows=cooking.slice().sort((a,b)=>(b.blueprint||0)-(a.blueprint||0));
     $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Fresh launches ranked by how well they fit the <b style="color:var(--tx)">winner fingerprint</b> from the biggest graduations — no bundles, a float that opens up, a clean settled score, real adoption. A pattern, not a promise.</p>'+section(rows);return;}
   if(FILTER==="dex"){
-    $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Tokens listed <b style="color:var(--tx)">directly on the Uniswap-v4 AMM</b>, not via the Pons launchpad — discovered on-chain and verdicted by the same engine. Live from block one. Cleanest first.</p>'+
+    $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Tokens listed <b style="color:var(--tx)">directly on the chain\'s AMMs</b> (Uniswap v2 · v3 · v4, every factory), not via the Pons launchpad — discovered on-chain by creation signature and verdicted by the same engine. Live from block one. Cleanest first.</p>'+
       (dexl.length?section(dexl.sort((a,b)=>a.risk-b.risk)):'<div class="state">No DEX listings verdicted yet — the discovery pass runs alongside the board scan.</div>');
     return;}
   if(FILTER==="graduated"){$("#board").innerHTML=grad.length?section(grad.sort((a,b)=>(b.mcapUsd||0)-(a.mcapUsd||0))):'<div class="state">No graduated tokens yet.</div>';return;}

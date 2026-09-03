@@ -31,9 +31,15 @@ const B0 = (() => {
       meter("Concentration", p.concentration || 0, `top 10 · ${f.top10Pct}%`),
       meter("Dumping now", p.dumping || 0, f.insiderSellersNow ? `${f.insiderSellersNow} selling` : "none"),
     ].join("");
-    const venue = r.venue === "uniswap-v4" ? chip("uniswap-v4", "#ff5cf0") : chip(r.section === "graduated" ? "graduated" : "launchpad · pons", "#35e6e0");
+    // DEX-discovered tokens carry a real venue (uniswap-v2/v3/v4 or a factory label); Pons tokens don't.
+    const DEXVEN = { "uniswap-v4": "#ff5cf0", "uniswap-v3": "#7aa2ff", "uniswap-v2": "#ffd23d" };
+    const isDex = r.section === "dex" || (!!r.venue && r.venue !== "pons");
+    const venue = isDex
+      ? `<span class="chip" style="color:${DEXVEN[r.venue] || "#c8ff4d"}"${r.factory ? ` title="factory ${r.factory}"` : ""}>${r.venue || "dex"}</span>`
+        + ((r.venues && r.venues.length > 1) ? `<span class="chip" style="color:var(--mute)" title="also on ${r.venues.join(", ")}">+${r.venues.length - 1}</span>` : "")
+      : chip(r.section === "graduated" ? "graduated" : "launchpad · pons", "#35e6e0");
     const CS = { "on-track": "#c8ff4d", "behind": "#ffd23d", "drifting": "#ffd23d", "failing": "#ff3b5c" };
-    const bpChips = (r.venue !== "uniswap-v4") ? [
+    const bpChips = !isDex ? [
       r.blueprint != null ? chip(`blueprint ${r.blueprint} · ${r.blueprintLabel || ""}`) : "",
       r.corridor ? chip(`corridor ${r.corridor.status}`, CS[r.corridor.status] || "#ffd23d") : "",
     ].join("") : "";
