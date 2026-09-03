@@ -13,6 +13,7 @@ import { latestBlock } from "./rpc.mjs";
 import { watchLogs, WS_ENABLED } from "./ws.mjs";
 import { refreshBoard, refreshDex, getBoard, ensureFresh, setSmartMoney } from "./board.mjs";
 import { smartMoneyFrom, convergence } from "./smart-money.mjs";
+import { coverageReport } from "./coverage.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON } from "./alerts.mjs";
@@ -365,6 +366,12 @@ createServer(async (req, res) => {
       return res.end(JSON.stringify({ updated: b.updated, scanning: b.scanning,
         cooking, graduated, dex, stats: b.stats || {},
         convergence: convergence({ cooking, dex, graduated }, { minCount: 2 }) }));
+    }
+    if (u.pathname === "/api/coverage") { // the launch surface: every factory producing tokens, new ones flagged
+      const blocks = Math.min(600000, Math.max(20000, Number(u.searchParams.get("blocks") || 250000)));
+      const rep = await coverageReport({ blocks, force: u.searchParams.get("force") === "1" });
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify(rep));
     }
     if (u.pathname === "/api/smart-money") { // tokens where proven wallets have converged, ranked
       const b = ensureFresh(BOARD_REFRESH_MS);
