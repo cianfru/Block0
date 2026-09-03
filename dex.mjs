@@ -33,24 +33,21 @@ const KNOWN = {
   [V3_POOLCREATED]: { dex: "uniswap-v3", ev: "PoolCreated", tokenTopics: [1, 2] },
 };
 
-// ── DISCOVERY SOURCES ─────────────────────────────────────────────────────────────────────────────────────────
-// Every contract that ANNOUNCES a new pool on the RH chain, with which log topics carry the two token addresses.
-// We were scanning ONLY the v4 singleton (Initialize) and were BLIND to the separate Uniswap-v3 factory at
-// 0x1f7d7550…, which has minted 1,100+ pools — many of them real launches (e.g. CHUMP was BORN there, months before
-// it ever got a v4 pool). The forensic engine is launchpad-agnostic, so covering a whole new DEX/launchpad is just
-// one more source here. Add ad-hoc sources without a code change via DEX_FACTORIES="addr:dex:topic0:tok0,tok1; …".
-const V3_FACTORY = (process.env.DEX_V3_FACTORY || "0x1f7d7550b1b028f7571e69a784071f0205fd2efa").toLowerCase();
-function parseFactoriesEnv(s) {
-  return (s || "").split(";").map((x) => x.trim()).filter(Boolean).map((x) => {
-    const [address, dex, topic, toks] = x.split(":");
-    return address && topic ? { address: address.toLowerCase(), dex: dex || "amm", topic: topic.toLowerCase(), tokenTopics: (toks || "1,2").split(",").map(Number) } : null;
-  }).filter(Boolean);
-}
-export const SOURCES = [
-  { address: AMM, dex: "uniswap-v4", topic: V4_INIT, tokenTopics: [2, 3] },        // RH singleton v4 PoolManager — Initialize
-  { address: V3_FACTORY, dex: "uniswap-v3", topic: V3_POOLCREATED, tokenTopics: [1, 2] }, // second DEX/launchpad — v3 PoolCreated
-  ...parseFactoriesEnv(process.env.DEX_FACTORIES),
-];
+// ── DISCOVERY: TOPIC-DRIVEN, CHAIN-WIDE (no factory allowlist) ─────────────────────────────────────────────────
+// We match the pool-creation SIGNATURE across EVERY contract, not a hardcoded list of factory addresses. A RH census
+// found 13 distinct factories (v2/v3/v4) minting pools — with DIFFERENT owners, i.e. independent DEXes/launchpads —
+// and more appear over time. An address allowlist guarantees blind spots (that's how we missed the v3 factory CHUMP
+// launched on); matching the creation event chain-wide cannot miss a factory, present or FUTURE. CREATION maps each
+// creation topic0 → which log topics carry the two token addresses. FACTORY_LABEL is a cosmetic address→name map only
+// (discovery does not depend on it); extend it via DEX_FACTORY_LABELS="0xaddr:Nice Name; 0xaddr2:Other".
+const CREATION = {
+  [V4_INIT]:        { ver: "uniswap-v4", tokenTopics: [2, 3] }, // Initialize(id, currency0, currency1, …)
+  [V3_POOLCREATED]: { ver: "uniswap-v3", tokenTopics: [1, 2] }, // PoolCreated(token0, token1, fee, …)
+  [V2_PAIRCREATED]: { ver: "uniswap-v2", tokenTopics: [1, 2] }, // PairCreated(token0, token1, pair, …)
+};
+export const CREATION_TOPICS = Object.keys(CREATION);
+function parseFactoryLabels(s) { const m = {}; for (const x of (s || "").split(";").map((y) => y.trim()).filter(Boolean)) { const i = x.indexOf(":"); if (i > 0) m[x.slice(0, i).trim().toLowerCase()] = x.slice(i + 1).trim(); } return m; }
+export const FACTORY_LABEL = { [AMM]: "uniswap-v4", ...parseFactoryLabels(process.env.DEX_FACTORY_LABELS) };
 
 let rid = 1;
 async function rpc(method, params, tries = 5) {
@@ -113,27 +110,25 @@ export async function traceEvents({ blocks = 40000, address = AMM } = {}) {
 export async function discoverDex({ blocks = 200000, address = null, initTopics = null } = {}) {
   const latest = await latestBlock();
   const from = Math.max(0, latest - blocks);
-  // sources to scan: default = every configured DEX/launchpad factory; explicit `address` = legacy single-source
-  // path (used by /api/dex-scan and traceEvents), which sweeps all KNOWN creation topics on that one contract.
-  const sources = address
-    ? [{ address: address.toLowerCase(), topics: (initTopics || Object.keys(KNOWN)).map((t) => t.toLowerCase()), tokenTopics: null, dex: null }]
-    : SOURCES.map((s) => ({ address: s.address, topics: [s.topic], tokenTopics: s.tokenTopics, dex: s.dex }));
-  // each token: first block/venue we see it listed (birth-within-window), plus every venue it appears on.
+  // CHAIN-WIDE by creation signature = every factory, present and future, no allowlist. The `address` arg still
+  // supports the legacy single-contract trace path (/api/dex/trace, /discover?address=…); default scans all emitters.
+  const topics = (initTopics && initTopics.length ? initTopics : CREATION_TOPICS).map((t) => t.toLowerCase());
+  const filter = address ? { address: address.toLowerCase(), topics: [topics] } : { topics: [topics] };
+  const logs = await logsWide(filter, from, latest);
+  // each token: first block/venue we see it listed (birth-within-window), the factory that listed it, and every venue.
   const tokens = new Map();
-  for (const src of sources) {
-    // filter to the pool-creation topics so the node returns ONLY those events (hundreds), not every Swap (millions).
-    const logs = await logsWide({ address: src.address, topics: [src.topics] }, from, latest);
-    for (const l of logs) {
-      const t0 = (l.topics && l.topics[0] || "").toLowerCase();
-      const spec = src.tokenTopics ? { dex: src.dex, tokenTopics: src.tokenTopics } : (KNOWN[t0] || { dex: "amm-v4", tokenTopics: [2, 3] });
-      const blk = toNum(l.blockNumber);
-      for (const ti of spec.tokenTopics) {
-        const a = addrOf(l.topics?.[ti]);
-        if (!a || a.length !== 42 || INFRA.has(a)) continue;
-        const cur = tokens.get(a);
-        if (!cur) tokens.set(a, { address: a, dex: spec.dex, block: blk, lastBlock: blk, tx: l.transactionHash, venues: new Set([spec.dex]) });
-        else { if (blk < cur.block) { cur.block = blk; cur.dex = spec.dex; cur.tx = l.transactionHash; } if (blk > cur.lastBlock) cur.lastBlock = blk; cur.venues.add(spec.dex); }
-      }
+  for (const l of logs) {
+    const t0 = (l.topics && l.topics[0] || "").toLowerCase();
+    const spec = CREATION[t0]; if (!spec) continue;                       // ignore anything that isn't a pool-creation event
+    const factory = (l.address || "").toLowerCase();
+    const ver = FACTORY_LABEL[factory] || spec.ver;                        // cosmetic label if known, else the DEX version
+    const blk = toNum(l.blockNumber);
+    for (const ti of spec.tokenTopics) {
+      const a = addrOf(l.topics?.[ti]);
+      if (!a || a.length !== 42 || INFRA.has(a)) continue;                 // strip the quote/wrapper side of the pool
+      const cur = tokens.get(a);
+      if (!cur) tokens.set(a, { address: a, dex: ver, factory, block: blk, lastBlock: blk, tx: l.transactionHash, venues: new Set([ver]) });
+      else { if (blk < cur.block) { cur.block = blk; cur.dex = ver; cur.factory = factory; cur.tx = l.transactionHash; } if (blk > cur.lastBlock) cur.lastBlock = blk; cur.venues.add(ver); }
     }
   }
   const arr = [...tokens.values()].map((t) => ({ ...t, venues: [...t.venues].filter(Boolean) }));
@@ -170,4 +165,4 @@ export async function recentDexTokens({ blocks = 200000, limit = 40 } = {}) {
   return { head, count: out.length, tokens: out };
 }
 
-export const DEX_CONFIG = { rpc: DEX_RPC, amm: AMM, range: RANGE, v4Init: V4_INIT, sources: SOURCES.map((s) => ({ address: s.address, dex: s.dex })) };
+export const DEX_CONFIG = { rpc: DEX_RPC, amm: AMM, range: RANGE, discovery: "chain-wide by creation signature (v2 PairCreated · v3 PoolCreated · v4 Initialize)", creationTopics: CREATION_TOPICS, labels: FACTORY_LABEL };
