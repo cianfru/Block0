@@ -196,23 +196,33 @@ reveal on nav labels is on-brand (used on the current landing). Everything gated
 
 ## The data contract (design against these)
 
-All read-only JSON, no auth, same-origin. Base = the deployed site.
+All read-only JSON, no auth. **CORS is open (`access-control-allow-origin: *`)**, so the front end can call the
+API cross-origin from its own domain — point it at the backend origin (e.g. `https://<app>.up.railway.app`) via a
+build-time base, or reverse-proxy `/api/*` onto the backend and call same-origin. A ready-to-adapt mapping
+reference (fetchers + the field mapping below, as TanStack Query hooks) lives in `docs/api-adapter.ts`.
 
 | Endpoint | Returns |
 |---|---|
-| `GET /api/board` | `{ cooking[], graduated[], dex[], stats }`. Each token: `sym, name, logo, address, mcapUsd, risk, label, parts{snipers,bundles,concentration,dumping,deployer}, flags{holders, wallets, top10Pct, snipers, bundles, insiderSellersNow, …}, blueprint, blueprintLabel, corridor{traj,status}, path{precedent,ratio,pos}, progress (launchpad), venue (dex), momentum` |
-| `GET /api/token?address=` | Full dossier: the above **plus** `buyers[] / sellers[] / topHolders[]` (each `{a, bal, bought, sold, net, sniper}`), `deployer{reputation, launched, graduated, others[]}`, `precedent`, `ageH`, `explorer` |
+| `GET /api/board` | `{ updated, scanning, cooking[], graduated[], dex[], stats }`. Each token: `sym, name, logo, address, mcapUsd, risk, label, section, venue, parts{snipers,bundles,concentration,dumping,deployer}, flags{holders, wallets, top10Pct, snipers, bundles, insiderSellersNow, …}, blueprint, blueprintLabel, corridor{traj,status}, path{precedent,ratio,pos}, progress (launchpad only), momentum` |
+| `GET /api/token?address=` | Full dossier: the above **plus** `buyers[] / sellers[] / topHolders[]` (each `{a, bal, bought, sold, net, sniper, first}`), `deployer{address, reputation, launched, graduated, others[]{sym,address,mcapUsd,graduated}}`, `precedent`, `ageH`, `explorer` |
 | `GET /api/backtest?token=` | History: `series[]` (`{t, ageH, risk, label, top10, holders, wallets, mcap, price, volUsd, traj, blueprint}`) + `corridor[]` (stage boxes: `{lo,hi,q1,med,q3,tw,tm}` = age band, healthy trajectory zone, target wallets `tw` + target mcap `tm`) + `priceRough` flag |
-| `GET /api/wallet?address=` | Cross-token profile: `{ address, tokensTraded, held, exited, style, tokens[] }` where each token is `{token, sym, bought, sold, net, nBuys, nSells, held, exited, first, last }` |
+| `GET /api/wallet?address=` | Cross-token profile: `{ address, tokensTraded, held, exited, style, tokens[] }` where each token is `{token, sym, bought, sold, net, nBuys, nSells, held, exited, first, last }` (`first`/`last` are unix seconds; `style` ∈ `active-trader`/`holder`/`mixed`) |
 | `GET /api/validation` | Signal accuracy: `{ cohort, perBin[] (age → AUC, winner/loser medians, on-band rates), lateLife }` |
 | `GET /api/status` | Health: board freshness, counts, store, rpc, alerts, storage |
 
-Notes for the designer:
-- **Risk / labels** are already computed — render `risk` (0–100) and `label` directly; color by the scale above.
-- **Venue:** launchpad tokens live in `cooking`/`graduated`; DEX tokens in `dex` and carry `venue`. Blueprint +
-  corridor + bonding progress apply to launchpad tokens; DEX tokens are "live from block one."
+Notes for the designer — a few exact shapes so the binding is right first time:
+- **Risk / labels** are already computed — render `risk` (0–100) and color by the scale above. Note `label` is
+  **UPPERCASE** (`"LOOKS CLEANER" | "MIXED" | "CAUTION" | "HIGH RISK"`); title-case it for display, or just derive
+  the wording from `risk` via the scale (either is fine — they agree).
+- **Section & venue are explicit fields** on every board token: `section` ∈ `"cooking" | "graduated" | "dex"`,
+  `venue` ∈ `"pons" | "uniswap-v4"`. (They also correspond to which array the token arrived in.) Split the board
+  UI by these so the two venues read distinctly — Pons launchpad vs. direct Uniswap listing.
+- **`corridor.status`** enum is `"on-track" | "behind" | "failing"` (map `"behind"` → amber "drifting" if you
+  prefer that wording). Blueprint + corridor + `progress` apply to launchpad tokens; DEX tokens are "live from
+  block one" (no bonding progress).
 - **Wallet lists** already carry the wallet address + whether it's a sniper — make them clickable into the wallet
-  view (`/api/wallet`).
+  view (`/api/wallet`). The `flags.insiderSellersNow` count is the click target for the "N insiders selling now"
+  reveal (open the `sellers[]` rows).
 - **Numbers are estimates where noted** — reconstructed prices are swap-implied; the API flags `priceRough` when a
   reconstruction is uncertain. Surface that honestly (a subtle "estimate" affordance), never as a hard quote.
 

@@ -143,6 +143,13 @@ async function serveStatic(res, urlPath) {
 
 createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
+  // The read-only JSON API is public and consumed cross-origin by the Lovable-designed front end (its own domain),
+  // so every response carries permissive CORS. A preflight (OPTIONS) is answered immediately, before any routing.
+  res.setHeader("access-control-allow-origin", "*");
+  res.setHeader("access-control-allow-methods", "GET, OPTIONS");
+  res.setHeader("access-control-allow-headers", "content-type");
+  res.setHeader("access-control-max-age", "86400");
+  if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
 
@@ -235,8 +242,12 @@ createServer(async (req, res) => {
 
     if (u.pathname === "/api/board") {
       const b = ensureFresh(BOARD_REFRESH_MS);
+      // Tag each verdict with an EXPLICIT section + venue so a front end can bind without inferring from which
+      // array it arrived in. Additive only — every existing field (label, corridor.status, …) is untouched.
+      const tag = (arr, section) => (arr || []).map((t) => ({ ...t, section, venue: t.venue || (section === "dex" ? "uniswap-v4" : "pons") }));
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-      return res.end(JSON.stringify({ updated: b.updated, scanning: b.scanning, cooking: b.cooking || [], graduated: b.graduated || [], dex: b.dex || [], stats: b.stats || {} }));
+      return res.end(JSON.stringify({ updated: b.updated, scanning: b.scanning,
+        cooking: tag(b.cooking, "cooking"), graduated: tag(b.graduated, "graduated"), dex: tag(b.dex, "dex"), stats: b.stats || {} }));
     }
 
     if (u.pathname === "/api/scan") {
