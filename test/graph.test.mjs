@@ -67,6 +67,21 @@ test("cluster flow lights RED when the bundle is selling now (recent window)", (
   assert.equal(g.nodes.find((n) => n.a === "s1").flow, "sell");
 });
 
+test("injected funder edges link otherwise-unconnected wallets into one flagged cluster", () => {
+  // two lone buyers that never interact on-chain, but share a funder (edge injected from the funder pass)
+  const L = [
+    { from: "pool", to: "a", amt: 100, ts: 1, block: 10 },
+    { from: "pool", to: "b", amt: 90, ts: 2, block: 40 }, // different block → not a bundle, no transfer between them
+  ];
+  const bare = buildGraph(L, { pool: "pool" });
+  assert.equal(bare.clusters.length, 0); // nothing links a and b on their own
+  const g = buildGraph(L, { pool: "pool", extraEdges: [{ a: "a", b: "b", kind: "funder", via: "0xfunder" }] });
+  assert.equal(g.clusters.length, 1);
+  assert.equal(g.clusters[0].size, 2);
+  assert.equal(g.clusters[0].hasFunder, true);
+  assert.equal(g.clusters[0].flag, true);
+});
+
 test("balances and supply share are computed on the nodes", () => {
   const g = buildGraph(T, { pool: "pool" });
   const w1 = g.nodes.find((n) => n.a === "w1");

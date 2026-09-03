@@ -23,6 +23,8 @@ import { traceEvents, discoverDex, recentDexTokens, DEX_CONFIG } from "./dex.mjs
 import { walletIntel } from "./wallet.mjs";
 import { buildLeaderboard } from "./leaderboard.mjs";
 import { buildGraph } from "./graph.mjs";
+import { resolveFunders, funderLinks } from "./funders.mjs";
+import { rpc } from "./rpc.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -278,9 +280,19 @@ createServer(async (req, res) => {
       const st = await getTransfers(address, 18, { pool: meta?.pool, launchedAt: meta?.launchedAt }).catch(() => ({ ev: null, pool: null }));
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       if (!st.ev || !st.ev.length) return res.end(JSON.stringify({ address, sym: meta?.sym || null, nodes: [], edges: [], clusters: [], stats: { nodes: 0, edges: 0, clusters: 0 }, note: "no transfer history yet" }));
-      const g = buildGraph(st.ev, { pool: st.pool || meta?.pool, topN });
+      const gopts = { pool: st.pool || meta?.pool, topN };
+      let g = buildGraph(st.ev, gopts), funderMeta = null;
+      // opt-in common-funder pass (?funders=1): the ONLY Alchemy cost on the bubble map — top 40, cached forever
+      if (u.searchParams.get("funders") === "1" && PROVIDER === "alchemy") {
+        const top = g.nodes.slice().sort((a, b) => b.pct - a.pct).map((n) => n.a);
+        const { funders, calls } = await resolveFunders(top, { rpc, kvGet: getJSON, kvSet: setJSON });
+        const nodeSet = new Set(g.nodes.map((n) => n.a));
+        const { edges: fedges, groups } = funderLinks(funders, nodeSet);
+        g = buildGraph(st.ev, { ...gopts, extraEdges: fedges }); // re-cluster with the funder links
+        funderMeta = { resolved: funders.size, calls, funderGroups: groups.length };
+      }
       const links = { zerion: (process.env.ZERION_URL || "https://app.zerion.io").replace(/\/$/, ""), explorer: (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null };
-      return res.end(JSON.stringify({ address, sym: meta?.sym || null, name: meta?.name || null, transfers: st.ev.length, links, ...g }));
+      return res.end(JSON.stringify({ address, sym: meta?.sym || null, name: meta?.name || null, transfers: st.ev.length, links, funders: funderMeta, ...g }));
     }
 
     if (u.pathname === "/api/token") {

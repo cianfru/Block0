@@ -104,6 +104,12 @@ export function buildGraph(transfers, opts = {}) {
     for (const a of mem) if (a !== hub) edges.push({ a: hub, b: a, kind: "bundle", block: g.block });
   }
 
+  // injected links (e.g. common-funder edges resolved separately, opt-in) — only between wallets already on the map
+  for (const e of opts.extraEdges || []) {
+    const a = (e.a || "").toLowerCase(), b = (e.b || "").toLowerCase();
+    if (a !== b && nodeSet.has(a) && nodeSet.has(b)) edges.push({ ...e, a, b });
+  }
+
   // clusters: connected components over every link
   const uf = new UF();
   for (const a of nodeSet) uf.find(a);
@@ -118,10 +124,11 @@ export function buildGraph(transfers, opts = {}) {
     // cohort lights green (accumulating) or red (the insiders are selling this token now).
     const net = m.reduce((s, n) => s + n.net, 0);
     const hasBundle = edges.some((e) => e.kind === "bundle" && memberSet.has(e.a) && memberSet.has(e.b));
+    const hasFunder = edges.some((e) => e.kind === "funder" && memberSet.has(e.a) && memberSet.has(e.b));
     const hasSniper = m.some((n) => n.role === "sniper" || n.role === "bundle");
     return { id: `c${i}`, size: m.length, wallets, bal: +bal.toFixed(2), pct: +(bal / held * 100).toFixed(2),
       net: +net.toFixed(2), flow: flowOf(net, bal), // the group's green/red verdict
-      hasBundle, hasSniper, flag: hasBundle || (m.length >= 3 && bal / held > 0.05) };
+      hasBundle, hasFunder, hasSniper, flag: hasBundle || hasFunder || (m.length >= 3 && bal / held > 0.05) };
   }).sort((x, y) => y.pct - x.pct);
 
   const clusterOf = new Map();
