@@ -36,6 +36,13 @@
   .pos{color:var(--lime)} .neg{color:var(--coral)} .flat{color:var(--dim)}
 
   .counts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+  .bw{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:12px}
+  @media(max-width:460px){.bw{grid-template-columns:1fr}}
+  .bwcell{display:flex;flex-direction:column;gap:5px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;background:rgba(255,255,255,.02);transition:border-color .18s ease}
+  .bwcell:hover{border-color:var(--line-2)}
+  .bwl{font-size:.6rem;text-transform:uppercase;letter-spacing:.12em;color:var(--mute)}
+  .bwv{font-family:var(--mono);font-size:.95rem;font-variant-numeric:tabular-nums}
+  .bwv b{font-family:var(--sans);font-weight:600}
 
   .toks{display:flex;flex-direction:column;gap:12px;margin-top:14px}
   .tok{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));overflow:hidden}
@@ -175,12 +182,25 @@ function render(d){
     <span class="chip">${t.tokensHeld} still holding</span>
     ${t.tokensRiding?`<span class="chip">${t.tokensRiding} riding a gain</span>`:""}
     ${d.partial?'<span class="chip" title="scan hit its time budget — a few smaller tokens may be missing">partial scan</span>':""}
-  </div>`;
+  </div>
+  ${bestWorst(d.tokens)}`;
 
   const toks=`<div class="toks">`+(d.tokens||[]).map((tk,i)=>tokCard(tk,i)).join("")+`</div>`;
   $("#body").innerHTML=head+kpis+`<h2 style="margin-top:34px;font-size:1.3rem">Per token — what our engine reconstructed</h2>`+toks;
   $("#cav").hidden=false;
 }
+
+// best single win / worst single loss — the two tokens that defined this wallet, shown side by side when it has
+// both. A click jumps to that token's card. Purely a readability aid over the sorted list, no new data.
+function bestWorst(tokens){
+  if(!tokens||tokens.length<2) return "";
+  let best=null, worst=null;
+  tokens.forEach((t,i)=>{ const o={...t,i}; if(t.pnl>0&&(!best||t.pnl>best.pnl)) best=o; if(t.pnl<0&&(!worst||t.pnl<worst.pnl)) worst=o; });
+  if(!best&&!worst) return "";
+  const cell=(lbl,o,c)=>o?`<a class="bwcell" href="#" onclick="event.preventDefault();jump(${o.i})"><span class="bwl">${lbl}</span><span class="bwv"><b>${o.sym}</b> <span class="${c}">${o.pnl>0?"+":"−"}${usd(o.pnl)}</span></span></a>`:"";
+  return `<div class="bw">${cell("Best trade",best,"pos")}${cell("Worst trade",worst,"neg")}</div>`;
+}
+function jump(i){ const el=document.querySelector(`.tok[data-i="${i}"]`); if(!el) return; if(!el.classList.contains("open")) toggle(i); el.scrollIntoView({behavior:"smooth",block:"center"}); }
 
 function tokCard(tk,i){
   const pnl=tk.pnl||0;
@@ -272,7 +292,21 @@ function drawTrades(cv, d){
     g.fillStyle="rgba(255,59,92,.9)"; g.fill(); }
   for(const t of trades){ if(t.side!=="buy") continue; const x=X(t.ts), y=Y(t.price), s=r(t.qty);
     g.beginPath(); g.arc(x,y,s,0,7); g.fillStyle="rgba(200,255,77,.9)"; g.shadowColor="rgba(200,255,77,.5)"; g.shadowBlur=6; g.fill(); g.shadowBlur=0; }
+
+  // axis labels so the chart reads without hover: price range on the left, date range on the bottom,
+  // and a tag on the avg-cost / now lines.
+  g.font="10px ui-monospace,Menlo,monospace"; g.textBaseline="alphabetic";
+  g.fillStyle="rgba(255,255,255,.5)"; g.textAlign="left";
+  g.fillText("$"+fmtPx(pMax), padL+1, padT+2);
+  g.fillText("$"+fmtPx(pMin), padL+1, H-padB+11);
+  g.fillStyle="rgba(255,255,255,.4)";
+  g.fillText(fmtDate(tMin), padL+1, H-3);
+  g.textAlign="right"; g.fillText(fmtDate(tMax), W-padR-1, H-3);
+  // line tags (right-aligned, clamped inside)
+  if(d.avgCost>0){ const y=Math.max(padT+8,Math.min(H-padB-2,Y(d.avgCost))); g.fillStyle="rgba(53,230,224,.9)"; g.textAlign="right"; g.fillText("avg cost", W-padR-2, y-3); }
+  if(d.curPrice>0){ const y=Math.max(padT+8,Math.min(H-padB-2,Y(d.curPrice))); g.fillStyle="rgba(255,255,255,.6)"; g.textAlign="right"; g.fillText("now", W-padR-2, y+11); }
 }
+function fmtDate(ts){ if(!ts) return ""; const d=new Date(ts*1000); return d.toLocaleDateString(undefined,{month:"short",day:"numeric"}); }
 
 function fmtQty(q){ q=Math.abs(q||0); if(q>=1e9)return (q/1e9).toFixed(2)+"B"; if(q>=1e6)return (q/1e6).toFixed(2)+"M"; if(q>=1e3)return (q/1e3).toFixed(1)+"K"; return q.toFixed(0); }
 function fmtPx(p){ p=Math.abs(p||0); if(!p) return "0"; if(p>=1) return p.toFixed(3); return p.toPrecision(3).replace(/0+$/,""); }

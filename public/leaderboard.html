@@ -73,7 +73,10 @@ async function load(){try{
   const rows=d.rows||[];
   if(d.computing&&!rows.length){$("#lb").innerHTML='<div class="state">Crunching the winners\' trade histories — the first build takes a few minutes. Check back shortly.</div>';setTimeout(load,30000);return;}
   if(!rows.length){$("#lb").innerHTML='<div class="state">No proven-PnL wallets yet — the board needs more graduated winners to aggregate over.</div>';return;}
-  $("#statchips").innerHTML=`<span class="chip"><span class="live-dot"></span> ${rows.length} wallets</span>`+(d.tokensScanned?`<span class="chip tnum">${d.tokensScanned} winners scanned</span>`:"")+(d.contractsFiltered?`<span class="chip tnum" title="contracts (bots, routers, pools) checked with eth_getCode and excluded — this is a list of humans you could follow">${d.contractsFiltered} bots filtered</span>`:"");
+  const botChip = d.contractsFiltered
+    ? `<span class="chip tnum" title="contracts (bots, routers, pools) checked with eth_getCode and excluded — this is a list of humans you could follow">${d.contractsFiltered} bots filtered</span>`
+    : d.contractsChecked ? `<span class="chip tnum" title="every ranked wallet checked with eth_getCode — none were contracts">✓ bots checked</span>` : "";
+  $("#statchips").innerHTML=`<span class="chip"><span class="live-dot"></span> ${rows.length} wallets</span>`+(d.tokensScanned?`<span class="chip tnum">${d.tokensScanned} winners scanned</span>`:"")+botChip;
   $("#lb").innerHTML=rows.map((w,i)=>B0.leaderRow(w,i+1,ex)).join("");
 }catch(e){$("#lb").innerHTML='<div class="state">Leaderboard unavailable — retrying…</div>';setTimeout(load,10000);}}
 load();
