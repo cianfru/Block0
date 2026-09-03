@@ -1,0 +1,63 @@
+# Rebuild the winner-study model — INCLUDING DEX winners — and commit the result.
+# This is the offline batch (RPC-heavy) that can't run in the app. Runs here where Alchemy + the native RH RPC are
+# reachable, then commits the refreshed model.json + study/*.json so the live site picks them up.
+#
+# Trigger it by hand from the Actions tab (Run workflow), or let the weekly schedule keep the model fresh as more
+# tokens graduate. Requires one repo secret: ALCHEMY_RPC_URL (your Alchemy HTTPS endpoint).
+name: rebuild-model
+
+on:
+  workflow_dispatch:
+    inputs:
+      dex:            { description: "Include DEX winners", type: boolean, default: true }
+      winners:        { description: "Pons winners (top graduated)", default: "16" }
+      losers:         { description: "Pons losers (aged/faded)", default: "40" }
+      dexBlocks:      { description: "DEX scan depth (blocks)", default: "2000000" }
+      dexCap:         { description: "DEX tokens to profile", default: "150" }
+  schedule:
+    - cron: "17 6 * * 1"   # Mondays 06:17 UTC — keep the model fresh weekly
+
+concurrency:
+  group: rebuild-model
+  cancel-in-progress: false
+
+jobs:
+  rebuild:
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    permissions:
+      contents: write
+    env:
+      RPC_URL: ${{ secrets.ALCHEMY_RPC_URL }}      # heavy transfer pulls (Alchemy)
+      DEX_RPC: https://rpc.mainnet.chain.robinhood.com  # wide log scans (native RH node)
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with: { node-version: "20" }
+      - name: Guard — RPC secret present
+        run: |
+          if [ -z "$RPC_URL" ]; then echo "::error::ALCHEMY_RPC_URL secret not set — add your Alchemy HTTPS endpoint under Settings → Secrets → Actions."; exit 1; fi
+      - name: Backtest the cohort (Pons + DEX winners)
+        run: |
+          node tools/build-cohort.mjs \
+            --winners="${{ github.event.inputs.winners || '16' }}" \
+            --losers="${{ github.event.inputs.losers || '40' }}" \
+            ${{ (github.event.inputs.dex == 'false') && ' ' || '--dex' }} \
+            --dexBlocks="${{ github.event.inputs.dexBlocks || '2000000' }}" \
+            --dexCap="${{ github.event.inputs.dexCap || '150' }}"
+      - name: Build the study data + assemble the model + validate
+        run: |
+          node tools/corridor.mjs
+          node tools/projection.mjs
+          node tools/extract_blueprint.mjs || echo "blueprint step skipped"
+          node tools/gen-model.mjs
+          node tools/validate.mjs
+      - name: Commit refreshed model
+        run: |
+          git config user.name "block0-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add model.json study
+          if git diff --cached --quiet; then echo "no model changes"; else
+            git commit -m "Rebuild model (Pons + DEX winners) [skip ci]"
+            git push
+          fi
