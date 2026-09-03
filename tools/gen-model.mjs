@@ -27,16 +27,27 @@ const ladder = proj.ladder.map((l) => ({ wallets: l.wallets, p25: l.p25, med: l.
 // corridor: the trajectory envelope by age bin + the CONCRETE STAGE TARGET (median winner wallets & mcap at that age).
 // For each bin we take, per winner, its path point nearest the bin midpoint (within the bin, else a close neighbour so
 // we don't invent a stage the winner never reached), then the median across winners — gated to MIN_N samples.
+const clamp = (v) => Math.max(0, Math.min(100, v));
 const corridor = corr.bins.map((b) => {
-  const mid = (b.lo + b.hi) / 2, ws = [], ms = [];
+  const mid = b.mid ?? (b.lo + b.hi) / 2, ws = [], ms = [];
   for (const w of proj.winners) {
     const inBin = (w.path || []).filter((p) => p.a >= b.lo && p.a < b.hi);
     let pick = inBin.length ? inBin.sort((x, y) => Math.abs(x.a - mid) - Math.abs(y.a - mid))[0] : null;
     if (!pick) { const near = (w.path || []).filter((p) => Math.abs(p.a - mid) <= (b.hi - b.lo)); if (near.length) pick = near.sort((x, y) => Math.abs(x.a - mid) - Math.abs(y.a - mid))[0]; }
     if (pick) { if (pick.w > 0) ws.push(pick.w); if (pick.m > 0) ms.push(pick.m); }
   }
+  // trajectory mean ± 1 standard deviation across the winners that were live in this age bin — the smooth CONE the
+  // chart draws (a real ±1σ band, clamped to the 0–100 score, rather than the old discrete quartile boxes).
+  const traj = [];
+  for (const w of corr.winners) for (const p of (w.path || [])) if (p.a >= b.lo && p.a < b.hi && p.t != null) traj.push(p.t);
+  const n = traj.length, mean = n ? traj.reduce((a, v) => a + v, 0) / n : null;
+  const sd = n > 1 ? Math.sqrt(traj.reduce((a, v) => a + (v - mean) ** 2, 0) / n) : 0;
   return {
-    lo: b.lo, hi: b.hi, q1: b.q1, med: b.med, q3: b.q3,
+    lo: b.lo, hi: b.hi, mid, q1: b.q1, med: b.med, q3: b.q3,
+    mean: mean == null ? null : Math.round(mean * 10) / 10,      // cone centre-line
+    sd: Math.round(sd * 10) / 10,                                 // ±1σ half-width
+    band: mean == null ? null : [Math.round(clamp(mean - sd)), Math.round(clamp(mean + sd))], // the drawn cone band
+    n_band: n,
     n_tgt: ws.length,
     tw: ws.length >= MIN_N ? Math.round(med(ws)) : null, // target unique-wallet count (median winner at this age)
     tm: ms.length >= MIN_N ? Math.round(med(ms)) : null, // target market cap (median winner at this age)

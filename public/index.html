@@ -311,7 +311,7 @@ function render(r){
       </div>
       <div style="position:relative"><canvas id="cvcor" style="height:340px"></canvas><div class="tip" id="tipcor"></div></div>
       <div class="chnote" id="chnotecor" hidden></div>
-      <div class="corcap"><span id="corverdict"></span> Each green box is where the 10 biggest past graduations sat at that age — a 0–100 <b style="color:var(--dim)">trajectory</b> score (clean distribution + real wallet adoption) with, below it, the concrete <b style="color:var(--lime)">wallet count</b> and <b style="color:var(--dim)">market cap</b> those winners typically carried by that stage. Inside the boxes on all three = tracking the winners; below = drifting; near the floor = dying. Hover to compare this token to the winner target at any age.</div>
+      <div class="corcap"><span id="corverdict"></span> The green cone is the winners' <b style="color:var(--dim)">trajectory</b> score (0–100 — clean distribution + real wallet adoption) as a <b style="color:var(--lime)">mean ± 1 standard deviation</b> band by age, with the concrete <b style="color:var(--lime)">wallet count</b> and <b style="color:var(--dim)">market cap</b> those winners carried at each stage along the bottom. Inside the cone = tracking the winners; below it = drifting; near the floor = dying. Hover to compare this token to the winner target at any age.</div>
     </div>
 
     <h2 class="sec">History — valuation &amp; score over time</h2>
@@ -399,7 +399,9 @@ async function loadHistory(r){
 let CORR=null, DOSSIER=null, CVC, TIPC, GEOC=null;
 const CORCOL={ontrack:"#c8ff4d",behind:"#ffd23d",failing:"#ff3b5c",na:"#7f7f88"};
 function corBinAt(ageH){ if(!CORR||!CORR.length) return null; return CORR.find(b=>ageH>=b.lo&&ageH<b.hi)||CORR[CORR.length-1]; }
-function corStatus(s){ const b=corBinAt(s.ageH); if(!b||s.traj==null) return "na"; if(s.traj<35) return "failing"; return s.traj>=b.q1?"ontrack":"behind"; }
+function corStatus(s){ const b=corBinAt(s.ageH); if(!b||s.traj==null) return "na"; if(s.traj<35) return "failing"; const floor=b.band?b.band[0]:b.q1; return s.traj>=floor?"ontrack":"behind"; }
+// continue the current path with a smooth line through pts (assumes the current point is pts[0]); midpoint quadratics
+function smoothFwd(g,pts){ for(let i=1;i<pts.length-1;i++){const xc=(pts[i].x+pts[i+1].x)/2,yc=(pts[i].y+pts[i+1].y)/2;g.quadraticCurveTo(pts[i].x,pts[i].y,xc,yc);} const l=pts[pts.length-1]; if(pts.length>1) g.quadraticCurveTo(l.x,l.y,l.x,l.y); }
 const ageLab=(h)=>h<1?Math.round(h*60)+"m":h<48?Math.round(h)+"h":Math.round(h/24)+"d";
 const wShort=(n)=>n==null?"—":n>=1000?(n/1000).toFixed(n>=10000?0:1)+"k":String(Math.round(n));
 function setCorVerdict(){
@@ -430,16 +432,26 @@ function drawCorridorChart(hoverIdx=-1){
   // y grid
   g.font="11px Inter,system-ui,sans-serif";g.textBaseline="middle";g.fillStyle="#7f7f88";g.strokeStyle="rgba(255,255,255,.06)";g.lineWidth=1;
   for(let i=0;i<=4;i++){const yy=padT+ih*i/4;g.beginPath();g.moveTo(padL,yy);g.lineTo(W-padR,yy);g.stroke();g.textAlign="right";g.fillText((100-i*25)+"",padL-6,yy);}
-  // corridor boxes (the milestone squares) + median + age tick
-  for(const b of CORR){ const bl=Math.max(b.lo,AGE_LO); if(bl>=AGE_HI) continue; const bh=Math.min(b.hi,AGE_HI);
-    const x=xOf(bl),xw=Math.max(2,xOf(bh)-x),yT=yOf(b.q3),yB=yOf(b.q1);
-    g.fillStyle="rgba(200,255,77,.11)";g.strokeStyle="rgba(200,255,77,.32)";g.lineWidth=1;
-    g.beginPath();g.rect(x+0.5,yT,xw-1.5,yB-yT);g.fill();g.stroke();
-    g.strokeStyle="rgba(200,255,77,.55)";g.setLineDash([4,3]);g.beginPath();g.moveTo(x+0.5,yOf(b.med));g.lineTo(x+xw-1,yOf(b.med));g.stroke();g.setLineDash([]);
-    // stage label + the concrete winner target at this age (wallets + market cap)
-    const cx=x+xw/2; g.textAlign="center";
+  // THE WINNER CONE — a smooth mean ± 1σ band of how past winners' trajectory scores ran by age (replaces the old
+  // discrete boxes). Built from the bin centres; clamped to the visible age range.
+  const cb=CORR.filter(b=>b.band&&b.mean!=null&&(b.mid??(b.lo+b.hi)/2)<=AGE_HI).map(b=>{const a=Math.max(AGE_LO,Math.min(AGE_HI,b.mid??(b.lo+b.hi)/2));return {x:xOf(a),top:yOf(b.band[1]),bot:yOf(b.band[0]),mid:yOf(b.mean)};});
+  if(cb.length>=2){
+    // extend the first/last band point flat to the plot edges so the cone fills the width cleanly
+    const top=[{x:padL,y:cb[0].top},...cb.map(p=>({x:p.x,y:p.top})),{x:W-padR,y:cb[cb.length-1].top}];
+    const bot=[{x:padL,y:cb[0].bot},...cb.map(p=>({x:p.x,y:p.bot})),{x:W-padR,y:cb[cb.length-1].bot}];
+    const mid=[{x:padL,y:cb[0].mid},...cb.map(p=>({x:p.x,y:p.mid})),{x:W-padR,y:cb[cb.length-1].mid}];
+    // filled ribbon (top forward, bottom back) with a soft vertical gradient
+    g.beginPath();g.moveTo(top[0].x,top[0].y);smoothFwd(g,top);const botR=bot.slice().reverse();g.lineTo(botR[0].x,botR[0].y);smoothFwd(g,botR);g.closePath();
+    const grd=g.createLinearGradient(0,padT,0,padT+ih);grd.addColorStop(0,"rgba(200,255,77,.16)");grd.addColorStop(1,"rgba(200,255,77,.05)");g.fillStyle=grd;g.fill();
+    // band edges + mean centre-line
+    g.strokeStyle="rgba(200,255,77,.28)";g.lineWidth=1;g.beginPath();g.moveTo(top[0].x,top[0].y);smoothFwd(g,top);g.stroke();g.beginPath();g.moveTo(bot[0].x,bot[0].y);smoothFwd(g,bot);g.stroke();
+    g.strokeStyle="rgba(200,255,77,.6)";g.lineWidth=1.5;g.setLineDash([5,4]);g.beginPath();g.moveTo(mid[0].x,mid[0].y);smoothFwd(g,mid);g.stroke();g.setLineDash([]);
+  }
+  // concrete winner stage targets (wallets + market cap) along the bottom at each bin centre
+  g.textAlign="center";
+  for(const b of CORR){ const a=b.mid??(b.lo+b.hi)/2; if(a<AGE_LO||a>AGE_HI) continue; const cx=xOf(a);
     g.fillStyle="#9aa091";g.font="10px Inter,system-ui,sans-serif";g.fillText("by "+ageLab(b.hi),cx,H-36);
-    if(b.tw&&xw>46){ g.fillStyle="#c8ff4d";g.font="600 10.5px Inter,system-ui,sans-serif";g.fillText("~"+wShort(b.tw)+" wallets",cx,H-21);
+    if(b.tw){ g.fillStyle="#c8ff4d";g.font="600 10.5px Inter,system-ui,sans-serif";g.fillText("~"+wShort(b.tw)+" wallets",cx,H-21);
       g.fillStyle="#8f9a86";g.font="10px Inter,system-ui,sans-serif";g.fillText(mcT(b.tm),cx,H-7); }
   }
   // token trajectory line through the cone, coloured by inside / below / failing
