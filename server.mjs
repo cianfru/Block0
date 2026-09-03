@@ -19,6 +19,7 @@ import { KV_BACKEND, getJSON, setJSON } from "./store/kv.mjs";
 import { getTransfers } from "./store.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { PROVIDER } from "./rpc.mjs";
+import { traceEvents, discoverDex, DEX_CONFIG } from "./dex.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -170,6 +171,19 @@ createServer(async (req, res) => {
       const out = await _btCache.get(key);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(out));
+    }
+
+    if (u.pathname === "/api/dex/trace") { // report what pool-creation events actually fire on the AMM (identify sigs)
+      const blocks = Number(u.searchParams.get("blocks") || 40000);
+      const address = (u.searchParams.get("address") || DEX_CONFIG.amm).toLowerCase();
+      const out = await traceEvents({ blocks, address });
+      res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify(out));
+    }
+    if (u.pathname === "/api/dex/discover") { // list tokens listed on the DEX over the last N blocks
+      const blocks = Number(u.searchParams.get("blocks") || 200000);
+      const initTopics = (u.searchParams.get("initTopics") || "").split(",").filter(Boolean);
+      const out = await discoverDex({ blocks, initTopics });
+      res.writeHead(200, { "content-type": "application/json" }); return res.end(JSON.stringify(out));
     }
 
     if (u.pathname === "/api/alerts/status") {
