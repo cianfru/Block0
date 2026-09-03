@@ -11,6 +11,7 @@ import { computeRisk, blueprintMatch } from "./intel.mjs";
 import { rpc, hx, toNum, PROVIDER, getTransferLogs, latestBlock, findDeployBlock } from "./rpc.mjs";
 import { estimateBlockAt, chainCalibration, parseTs } from "./store.mjs";
 import { liveTrajectory, corridorBins } from "./model.mjs";
+import { walletPnl, tradesFromTransfers } from "./pnl.mjs";
 
 const ZERO = "0x0000000000000000000000000000000000000000", DEAD = "0x000000000000000000000000000000000000dead";
 const AMM = "0x8366a39cc670b4001a1121b8f6a443a643e40951"; // RH singleton AMM
@@ -201,9 +202,24 @@ export async function backtest(addr, opts = {}) {
     series[k].volUsd = prices[k] != null ? Math.round(series[k].volTok * prices[k]) : null;
   }
 
+  // PER-WALLET PnL: with the price series in hand, replay pool trades through the avg-cost engine so every trader
+  // gets realized (on coins sold) + unrealized (on coins still held) profit. This is what lets the token page show
+  // whether the wallets buying/selling are up or down — and it's the base layer for the follow-worthy list.
+  const priceAt = (ts) => { if (ts == null) return null; const k = Math.min(prices.length - 1, Math.max(0, Math.floor((ts - t0) / step))); return prices[k]; };
+  const curPrice = prices.length ? prices[prices.length - 1] : null;
+  const trades = tradesFromTransfers(sorted, { isBuy, isSell, priceAt });
+  const pnlMap = walletPnl(trades, curPrice);
+  const pnl = [...pnlMap.entries()].map(([a, e]) => ({ a, ...e }))
+    .filter((e) => e.invested > 0 || e.realized !== 0) // real traders only
+    .sort((x, y) => Math.abs(y.pnl) - Math.abs(x.pnl))
+    .slice(0, 100);
+  const traders = pnl.length;
+  const winners = pnl.filter((e) => e.up).length;
+
   return {
     addr, sym: opts.sym, graduated: grad, points: series.length, ethUsd, supply,
     firstPoolBlock: firstPool, snipers: snipers.size, bundles: nBundles,
     t0, t1, transfers: sorted.length, corridor: corridorBins(), series,
+    curPrice, pnl, pnlStats: { traders, winners, winnerPct: traders ? Math.round((winners / traders) * 100) : null },
   };
 }

@@ -6,7 +6,8 @@
   "description": "Block0 — from block zero. Paste a token, watch who's holding and who's dumping, live.",
   "scripts": {
     "start": "node server.mjs",
-    "scan": "node cli.mjs"
+    "scan": "node cli.mjs",
+    "test": "node --test test/*.test.mjs"
   },
   "dependencies": {
     "ws": "^8.21.3"

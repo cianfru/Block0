@@ -21,6 +21,7 @@ import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { PROVIDER } from "./rpc.mjs";
 import { traceEvents, discoverDex, recentDexTokens, DEX_CONFIG } from "./dex.mjs";
 import { walletIntel } from "./wallet.mjs";
+import { buildLeaderboard } from "./leaderboard.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -90,6 +91,34 @@ startAlerts();
 const DEX_REFRESH_MS = Number(process.env.DEX_REFRESH_MS || 300000);
 if (Number(process.env.BOARD_DEX ?? 10) > 0) {
   setTimeout(() => { refreshDex().catch(() => {}); setInterval(() => refreshDex().catch(() => {}), DEX_REFRESH_MS); }, 45000);
+}
+
+// PROVEN-PnL LEADERBOARD refresh — aggregates per-token wallet PnL across the graduated + DEX winners into the
+// "follow the smart money" board. Heavy but reuses cached backtests, so it runs infrequently and off-cycle. The
+// result is cached in KV so a restart (or a second instance) serves instantly while the first rebuild runs.
+const LB_REFRESH_MS = Number(process.env.LEADERBOARD_REFRESH_MS || 30 * 60 * 1000);
+const LB_TOKENS = Number(process.env.LEADERBOARD_TOKENS || 40); // how many winners to aggregate over
+let _leaderboard = null, _lbRunning = false;
+async function refreshLeaderboard() {
+  if (_lbRunning) return; _lbRunning = true;
+  try {
+    const b = getBoard();
+    // winners only: graduated launchpad tokens + DEX-listed tokens, biggest first, deduped
+    const seen = new Set();
+    const tokens = [...(b.graduated || []), ...(b.dex || [])]
+      .filter((t) => t.address && !seen.has(t.address) && seen.add(t.address))
+      .sort((x, y) => (y.mcapUsd || 0) - (x.mcapUsd || 0))
+      .slice(0, LB_TOKENS)
+      .map((t) => ({ address: t.address.toLowerCase(), sym: t.sym }));
+    if (!tokens.length) return;
+    const lb = await buildLeaderboard(tokens, (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 }));
+    _leaderboard = lb;
+    setJSON("leaderboard", lb).catch(() => {});
+  } catch { /* transient — next tick retries */ } finally { _lbRunning = false; }
+}
+if (Number(process.env.LEADERBOARD_ON ?? 1) > 0) {
+  getJSON("leaderboard").then((v) => { if (v) _leaderboard = v; }).catch(() => {});
+  setTimeout(() => { refreshLeaderboard(); setInterval(refreshLeaderboard, LB_REFRESH_MS); }, 90000);
 }
 
 const __dir = fileURLToPath(new URL(".", import.meta.url));
@@ -170,6 +199,14 @@ createServer(async (req, res) => {
       const calls = await getCalls(Number(u.searchParams.get("n") || 100));
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify({ calls }));
+    }
+
+    if (u.pathname === "/api/leaderboard") { // proven-PnL wallets to follow — aggregated across graduated + DEX winners
+      const lb = _leaderboard || await getJSON("leaderboard").catch(() => null);
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      if (!lb) return res.end(JSON.stringify({ computing: true, rows: [] })); // first build not finished yet
+      const n = Math.max(1, Math.min(200, Number(u.searchParams.get("n") || 100)));
+      return res.end(JSON.stringify({ ...lb, rows: (lb.rows || []).slice(0, n) }));
     }
 
     if (u.pathname === "/api/backtest") {
