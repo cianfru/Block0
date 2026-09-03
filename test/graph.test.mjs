@@ -44,6 +44,29 @@ test("dust edge floor drops a small transfer and splits the cluster", () => {
   assert.ok(!c.wallets.includes("w4"));
 });
 
+test("cluster flow lights green when the group is net accumulating over the window", () => {
+  const g = buildGraph(T, { pool: "pool" }); // wide default window → lifetime net, which is positive here
+  const c = g.clusters[0];
+  assert.equal(c.flow, "buy");
+  assert.ok(c.net > 0);
+});
+
+test("cluster flow lights RED when the bundle is selling now (recent window)", () => {
+  // s1 & s2 bundle-buy early, then both dump to the pool much later; a 1h window sees only the dumping
+  const S = [
+    { from: "pool", to: "s1", amt: 100, ts: 1000, block: 10 },
+    { from: "pool", to: "s2", amt: 100, ts: 1000, block: 10 },
+    { from: "s1", to: "pool", amt: 60, ts: 100000, block: 500 },
+    { from: "s2", to: "pool", amt: 50, ts: 100000, block: 501 },
+  ];
+  const g = buildGraph(S, { pool: "pool", window: 3600 });
+  const c = g.clusters[0];
+  assert.equal(c.hasBundle, true);
+  assert.equal(c.flow, "sell");     // the insiders are distributing → red
+  assert.ok(c.net < 0);
+  assert.equal(g.nodes.find((n) => n.a === "s1").flow, "sell");
+});
+
 test("balances and supply share are computed on the nodes", () => {
   const g = buildGraph(T, { pool: "pool" });
   const w1 = g.nodes.find((n) => n.a === "w1");

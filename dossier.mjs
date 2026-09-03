@@ -70,5 +70,11 @@ export async function tokenDossier(address) {
   r.topHolders = whales.slice().sort((a, b) => b.bal - a.bal).slice(0, 12);
   r.deployer = deployerReputation(all, meta); // deployer track record (other launches by the same wallet)
   r.explorer = (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null; // when set, wallet/contract links activate
+  // Wallet identity links for the front-end cards. Zerion supports the Robinhood chain, so a wallet address opens
+  // a real portfolio page — the UI renders a Zerion preview card (bag/PnL we already know) that clicks through to it.
+  r.links = {
+    zerion: (process.env.ZERION_URL || "https://app.zerion.io").replace(/\/$/, ""), // wallet: `${zerion}/${addr}`
+    explorer: r.explorer,
+  };
   return r;
 }

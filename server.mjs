@@ -279,7 +279,8 @@ createServer(async (req, res) => {
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       if (!st.ev || !st.ev.length) return res.end(JSON.stringify({ address, sym: meta?.sym || null, nodes: [], edges: [], clusters: [], stats: { nodes: 0, edges: 0, clusters: 0 }, note: "no transfer history yet" }));
       const g = buildGraph(st.ev, { pool: st.pool || meta?.pool, topN });
-      return res.end(JSON.stringify({ address, sym: meta?.sym || null, name: meta?.name || null, transfers: st.ev.length, ...g }));
+      const links = { zerion: (process.env.ZERION_URL || "https://app.zerion.io").replace(/\/$/, ""), explorer: (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null };
+      return res.end(JSON.stringify({ address, sym: meta?.sym || null, name: meta?.name || null, transfers: st.ev.length, links, ...g }));
     }
 
     if (u.pathname === "/api/token") {

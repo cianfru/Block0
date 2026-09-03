@@ -31,23 +31,30 @@ export function buildGraph(transfers, opts = {}) {
   const snipeBlocks = opts.snipeBlocks ?? 3;
   const topN = opts.topN ?? 80;
   const minEdgeAmt = opts.minEdgeAmt ?? 0; // drop dust transfer edges below this token amount
+  const windowSec = opts.window ?? 86400;  // "are they selling NOW" horizon for the green/red flow (default 24h)
   const extraInfra = new Set((opts.extraInfra || []).map((a) => a.toLowerCase()));
   const isInfra = (a) => a === ZERO || a === DEAD || a === pool || a === AMM || ROUTERS.has(a) || extraInfra.has(a);
   const isBuy = (e) => e.from === pool || e.from === AMM || ROUTERS.has(e.from);
   const isSell = (e) => e.to === pool || e.to === AMM || ROUTERS.has(e.to);
 
+  // recent-flow window is measured back from the latest transfer seen, so a stale token isn't all-flat
+  let maxTs = 0; for (const e of transfers) if (e.ts && e.ts > maxTs) maxTs = e.ts;
+  const cutoff = maxTs ? maxTs - windowSec : 0;
+
   const W = new Map();
-  const get = (a) => { let w = W.get(a); if (!w) W.set(a, w = { a, bal: 0, bought: 0, sold: 0, first: null, firstBlock: null, sniper: false }); return w; };
+  const get = (a) => { let w = W.get(a); if (!w) W.set(a, w = { a, bal: 0, bought: 0, sold: 0, recIn: 0, recOut: 0, first: null, firstBlock: null, sniper: false }); return w; };
   const edgeMap = new Map(); // "lo|hi" -> { a, b, amt, n } : direct holder→holder token moves
   let firstPoolBlock = null;
 
   for (const e of transfers) {
     if (isBuy(e) && firstPoolBlock == null) firstPoolBlock = e.block;
-    if (!isInfra(e.from)) { const w = get(e.from); w.bal -= e.amt; if (isSell(e)) w.sold += e.amt; }
+    const recent = e.ts && e.ts >= cutoff;
+    if (!isInfra(e.from)) { const w = get(e.from); w.bal -= e.amt; if (isSell(e)) w.sold += e.amt; if (recent) w.recOut += e.amt; }
     if (!isInfra(e.to)) {
       const w = get(e.to); w.bal += e.amt;
       if (w.first == null) { w.first = e.ts; w.firstBlock = e.block; }
       if (isBuy(e)) w.bought += e.amt;
+      if (recent) w.recIn += e.amt;
     }
     // a wallet-to-wallet move (neither side infra, not a pool trade) = a coordination edge
     if (!isInfra(e.from) && !isInfra(e.to) && !isBuy(e) && !isSell(e) && e.from !== e.to && e.amt > 0) {
@@ -74,9 +81,13 @@ export function buildGraph(transfers, opts = {}) {
   for (const g of bundleGroups) for (const a of g.wallets) nodeSet.add(a);
 
   const role = (w) => (w.firstBlock != null && bundleGroups.some((g) => g.wallets.includes(w.a))) ? "bundle" : w.sniper ? "sniper" : "holder";
-  const nodes = [...nodeSet].map((a) => { const w = W.get(a); return {
-    a, bal: +Math.max(0, w.bal).toFixed(2), pct: +(Math.max(0, w.bal) / held * 100).toFixed(2),
+  // flow sign from the recent window: net tokens in − out. "sell"/"buy" needs the move to matter vs the position,
+  // so the gate is 1% of the balance (with a tiny floor) — a whale trimming 0.1% is not "distributing".
+  const flowOf = (net, bal) => { const g = Math.max(1e-6, bal * 0.01); return net < -g ? "sell" : net > g ? "buy" : "flat"; };
+  const nodes = [...nodeSet].map((a) => { const w = W.get(a); const bal = Math.max(0, w.bal); const net = w.recIn - w.recOut; return {
+    a, bal: +bal.toFixed(2), pct: +(bal / held * 100).toFixed(2),
     bought: +w.bought.toFixed(2), sold: +w.sold.toFixed(2), first: w.first, firstBlock: w.firstBlock, role: role(w),
+    net: +net.toFixed(2), flow: flowOf(net, bal), // green (buy) / red (sell) / neutral, per wallet
   }; });
 
   // edges: transfer links between two node wallets, above the dust floor
@@ -103,9 +114,13 @@ export function buildGraph(transfers, opts = {}) {
     const wallets = m.map((n) => n.a);
     const memberSet = new Set(wallets);
     const bal = m.reduce((s, n) => s + n.bal, 0);
+    // cluster net flow = the group's EXTERNAL move over the window (internal shuffles cancel), so the whole
+    // cohort lights green (accumulating) or red (the insiders are selling this token now).
+    const net = m.reduce((s, n) => s + n.net, 0);
     const hasBundle = edges.some((e) => e.kind === "bundle" && memberSet.has(e.a) && memberSet.has(e.b));
     const hasSniper = m.some((n) => n.role === "sniper" || n.role === "bundle");
     return { id: `c${i}`, size: m.length, wallets, bal: +bal.toFixed(2), pct: +(bal / held * 100).toFixed(2),
+      net: +net.toFixed(2), flow: flowOf(net, bal), // the group's green/red verdict
       hasBundle, hasSniper, flag: hasBundle || (m.length >= 3 && bal / held > 0.05) };
   }).sort((x, y) => y.pct - x.pct);
 
