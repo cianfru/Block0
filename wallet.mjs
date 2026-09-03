@@ -36,7 +36,7 @@ export async function walletIntel(addr, { topN = 30 } = {}) {
   for (const t of sent) { const a = (t.rawContract?.address || "").toLowerCase(); if (!a || INFRA.has(a)) continue; const e = g(a); e.sold += Number(t.value || 0); e.nSells++; stamp(e, t); }
 
   let arr = [...tok.values()].map((e) => {
-    const net = e.bought - e.sold, held = net > e.bought * 0.02; // still holding if >2% of what it ever bought remains
+    const net = e.bought - e.sold, held = net > e.bought * 0.10; // still meaningfully holding = >10% of what it bought remains
     return { token: e.token, bought: +e.bought.toFixed(2), sold: +e.sold.toFixed(2), net: +net.toFixed(2),
       nBuys: e.nBuys, nSells: e.nSells, first: e.first, last: e.last, held, exited: !held && e.sold > 0 };
   });
