@@ -11,7 +11,7 @@ import { fileURLToPath } from "node:url";
 import { scan, pullTransfers, detectPool, ROUTERS } from "./engine.mjs";
 import { latestBlock } from "./rpc.mjs";
 import { watchLogs, WS_ENABLED } from "./ws.mjs";
-import { refreshBoard, getBoard, ensureFresh } from "./board.mjs";
+import { refreshBoard, refreshDex, getBoard, ensureFresh } from "./board.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON } from "./alerts.mjs";
@@ -84,6 +84,12 @@ setInterval(() => refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).ca
 
 // launch alert push (Telegram) — dormant unless TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set
 startAlerts();
+
+// DEX discovery on its own interval (decoupled from the Pons board; first run staggered ~45s after boot)
+const DEX_REFRESH_MS = Number(process.env.DEX_REFRESH_MS || 300000);
+if (Number(process.env.BOARD_DEX ?? 10) > 0) {
+  setTimeout(() => { refreshDex().catch(() => {}); setInterval(() => refreshDex().catch(() => {}), DEX_REFRESH_MS); }, 45000);
+}
 
 const __dir = fileURLToPath(new URL(".", import.meta.url));
 const PORT = process.env.PORT || 8080;

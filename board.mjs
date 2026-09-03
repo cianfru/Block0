@@ -58,30 +58,34 @@ export async function refreshBoard() {
     for (const m of gradPick) { try { graduated.push(await verdict(m)); } catch { /* skip */ } }
     cooking.sort((a, b) => (b.progress || 0) - (a.progress || 0) || a.risk - b.risk);
     graduated.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0));
-
-    // DEX-listed tokens (non-Pons, discovered on the v4 AMM) — verdicted the SAME way, venue-labeled. Soft-fails so
-    // it can never break the Pons board. Deduped against the whole Pons universe (a graduated Pons token is also on
-    // the AMM) and bounded to protect Alchemy. No bonding curve → these are their own "direct listing" category.
-    let dex = CACHE.dex || [];
-    if (N_DEX > 0) try {
-      const ponsAll = new Set([...(active.items || []), ...(grad.items || [])].map((t) => (t.address || "").toLowerCase()));
-      const cand = await recentDexTokens({ blocks: Number(process.env.DEX_BLOCKS || 80000), limit: N_DEX * 3 });
-      const picks = (cand.tokens || []).filter((m) => !ponsAll.has(m.address)).slice(0, N_DEX);
-      const dnew = [];
-      for (const m of picks) {
-        try {
-          const v = await verdict({ address: m.address, sym: m.symbol, name: m.name || null, pool: null, graduated: false, launchedAt: null });
-          if ((v.flags?.holders || 0) >= DEX_MIN_HOLDERS) { v.venue = m.venue; v.dexBlock = m.block; dnew.push(v); }
-        } catch { /* skip */ }
-      }
-      if (dnew.length) { dnew.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0)); dex = dnew; }
-    } catch { /* keep last DEX set on failure */ }
-
-    keep([...cooking, ...graduated, ...dex].map((r) => r.address)); // bound store memory to the live board
+    keep([...cooking, ...graduated, ...(CACHE.dex || [])].map((r) => r.address)); // bound store memory to the live board
+    PONS_ADDRS = new Set([...(active.items || []), ...(grad.items || [])].map((t) => (t.address || "").toLowerCase()));
     BOOTED = true;
-    CACHE = { updated: Date.now(), scanning: false, cooking, graduated, dex,
-      stats: { launchTotal: active.launchTotal, activeTotal: active.total, graduatedTotal: grad.total, dexTotal: dex.length, store: storeStats() } };
+    CACHE = { updated: Date.now(), scanning: false, cooking, graduated, dex: CACHE.dex || [],
+      stats: { launchTotal: active.launchTotal, activeTotal: active.total, graduatedTotal: grad.total, dexTotal: (CACHE.dex || []).length, store: storeStats() } };
   } finally { CACHE = { ...CACHE, scanning: false }; }
+  return CACHE;
+}
+
+// DEX discovery runs on its OWN interval, decoupled from the Pons board so its (slower) Alchemy verdicts never delay
+// the core board. Discovers recent non-Pons v4 listings, dedupes against the Pons universe, verdicts a bounded set,
+// keeps ones above the spam floor, and merges into CACHE.dex.
+let DEX_SCANNING = false, PONS_ADDRS = new Set();
+export async function refreshDex() {
+  if (DEX_SCANNING || N_DEX <= 0) return CACHE;
+  DEX_SCANNING = true;
+  try {
+    const cand = await recentDexTokens({ blocks: Number(process.env.DEX_BLOCKS || 80000), limit: N_DEX * 3 });
+    const picks = (cand.tokens || []).filter((m) => !PONS_ADDRS.has(m.address)).slice(0, N_DEX);
+    const dnew = [];
+    for (const m of picks) {
+      try {
+        const v = await verdict({ address: m.address, sym: m.symbol, name: m.name || null, pool: null, graduated: false, launchedAt: null });
+        if ((v.flags?.holders || 0) >= DEX_MIN_HOLDERS) { v.venue = m.venue; v.dexBlock = m.block; dnew.push(v); }
+      } catch { /* skip */ }
+    }
+    if (dnew.length) { dnew.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0)); CACHE = { ...CACHE, dex: dnew }; }
+  } catch { /* keep last DEX set */ } finally { DEX_SCANNING = false; }
   return CACHE;
 }
 
