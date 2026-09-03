@@ -162,7 +162,10 @@ async function poll() {
 if (!WS_ENABLED) setInterval(poll, POLL_MS);
 
 async function serveStatic(res, urlPath) {
-  const route = urlPath === "/" ? "board.html" : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
+  const route = urlPath === "/" ? "landing.html"
+    : (urlPath === "/board" || urlPath === "/board.html") ? "board.html"
+    : (urlPath === "/leaderboard" || urlPath === "/leaderboard.html") ? "leaderboard.html"
+    : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
     : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html"
     : (urlPath === "/terms" || urlPath === "/terms.html") ? "terms.html" : null;
   const file = route || urlPath.replace(/^\//, "");
@@ -207,9 +210,10 @@ createServer(async (req, res) => {
     if (u.pathname === "/api/leaderboard") { // proven-PnL wallets to follow — aggregated across graduated + DEX winners
       const lb = _leaderboard || await getJSON("leaderboard").catch(() => null);
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-      if (!lb) return res.end(JSON.stringify({ computing: true, rows: [] })); // first build not finished yet
+      const links = { zerion: (process.env.ZERION_URL || "https://app.zerion.io").replace(/\/$/, ""), explorer: (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null };
+      if (!lb) return res.end(JSON.stringify({ computing: true, rows: [], links })); // first build not finished yet
       const n = Math.max(1, Math.min(200, Number(u.searchParams.get("n") || 100)));
-      return res.end(JSON.stringify({ ...lb, rows: (lb.rows || []).slice(0, n) }));
+      return res.end(JSON.stringify({ ...lb, links, rows: (lb.rows || []).slice(0, n) }));
     }
 
     if (u.pathname === "/api/backtest") {

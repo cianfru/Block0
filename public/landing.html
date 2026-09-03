@@ -1,0 +1,142 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block0 — Should I ape? Check before you find out.</title>
+<meta name="description" content="Block0 grades every launch on the Robinhood Chain — snipers, bundles, concentration, live insider dumping — reconstructed from public on-chain data. Signal, not proof.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav">
+      <a href="/board">Board</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/token">Dossier</a>
+      <a href="/methodology">Methodology</a>
+    </nav>
+    <div class="hd-r">
+      <span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span>
+      <button class="btn-connect" id="connect">Connect</button>
+    </div>
+  </div>
+  <div class="gatebar" id="gatebar" hidden></div>
+</header>
+
+<main class="wrap">
+  <!-- Hero -->
+  <section class="hero">
+    <p class="micro eye">the launch scanner for the robinhood chain</p>
+    <h1>Should I ape?<br><em>Check before you find out.</em></h1>
+    <p class="lede">Block0 watches every launch on the Robinhood Chain, reconstructs the truth from public on-chain data, and grades it — snipers, bundles, concentration, live insider dumping — so you know what's safe to touch at a glance.</p>
+    <form class="scan" onsubmit="return scan(event)">
+      <input id="addr" placeholder="Paste a contract address — or don't, the board is live" autocomplete="off">
+      <button class="go" type="submit">Scan it</button>
+    </form>
+    <div class="herochips">
+      <span class="chip"><span class="live-dot"></span> board updating live</span>
+      <span class="chip">no signing · read-only</span>
+      <a class="chip" href="/board">open the board →</a>
+    </div>
+    <div class="ticker"><div class="run" id="ticker"></div></div>
+  </section>
+
+  <!-- Live board preview -->
+  <section class="sec">
+    <div class="stitle"><p class="micro eye">the board</p><h2>A live grid of launches, each with its verdict</h2><p class="sub">Risk score 0–100, four sub-scores, blueprint fit and corridor pace — plus a plain-words alert when something is happening right now.</p></div>
+    <div class="grid" id="preview"><div class="state">Loading live launches…</div></div>
+    <a class="seeall" href="/board">See all launches</a>
+  </section>
+
+  <!-- Pillars -->
+  <section class="sec">
+    <div class="stitle"><p class="micro eye">the moat</p><h2>Most launch tools are black boxes. This one shows its work.</h2><p class="sub">Radical transparency is the product. A trader can't trust a number they can't check, so every score is a published formula over public data — and the model's measured accuracy is published too.</p></div>
+    <div class="pillars">
+      <div class="panel panel-hover pillar"><span class="dot" style="background:#35e6e0;box-shadow:0 0 8px #35e6e0"></span><h3>Two venues, told apart</h3><p>Launchpad tokens on the Pons bonding curve — cooking, then graduated — and raw Uniswap-v4 listings that are live from block one. You always know which one you're reading.</p></div>
+      <div class="panel panel-hover pillar"><span class="dot" style="background:#c8ff4d;box-shadow:0 0 8px #c8ff4d"></span><h3>The winner corridor</h3><p>We don't just flag risk. We place a live token against the fingerprint of past winners: concrete wallet and market-cap targets per stage, with this token's path drawn through them.</p></div>
+      <div class="panel panel-hover pillar"><span class="dot" style="background:#ff5cf0;box-shadow:0 0 8px #ff5cf0"></span><h3>Wallets across every token</h3><p>Click any seller and see their whole footprint — what they hold, what they exited, whether they flip. Follow the smart money, not the influencer.</p></div>
+      <div class="panel panel-hover pillar"><span class="dot" style="background:#ffd23d;box-shadow:0 0 8px #ffd23d"></span><h3>Honest by default</h3><p>Every number shows its method and caveat. Estimates look like estimates. There is no buy button anywhere in this product, and there never will be.</p></div>
+    </div>
+  </section>
+
+  <!-- Accuracy -->
+  <section class="sec">
+    <div class="stitle"><p class="micro eye">uncomfortable honesty</p><h2>We publish where the signal doesn't work</h2><p class="sub">A fresh launch's first ~30 minutes is a measured coin-flip. The UI says too early to call — it doesn't fake a verdict. AUC measures how well the model separates eventual winners from losers at each age.</p></div>
+    <div class="panel" id="acc"><div class="state">Loading measured accuracy…</div></div>
+    <p class="caveat">Re-measured on every model rebuild and published in full on the <a href="/methodology">methodology page</a>. In-sample separation on the study cohort — not out-of-sample proof.</p>
+  </section>
+
+  <!-- Access -->
+  <section class="sec">
+    <div class="panel access">
+      <p class="micro eye">access</p>
+      <h2>Token-gated, read-only<span class="blink">_</span></h2>
+      <p>Connect an EVM wallet, we read your Block0-token balance, and if it clears the threshold you're in. No signing, no transactions, no custody — a pure balance check. The gate stays open while tokenomics are being finalised.</p>
+      <div class="btns"><a class="btn-lime" href="/board">Open the board</a><a class="btn-ghost" href="/methodology">Read the methodology</a></div>
+      <p class="caveat" style="text-align:center;margin-left:auto;margin-right:auto">Signal, not proof — never a buy recommendation.</p>
+    </div>
+  </section>
+</main>
+
+<footer class="ft">
+  <div class="ft-in">
+    <div class="ft-top">
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p></div>
+      <div class="ft-cols">
+        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Token dossier</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+      </div>
+    </div>
+    <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
+  </div>
+</footer>
+
+<script src="/block0-cards.js"></script>
+<script>
+const $=(s)=>document.querySelector(s);
+function scan(e){e.preventDefault();const v=$("#addr").value.trim();location.href=/^0x[0-9a-fA-F]{40}$/.test(v)?"/token?address="+v:"/board";return false;}
+$("#connect").addEventListener("click",()=>{const b=$("#connect"),g=$("#gatebar");b.textContent="Reading balance…";
+  setTimeout(()=>{b.textContent="Access granted";g.hidden=false;g.textContent="Read-only balance check — no signing, no transactions, no custody. The gate is open while the Block0 token is unset.";},1100);});
+function tickerFrom(b){
+  const items=[];const all=(b.cooking||[]).concat(b.graduated||[],b.dex||[]);
+  for(const r of all.slice(0,8)){
+    if(r.flags&&r.flags.insiderSellersNow)items.push({t:`▼ ${r.flags.insiderSellersNow} selling ${r.sym}`,c:"#ff3b5c"});
+    else if(r.ageH<0.5)items.push({t:`${r.sym} · too early to call`,c:"#ffd23d"});
+    else if(r.venue==="uniswap-v4")items.push({t:`${r.sym} · uniswap-v4 listing`,c:"#ff5cf0"});
+    else if(r.risk<25)items.push({t:`✓ ${r.sym} looks clean`,c:"#c8ff4d"});
+    else if(r.corridor)items.push({t:`${r.sym} corridor ${r.corridor.status}`,c:r.corridor.status==="on-track"?"#c8ff4d":"#ffd23d"});
+    else items.push({t:`${r.sym} risk ${r.risk}`,c:"#b6b6bd"});
+  }
+  const s=b.stats||{};if(s.launchTotal)items.push({t:`${s.launchTotal.toLocaleString()} launches scanned`,c:"#b6b6bd"});
+  if(!items.length)items.push({t:"scanning the launch universe…",c:"#b6b6bd"});
+  const run=items.concat(items);
+  $("#ticker").innerHTML=run.map(x=>`<span style="color:${x.c}">${x.t}</span>`).join("");
+}
+async function loadBoard(){try{
+  const b=await fetch("/api/board").then(r=>r.json());
+  tickerFrom(b);
+  const all=(b.cooking||[]).slice().concat(b.dex||[]).sort((a,b)=>a.risk-b.risk);
+  const four=(all.length?all:(b.graduated||[])).slice(0,4);
+  $("#preview").innerHTML=four.length?four.map((r,i)=>B0.tokenCard(r,i)).join(""):'<div class="state">Board warming up — the first scan takes a moment…</div>';
+}catch(e){$("#preview").innerHTML='<div class="state">Board unavailable — retrying…</div>';setTimeout(loadBoard,8000);}}
+async function loadAcc(){try{
+  const v=await fetch("/api/validation").then(r=>r.json());
+  const bins=v.perBin||[];
+  if(!bins.length){$("#acc").innerHTML='<div class="state">Accuracy publishes after the first model build.</div>';return;}
+  $("#acc").innerHTML=bins.map(r=>{
+    const c=r.auc<0.6?"#ff3b5c":r.auc<0.75?"#ffd23d":"#c8ff4d";
+    const note=r.auc<0.6?"a measured coin-flip — too early to call":r.auc<0.75?"first usable separation":r.auc<0.9?"the signal matures":"clean separation";
+    return `<div class="acc-row"><span class="band">${r.age}</span><div class="track"><div class="fill" style="width:${Math.round(r.auc*100)}%;background:${c};box-shadow:0 0 9px ${c}99"></div></div><span class="auc tnum" style="color:${c}">${r.auc.toFixed(2)}</span><span class="note">${note} · ${r.nW}W / ${r.nL}L</span></div>`;
+  }).join("");
+}catch(e){$("#acc").innerHTML='<div class="state">Accuracy unavailable.</div>';}}
+loadBoard();loadAcc();setInterval(loadBoard,30000);
+</script>
+</body>
+</html>

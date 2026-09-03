@@ -1,0 +1,81 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Block0 — Follow the smart money</title>
+<meta name="description" content="Wallets with proven positive PnL across the Robinhood Chain's winners — who bought low and sold high, ranked by realised profit. Signal, not proof.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav">
+      <a href="/board">Board</a>
+      <a href="/leaderboard" class="on">Leaderboard</a>
+      <a href="/token">Dossier</a>
+      <a href="/methodology">Methodology</a>
+    </nav>
+    <div class="hd-r">
+      <span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span>
+      <button class="btn-connect" id="connect">Connect</button>
+    </div>
+  </div>
+  <div class="gatebar" id="gatebar" hidden></div>
+</header>
+
+<main class="wrap">
+  <section class="sec">
+    <div class="sec-head">
+      <div>
+        <p class="micro eye">follow the smart money</p>
+        <h1>Wallets that actually made money</h1>
+      </div>
+      <div class="statchips" id="statchips"></div>
+    </div>
+    <p class="sub" style="color:var(--dim);max-width:70ch;margin-top:12px;font-size:.92rem;line-height:1.6">Every wallet's realised profit summed across the graduated and DEX winners — who bought low and sold high, across how many launches, and whether they're still holding. Ranked by realised cash taken out, not paper gains. Click through to the full Zerion portfolio.</p>
+
+    <div class="lb" id="lb"><div class="state">Building the leaderboard…</div></div>
+
+    <p class="caveat">PnL is swap-implied — reconstructed from public transfers, not broker statements. A wallet needs real capital deployed and a real realised gain on a launch to appear; coins with an unknown cost basis are credited zero profit, so figures understate rather than overstate. Signal, not proof — never a recommendation to copy a trade.</p>
+  </section>
+</main>
+
+<footer class="ft">
+  <div class="ft-in">
+    <div class="ft-top">
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p></div>
+      <div class="ft-cols">
+        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Token dossier</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+      </div>
+    </div>
+    <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
+  </div>
+</footer>
+
+<script src="/block0-cards.js"></script>
+<script>
+const $=(s)=>document.querySelector(s);
+$("#connect").addEventListener("click",()=>{const b=$("#connect"),g=$("#gatebar");b.textContent="Reading balance…";
+  setTimeout(()=>{b.textContent="Access granted";g.hidden=false;g.textContent="Read-only balance check — no signing, no transactions, no custody.";},1100);});
+const ZERION="https://app.zerion.io";
+async function load(){try{
+  const d=await fetch("/api/leaderboard?n=100").then(r=>r.json());
+  const zb=(d.links&&d.links.zerion)||ZERION;
+  const rows=d.rows||[];
+  if(d.computing&&!rows.length){$("#lb").innerHTML='<div class="state">Crunching the winners\' trade histories — the first build takes a few minutes. Check back shortly.</div>';setTimeout(load,30000);return;}
+  if(!rows.length){$("#lb").innerHTML='<div class="state">No proven-PnL wallets yet — the board needs more graduated winners to aggregate over.</div>';return;}
+  $("#statchips").innerHTML=`<span class="chip"><span class="live-dot"></span> ${rows.length} wallets</span>`+(d.tokensScanned?`<span class="chip tnum">${d.tokensScanned} winners scanned</span>`:"");
+  $("#lb").innerHTML=rows.map((w,i)=>B0.leaderRow(w,i+1,zb)).join("");
+}catch(e){$("#lb").innerHTML='<div class="state">Leaderboard unavailable — retrying…</div>';setTimeout(load,10000);}}
+load();
+</script>
+</body>
+</html>
