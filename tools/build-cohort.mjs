@@ -16,11 +16,17 @@
 import { mkdirSync, writeFileSync } from "node:fs";
 import { fetchActive, fetchGraduated } from "../pons.mjs";
 import { backtest } from "../backtest.mjs";
+import { discoverDex, tokenMeta } from "../dex.mjs";
 
 const arg = Object.fromEntries(process.argv.slice(2).map((a) => { const [k, v] = a.replace(/^--/, "").split("="); return [k, v ?? true]; }));
 const N_WIN = Number(arg.winners || 12), N_LOSE = Number(arg.losers || 30);
 const MIN_LOSER_AGE_H = Number(arg.minLoserAgeH || 48), MAX_LOSER_MCAP = Number(arg.maxLoserMcap || 60000);
 const POINTS = Number(arg.points || 90);
+// DEX cohort (--dex): mine non-Pons Uniswap-v4 listings — the gold mine for a bigger, better-fit model. We backtest
+// a bounded set of discovered tokens and classify each by its OUTCOME (final reconstructed mcap + holders).
+const DEX_BLOCKS = Number(arg.dexBlocks || 1_500_000), DEX_CAP = Number(arg.dexCap || 120);
+const DEX_WIN_MCAP = Number(arg.dexWinMcap || 300000), DEX_WIN_HOLDERS = Number(arg.dexWinHolders || 150);
+const DEX_LOSE_MCAP = Number(arg.dexLoseMcap || 15000);
 const ageH = (t) => t.launchedAt ? (Date.now() - Date.parse(t.launchedAt)) / 3.6e6 : 0;
 const key = (sym) => (sym || "?").replace(/\s+/g, "_");
 
@@ -60,9 +66,40 @@ for (const m of losers) {
   } catch (e) { skip++; console.log("  skip loser", m.sym, e.message); }
 }
 
+// ─── DEX cohort (non-Pons Uniswap-v4 listings) — the gold mine ───────────────────────────────────────
+const dexBoard = []; // {sym, mcapUsd} for board.json currentMc
+if (arg.dex) {
+  const $ = (x) => x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1e3 ? "$" + Math.round(x / 1e3) + "k" : "$" + Math.round(x || 0);
+  console.log(`\n=== DEX cohort · scanning ${DEX_BLOCKS.toLocaleString()} blocks for listings ===`);
+  const { tokens } = await discoverDex({ blocks: DEX_BLOCKS });
+  const cand = tokens.sort((a, b) => b.block - a.block).slice(0, DEX_CAP);
+  console.log(`discovered ${tokens.length} DEX tokens · profiling ${cand.length} (win ≥ ${$(DEX_WIN_MCAP)}/${DEX_WIN_HOLDERS} holders · lose < ${$(DEX_LOSE_MCAP)})`);
+  let dw = 0, dl = 0, prof = 0;
+  for (const t of cand) {
+    let m; try { m = await tokenMeta(t.address); } catch { continue; }
+    if (!m.symbol || !(m.supply > 0)) continue;
+    let r; try { r = await backtest(t.address, { sym: m.symbol, graduated: false, points: POINTS }); } catch { continue; }
+    if (r.error || !r.series?.length) continue;
+    prof++;
+    const last = r.series[r.series.length - 1], mcap = last.mcap || 0, holders = last.holders || 0;
+    const k = `${key(m.symbol)}_${t.address.slice(2, 8)}`; // unique across Pons + DEX + same-symbol DEX tokens
+    r.sym = k; r.mcapUsd = Math.round(mcap); r.name = m.name || m.symbol; r.venue = "uniswap-v4";
+    if (mcap >= DEX_WIN_MCAP && holders >= DEX_WIN_HOLDERS) {
+      const j = JSON.stringify(r); writeFileSync(`profiles/${k}.json`, j); writeFileSync(`winners_full/${k}.json`, j);
+      dexBoard.push({ sym: k, mcapUsd: r.mcapUsd }); dw++; ok++;
+      console.log(`  ✓ DEX WINNER ${m.symbol.padEnd(12)} ${$(mcap).padStart(7)} · ${holders} holders`);
+    } else if (mcap < DEX_LOSE_MCAP || holders < 30) {
+      const kind = mcap < 2000 ? "dead" : "faded";
+      writeFileSync(`losers/${k}.json`, JSON.stringify(r));
+      loserMeta[kind].push({ sym: k, mcapUsd: r.mcapUsd, kind }); dl++; ok++;
+    }
+  }
+  console.log(`DEX cohort: ${dw} winners · ${dl} losers (from ${prof} profiled)`);
+}
+
 // metadata the study builders read
 writeFileSync("losers.json", JSON.stringify(loserMeta));
-writeFileSync("board.json", JSON.stringify({ cooking: [], graduated: grad.items.map((t) => ({ sym: t.sym, mcapUsd: t.mcapUsd })) }));
+writeFileSync("board.json", JSON.stringify({ cooking: [], graduated: [...grad.items.map((t) => ({ sym: t.sym, mcapUsd: t.mcapUsd })), ...dexBoard] }));
 
 console.log(`\ndone — ${ok} backtests written, ${skip} skipped.`);
 console.log("next: node tools/corridor.mjs && node tools/projection.mjs && node tools/gen-model.mjs && node tools/validate.mjs");

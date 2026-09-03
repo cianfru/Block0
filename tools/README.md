@@ -15,6 +15,12 @@ cohort backtests ──► study/*.json ──► model.json
    into `winners_full/`, `profiles/`, and `losers/` (plus `board.json`, `losers.json`). This is the only step that
    needs an RPC, so it runs offline, not in the deploy. Widen the cohort as the launchpad grows:
    `node tools/build-cohort.mjs --winners=16 --losers=40`.
+   - **Add DEX winners (the gold mine)** with `--dex`: discovers non-Pons Uniswap-v4 listings on-chain, backtests a
+     bounded set, and classifies each by OUTCOME (final reconstructed mcap + holders) — winners (≥ `--dexWinMcap`
+     mcap and `--dexWinHolders` holders) join the winner cohort, faded ones join the losers. This grows the study
+     far past the handful of Pons graduations. Tunables: `--dexBlocks` (scan depth), `--dexCap` (how many to profile),
+     `--dexWinMcap`, `--dexWinHolders`, `--dexLoseMcap`. Example:
+     `node tools/build-cohort.mjs --dex --dexBlocks=2000000 --dexCap=150`.
 
 2. **Build the study data** (from the scanner root, with the cohort dirs present):
    - `node tools/corridor.mjs`   → `study/corridor_data.json`   — per-age trajectory envelope (winner q1/med/q3 by age bin)

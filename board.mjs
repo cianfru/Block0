@@ -54,8 +54,11 @@ export async function refreshBoard() {
     const activePick = active.items.filter((t) => t.address && t.mcapUsd > 0).slice(0, N_ACTIVE);
     const gradPick = grad.items.filter((t) => t.address).sort((a, b) => b.mcapUsd - a.mcapUsd).slice(0, N_GRAD);
     const cooking = [], graduated = [];
-    for (const m of activePick) { try { cooking.push(await verdict(m)); } catch { /* skip */ } }
-    for (const m of gradPick) { try { graduated.push(await verdict(m)); } catch { /* skip */ } }
+    // publish progressively as each token is verdicted, so a slow/throttled scan surfaces data immediately instead
+    // of showing nothing until all 40 finish (which under Alchemy pressure could be minutes).
+    const publish = () => { CACHE = { ...CACHE, scanning: true, updated: Date.now(), cooking: cooking.slice(), graduated: graduated.slice(), dex: CACHE.dex || [] }; };
+    for (const m of activePick) { try { cooking.push(await verdict(m)); publish(); } catch { /* skip */ } }
+    for (const m of gradPick) { try { graduated.push(await verdict(m)); publish(); } catch { /* skip */ } }
     cooking.sort((a, b) => (b.progress || 0) - (a.progress || 0) || a.risk - b.risk);
     graduated.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0));
     keep([...cooking, ...graduated, ...(CACHE.dex || [])].map((r) => r.address)); // bound store memory to the live board
