@@ -153,7 +153,7 @@ createServer(async (req, res) => {
       return res.end(JSON.stringify({
         ok: healthy, uptimeS: Math.round(process.uptime()),
         board: { updated: b.updated || null, ageSeconds: ageMs == null ? null : Math.round(ageMs / 1000), scanning: !!b.scanning,
-          cooking: (b.cooking || []).length, graduated: (b.graduated || []).length, store: b.stats?.store || null },
+          cooking: (b.cooking || []).length, graduated: (b.graduated || []).length, dex: (b.dex || []).length, store: b.stats?.store || null },
         rpc: { provider: PROVIDER }, alerts: { on: ALERTS_ON }, storage: { backend: KV_BACKEND },
       }));
     }
