@@ -28,15 +28,15 @@ jobs:
     permissions:
       contents: write
     env:
-      RPC_URL: ${{ secrets.ALCHEMY_RPC_URL }}      # heavy transfer pulls (Alchemy)
+      RPC_URL: ${{ secrets.ALCHEMY_RPC_URL || secrets.RPC_URL || secrets.ALCHEMY_URL }}  # heavy transfer pulls (Alchemy)
       DEX_RPC: https://rpc.mainnet.chain.robinhood.com  # wide log scans (native RH node)
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "20" }
+        with: { node-version: "22" }
       - name: Guard — RPC secret present
         run: |
-          if [ -z "$RPC_URL" ]; then echo "::error::ALCHEMY_RPC_URL secret not set — add your Alchemy HTTPS endpoint under Settings → Secrets → Actions."; exit 1; fi
+          if [ -z "$RPC_URL" ]; then echo "::error::No Alchemy endpoint found. Add a GitHub REPO SECRET (not a Railway var) named ALCHEMY_RPC_URL (or RPC_URL) = your Alchemy HTTPS URL, under the repo's Settings → Secrets and variables → Actions → New repository secret."; exit 1; fi
       - name: Backtest the cohort (Pons + DEX winners)
         run: |
           node tools/build-cohort.mjs \
