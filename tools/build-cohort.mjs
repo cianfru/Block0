@@ -20,12 +20,12 @@ import { discoverDex, tokenMeta } from "../dex.mjs";
 import { isTokenizedStock } from "../intel.mjs";
 
 const arg = Object.fromEntries(process.argv.slice(2).map((a) => { const [k, v] = a.replace(/^--/, "").split("="); return [k, v ?? true]; }));
-const N_WIN = Number(arg.winners || 12), N_LOSE = Number(arg.losers || 30);
+const N_WIN = Number(arg.winners || 24), N_LOSE = Number(arg.losers || 100);
 const MIN_LOSER_AGE_H = Number(arg.minLoserAgeH || 48), MAX_LOSER_MCAP = Number(arg.maxLoserMcap || 60000);
 const POINTS = Number(arg.points || 90);
 // DEX cohort (--dex): mine non-Pons Uniswap-v4 listings — the gold mine for a bigger, better-fit model. We backtest
 // a bounded set of discovered tokens and classify each by its OUTCOME (final reconstructed mcap + holders).
-const DEX_BLOCKS = Number(arg.dexBlocks || 1_500_000), DEX_CAP = Number(arg.dexCap || 120);
+const DEX_BLOCKS = Number(arg.dexBlocks || 2_500_000), DEX_CAP = Number(arg.dexCap || 300);
 const DEX_WIN_MCAP = Number(arg.dexWinMcap || 300000), DEX_WIN_HOLDERS = Number(arg.dexWinHolders || 150);
 const DEX_LOSE_MCAP = Number(arg.dexLoseMcap || 15000);
 const ageH = (t) => t.launchedAt ? (Date.now() - Date.parse(t.launchedAt)) / 3.6e6 : 0;

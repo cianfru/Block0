@@ -10,10 +10,10 @@ on:
   workflow_dispatch:
     inputs:
       dex:            { description: "Include DEX winners", type: boolean, default: true }
-      winners:        { description: "Pons winners (top graduated)", default: "16" }
-      losers:         { description: "Pons losers (aged/faded)", default: "40" }
-      dexBlocks:      { description: "DEX scan depth (blocks)", default: "2000000" }
-      dexCap:         { description: "DEX tokens to profile", default: "150" }
+      winners:        { description: "Pons winners (top graduated)", default: "24" }
+      losers:         { description: "Pons losers (aged/faded)", default: "120" }
+      dexBlocks:      { description: "DEX scan depth (blocks)", default: "2500000" }
+      dexCap:         { description: "DEX tokens to profile (now chain-wide: v2/v3/v4)", default: "400" }
   schedule:
     - cron: "17 6 * * 1"   # Mondays 06:17 UTC — keep the model fresh weekly
 
@@ -24,7 +24,7 @@ concurrency:
 jobs:
   rebuild:
     runs-on: ubuntu-latest
-    timeout-minutes: 90
+    timeout-minutes: 150   # bigger chain-wide cohort (v2/v3/v4) = more backtests; give it room
     permissions:
       contents: write
     env:

@@ -169,7 +169,7 @@
     <div class="stitle"><p class="micro eye">measured, not marketed</p><h2>How often it catches a winner — and how often it's fooled</h2><p class="sub">The model's rule is simple: is a token tracking inside the winner corridor for its age? Here's how that rule scores — each eventual <b style="color:var(--lime)">winner tested against a corridor rebuilt without it</b> (held-out), and every <b style="color:var(--coral)">loser measured against a corridor it never shaped</b>. The gap between the two is the signal.</p></div>
     <div id="track"></div>
     <div class="panel" id="acc"><div class="state">Loading measured accuracy…</div></div>
-    <p class="caveat">Winners are scored leave-one-out; losers are out-of-sample by construction. A small, young cohort — every count is shown, and this is honest separation, not a long-run track record. Full table on the <a href="/methodology">methodology page</a>, re-measured on every rebuild.</p>
+    <p class="caveat">Winners are scored leave-one-out; losers are out-of-sample by construction. Measured on <span id="cohortsize">the study cohort</span> — every count is shown, and this is honest separation, not a long-run track record (that's the live forward record above). The cohort grows with every rebuild as more launches resolve across all factories. Full table on the <a href="/methodology">methodology page</a>.</p>
   </section>
 
   <!-- Access -->
@@ -229,7 +229,8 @@ async function loadAcc(){try{
   const v=await fetch("/api/validation").then(r=>r.json());
   // honest, checkable hero stat — the real fade rate from the published winner study
   if(v.cohort&&v.cohort.winners!=null&&v.cohort.losers!=null){const w=v.cohort.winners,l=v.cohort.losers,tot=w+l;
-    if(tot>0)$("#cohortstat").innerHTML=`<span class="live-dot"></span> ${Math.round(l/tot*100)}% of ${tot} studied launches faded`;}
+    if(tot>0)$("#cohortstat").innerHTML=`<span class="live-dot"></span> ${Math.round(l/tot*100)}% of ${tot} studied launches faded`;
+    const cs=$("#cohortsize"); if(cs&&tot>0) cs.textContent=`${w} winners vs ${l} losers studied so far`;}
   const bins=(v.perBin||[]).filter(r=>r.catchLOO!=null);
   if(!bins.length){$("#acc").innerHTML='<div class="state">Accuracy publishes after the first model build.</div>';return;}
   const pc=(x)=>x==null?"—":Math.round(x*100)+"%";
