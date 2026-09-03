@@ -435,13 +435,16 @@ function drawCorridorChart(hoverIdx=-1){
   const tokMax=(SERIES[SERIES.length-1].ageH)||1, AGE_LO=0.15, maxBinHi=CORR[CORR.length-1].hi;
   const AGE_HI=Math.min(maxBinHi,Math.max(tokMax*1.4,4));
   const lx=(a)=>Math.log10(Math.max(AGE_LO,a)), x0=lx(AGE_LO), x1=lx(AGE_HI);
-  const xOf=(a)=>padL+(lx(a)-x0)/(x1-x0)*iw, yOf=(t)=>padT+ih-(cl(t)/100)*ih;
+  // reserve headroom: score 100 sits 12% down from the top and 0 sits 4% up from the bottom, so a cone/trajectory
+  // that maxes out never pins to the ceiling — there's always breathing room above and below.
+  const yTop=padT+ih*0.12, yBot=padT+ih*0.96;
+  const xOf=(a)=>padL+(lx(a)-x0)/(x1-x0)*iw, yOf=(t)=>yTop+(1-cl(t)/100)*(yBot-yTop);
   const inR=(a)=>a>=AGE_LO&&a<=AGE_HI;
   const pts=SERIES.filter(s=>s.ageH>=AGE_LO&&s.ageH<=AGE_HI&&s.traj!=null);
   const nowAge=(DOSSIER&&DOSSIER.ageH)||(pts.length?pts[pts.length-1].ageH:0);
   // y grid (very subtle)
   g.font="11px Inter,system-ui,sans-serif";g.textBaseline="middle";g.fillStyle="#6b6b73";g.strokeStyle="rgba(255,255,255,.04)";g.lineWidth=1;
-  for(let i=0;i<=4;i++){const yy=padT+ih*i/4;g.beginPath();g.moveTo(padL,yy);g.lineTo(W-padR,yy);g.stroke();g.textAlign="right";g.fillText((100-i*25)+"",padL-6,yy);}
+  for(let i=0;i<=4;i++){const v=100-i*25,yy=yOf(v);g.beginPath();g.moveTo(padL,yy);g.lineTo(W-padR,yy);g.stroke();g.textAlign="right";g.fillText(v+"",padL-6,yy);}
   // 1) PROVENANCE BOXES — the raw q1–q3 winner spread per bin the cone was fitted from, kept faint behind the cone
   for(const b of CORR){const bl=Math.max(b.lo,AGE_LO);if(bl>=AGE_HI)continue;const bh=Math.min(b.hi,AGE_HI);
     const x=xOf(bl),xw=Math.max(2,xOf(bh)-x),yT=yOf(b.q3),yB=yOf(b.q1);
@@ -472,7 +475,7 @@ function drawCorridorChart(hoverIdx=-1){
     // bottom stage target (wallets + mcap) at each bin centre
     const a=b.mid??(b.lo+b.hi)/2; if(inR(a)){ const cx=xOf(a);
       g.fillStyle=isCur?"#cfe8ff":"#8b9184";g.font=(isCur?"600 ":"")+"10px Inter,system-ui,sans-serif";g.fillText("by "+ageLab(b.hi),cx,H-36);
-      if(b.tw){ g.fillStyle=isCur?"#5ff0ea":"#c8ff4d";g.font="600 10.5px Inter,system-ui,sans-serif";g.fillText("~"+wShort(b.tw)+" wallets",cx,H-21);
+      if(b.twLo){ g.fillStyle=isCur?"#5ff0ea":"#c8ff4d";g.font="600 10.5px Inter,system-ui,sans-serif";g.fillText(wShort(b.twLo)+"–"+wShort(b.twHi)+" wallets",cx,H-21);
         g.fillStyle=isCur?"#a9d9e6":"#8f9a86";g.font="10px Inter,system-ui,sans-serif";g.fillText(mcT(b.tm),cx,H-7); } }
   }
   // current gate: a "next gate" target pill at the top
@@ -505,7 +508,7 @@ function onHoverCor(e){
   const b=corBinAt(s.ageH);
   TIPC.innerHTML=`<div class="d">at ${ageLab(s.ageH)} old</div><b style="color:${col}">trajectory ${s.traj}</b> · ${LB[st]}<br>
     <span style="color:var(--dim)">this token: ${(s.wallets||0).toLocaleString()} wallets · ${mcT(s.mcap)}</span>
-    ${b&&b.tw?`<br><span style="color:var(--lime)">winners here: ~${b.tw.toLocaleString()} wallets · ${mcT(b.tm)}</span>`:""}`;
+    ${b&&b.twLo?`<br><span style="color:var(--lime)">winners' gate: ${wShort(b.twLo)}–${wShort(b.twHi)} wallets · ${mcT(b.tm)}</span>`:""}`;
   TIPC.style.display="block";
   const x=GEOC.xOf(s.ageH), tw=TIPC.offsetWidth;
   TIPC.style.left=Math.max(6,Math.min(CVC.clientWidth-tw-6,x-tw/2))+"px"; TIPC.style.top="12px";

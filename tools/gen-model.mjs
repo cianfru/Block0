@@ -16,6 +16,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const ROOT = new URL("..", import.meta.url);
 const rd = (f) => JSON.parse(readFileSync(new URL(f, ROOT), "utf8"));
 const med = (a) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const pctl = (a, p) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); const i = (s.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return s[lo] + (s[hi] - s[lo]) * (i - lo); };
 const MIN_N = 4; // a bin needs ≥ this many winner samples before we state a target — otherwise it stays null (never fabricated)
 
 const proj = rd("study/projection_data.json"); // { ladder, winners:[{path:[{w,m,a}]}], losers }
@@ -42,6 +43,7 @@ const corridor = corr.bins.map((b) => {
   for (const w of corr.winners) for (const p of (w.path || [])) if (p.a >= b.lo && p.a < b.hi && p.t != null) traj.push(p.t);
   const n = traj.length, mean = n ? traj.reduce((a, v) => a + v, 0) / n : null;
   const sd = n > 1 ? Math.sqrt(traj.reduce((a, v) => a + (v - mean) ** 2, 0) / n) : 0;
+  const enough = ws.length >= MIN_N;
   return {
     lo: b.lo, hi: b.hi, mid, q1: b.q1, med: b.med, q3: b.q3,
     mean: mean == null ? null : Math.round(mean * 10) / 10,      // cone centre-line
@@ -49,10 +51,22 @@ const corridor = corr.bins.map((b) => {
     band: mean == null ? null : [Math.round(clamp(mean - sd)), Math.round(clamp(mean + sd))], // the drawn cone band
     n_band: n,
     n_tgt: ws.length,
-    tw: ws.length >= MIN_N ? Math.round(med(ws)) : null, // target unique-wallet count (median winner at this age)
+    // gate targets as a BAND (p25–p75 of the winners at this age), not a single wobbly median
+    twLo: enough ? Math.round(pctl(ws, 0.25)) : null,
+    twHi: enough ? Math.round(pctl(ws, 0.75)) : null,
+    tw: enough ? Math.round(med(ws)) : null,
     tm: ms.length >= MIN_N ? Math.round(med(ms)) : null, // target market cap (median winner at this age)
   };
 });
+// Unique-buyer count only ever GROWS for a token, so the per-bin median wobbling down (1500→1400→1300) is a
+// sampling artifact (the winner set changes bin to bin). Enforce a non-decreasing floor on the wallet band so the
+// gates read as the true cumulative uptrend a real winner follows.
+let floLo = 0, floHi = 0;
+for (const c of corridor) {
+  if (c.twLo != null) { c.twLo = Math.max(c.twLo, floLo); floLo = c.twLo; }
+  if (c.twHi != null) { c.twHi = Math.max(c.twHi, floHi, c.twLo || 0); floHi = c.twHi; }
+  if (c.tw != null) c.tw = Math.max(c.twLo || 0, Math.min(c.twHi || Infinity, c.tw)); // keep median inside the monotone band
+}
 
 const model = {
   generatedAt: new Date().toISOString().slice(0, 10),
