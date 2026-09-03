@@ -23,6 +23,22 @@ const B0 = (() => {
   }
   const chip = (txt, color) => `<span class="chip"${color ? ` style="color:${color}"` : ""}>${txt}</span>`;
 
+  // ── polished monoline icon set (currentColor, 1em, rounded) — replaces cheap emoji everywhere ──────────────────
+  const ICONS = {
+    target: '<circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/>',
+    radar: '<circle cx="12" cy="12" r="9" opacity=".45"/><circle cx="12" cy="12" r="5.4" opacity=".75"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><path d="M12 12 19 6"/>',
+    sliders: '<path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.3" fill="var(--bg,#08080b)"/><circle cx="15" cy="12" r="2.3" fill="var(--bg,#08080b)"/><circle cx="8" cy="17" r="2.3" fill="var(--bg,#08080b)"/>',
+    globe: '<circle cx="12" cy="12" r="9"/><path d="M3 12h18"/><path d="M12 3c2.6 2.4 4 5.6 4 9s-1.4 6.6-4 9c-2.6-2.4-4-5.6-4-9s1.4-6.6 4-9z"/>',
+    bolt: '<path d="M13 2 5 13h5l-1 9 10-13h-5l1-7z" stroke-linejoin="round"/>',
+    warn: '<path d="M12 3.2 22 20H2z" stroke-linejoin="round"/><path d="M12 9v5"/><circle cx="12" cy="17.4" r=".65" fill="currentColor" stroke="none"/>',
+    trend: '<path d="M3 16.5 9.5 10l4 3.5L21 6"/><path d="M15.5 6H21v5.5"/>',
+    check: '<path d="M4 12.5 9.5 18 20 5.5"/>',
+  };
+  const ico = (name, cls = "") => {
+    const p = ICONS[name]; if (!p) return "";
+    return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">${p}</svg>`;
+  };
+
   function tokenCard(r, i) {
     const f = r.flags || {}, p = r.parts || {}, c = HEX(r.risk), tooEarly = r.ageH < 0.5;
     const meters = [
@@ -50,7 +66,8 @@ const B0 = (() => {
         : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#c8ff4d">✓ no snipers · no bundles</p>` : "";
     const liveDanger = (r.alert && r.alert.tone === "bad") || f.insiderSellersNow;   // actively being dumped → the card buzzes
     const sm = r.smart && r.smart.count ? r.smart : null;
-    const smartRow = sm ? `<div class="smart${sm.count >= 2 ? " conv" : ""}" title="${sm.wallets.map((w) => codename(w.a) + (w.tokensWon ? " · " + w.tokensWon + " wins" : "")).join("\n")}"><span class="ic">🧠</span> <b>${sm.count}</b> smart-money wallet${sm.count > 1 ? "s" : ""} holding${sm.count >= 2 ? " · converging" : ""}</div>` : "";
+    const smBreak = sm && sm.riding ? ` <span class="smb">${sm.proven} proven · ${sm.riding} riding</span>` : "";
+    const smartRow = sm ? `<div class="smart${sm.count >= 2 ? " conv" : ""}" title="${sm.wallets.map((w) => codename(w.a) + (w.kind ? " (" + w.kind + ")" : "") + (w.tokensWon ? " · " + w.tokensWon + " wins" : "")).join("\n")}">${ico("target")} <b>${sm.count}</b> smart-money wallet${sm.count > 1 ? "s" : ""} holding${sm.count >= 2 ? " · converging" : ""}${smBreak}</div>` : "";
     return `<a class="panel panel-hover tcard${isNew(r) ? " new" : ""}${liveDanger ? " live" : ""}${sm && sm.count >= 2 ? " smartconv" : ""}" href="/token?address=${r.address}" style="animation-delay:${Math.min(i * 60, 600)}ms">
       <div class="body">
         <div class="top">${icon(r)}
@@ -98,5 +115,5 @@ const B0 = (() => {
     </a>`;
   }
 
-  return { HEX, mcT, usd, fmtAge, sev, isNew, icon, meter, chip, tokenCard, codename, avatar, leaderRow };
+  return { HEX, mcT, usd, fmtAge, sev, isNew, icon, ico, meter, chip, tokenCard, codename, avatar, leaderRow };
 })();

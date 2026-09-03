@@ -41,6 +41,28 @@ test("ranking is by realized cash first", async () => {
   assert.equal(lb.rows[1].a, "w1");
 });
 
+test("riding: a diamond-hand with big unrealized on a REAL-MARKET token qualifies (kind=riding), gated by market quality", async () => {
+  // a genuine runner: high mcap, live price, many traders → unrealized counts
+  const realRunner = { sym: "RUN", curPrice: 0.01, supply: 1e9 /* mcap $10M */, pnlStats: { traders: 40 }, pnl: [
+    { a: "diamond", invested: 1000, realized: 0, unrealized: 40000, pnl: 40000, roi: 40, up: true, holding: true },
+  ] };
+  // a thin mirage: tiny mcap / few traders → the same paper gain must NOT qualify anyone
+  const mirage = { sym: "MIR", curPrice: 0.00001, supply: 1e6 /* mcap $10 */, pnlStats: { traders: 2 }, pnl: [
+    { a: "paperhands", invested: 1000, realized: 0, unrealized: 40000, pnl: 40000, roi: 40, up: true, holding: true },
+  ] };
+  const lb = await buildLeaderboard(
+    [{ address: "0xrun", sym: "RUN" }, { address: "0xmir", sym: "MIR" }],
+    async (a) => (a === "0xrun" ? realRunner : mirage),
+  );
+  const d = lb.rows.find((r) => r.a === "diamond");
+  assert.ok(d, "diamond should qualify on unrealized");
+  assert.equal(d.kind, "riding");
+  assert.equal(d.proven, false);
+  assert.equal(d.tokensRiding, 1);
+  assert.ok(d.ridingProfit >= 40000);
+  assert.equal(lb.rows.find((r) => r.a === "paperhands"), undefined); // mirage gated out
+});
+
 test("a token that fails to backtest is skipped, not fatal", async () => {
   const lb = await buildLeaderboard(
     [...tokens, { address: "0xbad", sym: "BAD" }],

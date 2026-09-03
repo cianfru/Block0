@@ -52,7 +52,7 @@
 <header class="hd"><div class="hd-in">
   <a href="/" class="wordmark">block<b>0</b></a>
   <nav class="nav"><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/methodology">Methodology</a></nav>
-  <div class="hd-r"><span class="chip chainchip">🕵 control</span></div>
+  <div class="hd-r"><span class="chip chainchip"><svg class="ic" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><path d="M4 7h16M4 12h16M4 17h16"/><circle cx="9" cy="7" r="2.3" fill="#08080b"/><circle cx="15" cy="12" r="2.3" fill="#08080b"/><circle cx="8" cy="17" r="2.3" fill="#08080b"/></svg> control</span></div>
 </div></header>
 
 <main class="wrap">
@@ -79,12 +79,12 @@
     </div>
 
     <div class="cols" style="grid-template-columns:1fr">
-      <div class="panel card"><h3>🛰 Coverage — the launch surface</h3>
+      <div class="panel card"><h3><svg class="ic" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="9" opacity=".45"/><circle cx="12" cy="12" r="5.4" opacity=".75"/><circle cx="12" cy="12" r="1.7" fill="currentColor" stroke="none"/><path d="M12 12 19 6"/></svg> Coverage — the launch surface</h3>
         <p class="muted" id="covsum" style="margin:-4px 0 10px">Loading factory census…</p>
         <div id="covbars"></div>
         <div class="covwrap"><table class="feed" id="covtbl"></table></div>
       </div>
-      <div class="panel card"><h3>🧠 Smart-money convergence</h3>
+      <div class="panel card"><h3><svg class="ic" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg> Smart-money convergence</h3>
         <p class="muted" id="convsum" style="margin:-4px 0 10px">Loading proven-wallet positions…</p>
         <div class="covwrap"><table class="feed" id="convtbl"></table></div>
       </div>
@@ -125,11 +125,12 @@ async function loadConvergence(){
     $("#convsum").innerHTML=`<b style="color:var(--tx)">${toks.length}</b> tokens with a proven wallet positioned · <b style="color:var(--lime)">${conv}</b> with 2+ converging`;
     $("#convtbl").innerHTML=toks.map(t=>{
       const wl=(t.wallets||[]).slice(0,4).map(w=>`<span class="wl2" title="${(w.tokensWon||0)}w · ${w.winRate!=null?w.winRate+'% hit':''}">${codename(w.a)}</span>`).join(", ");
-      return `<tr class="convrow"><td><b style="color:var(--tx)">${t.sym||"?"}</b></td><td>${venChip(t.venue)}</td><td class="cnt">${t.count}🧠</td><td class="muted">${mc(t.mcapUsd)}</td><td>${wl}</td></tr>`;
+      return `<tr class="convrow"><td><b style="color:var(--tx)">${t.sym||"?"}</b></td><td>${venChip(t.venue)}</td><td class="cnt">${t.count} ${IC("target")}</td><td class="muted">${mc(t.mcapUsd)}</td><td>${wl}</td></tr>`;
     }).join("")||'<tr><td class="muted">no smart-money positions yet — the leaderboard builds first</td></tr>';
   }catch(e){$("#convsum").textContent="Convergence unavailable.";}
 }
-const flag=(cc)=>{ if(!cc||cc.length!==2) return "🏳"; return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0))); };
+const IC=(n)=>window.B0&&B0.ico?B0.ico(n):"";
+const flag=(cc)=>{ if(!cc||cc.length!==2) return IC("globe"); return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0))); };
 const fmt=(n)=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(1)+"K":String(n||0);
 const dur=(s)=>{if(s==null)return"—";const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`;};
 const ago=(s)=>s<60?s+"s":s<3600?Math.floor(s/60)+"m":s<86400?Math.floor(s/3600)+"h":Math.floor(s/86400)+"d";

@@ -15,16 +15,22 @@ let CURRENT = { set: new Set(), meta: {}, size: 0, updated: 0 };
 export function setCurrentSmartMoney(sm) { if (sm && sm.set) CURRENT = sm; }
 export function getCurrentSmartMoney() { return CURRENT; }
 
-// Build the smart-money set + per-wallet track record from a leaderboard snapshot.
-export function smartMoneyFrom(leaderboard, { minWins = 1 } = {}) {
+// Build the smart-money set + per-wallet track record from a leaderboard snapshot. Includes both PROVEN wallets
+// (realized cash) and RIDING wallets (large unrealized on a real-market runner still held) — the `kind` distinguishes
+// them so the UI can be honest about proven vs paper.
+export function smartMoneyFrom(leaderboard) {
   const rows = (leaderboard && leaderboard.rows) || [];
   const set = new Set();
   const meta = {};
   for (const r of rows) {
-    if (!r.a || (r.tokensWon || 0) < minWins) continue;
+    if (!r.a) continue;
+    const proven = r.proven ?? ((r.tokensWon || 0) >= 1);   // back-compat with pre-riding leaderboards
+    const riding = r.riding ?? false;
+    if (!proven && !riding) continue;
     const a = r.a.toLowerCase();
     set.add(a);
-    meta[a] = { realized: r.realized, roi: r.roi, tokensWon: r.tokensWon, winRate: r.winRate, holdingAny: r.holdingAny };
+    meta[a] = { realized: r.realized, roi: r.roi, tokensWon: r.tokensWon, winRate: r.winRate, holdingAny: r.holdingAny,
+      kind: r.kind || (proven && riding ? "both" : proven ? "proven" : "riding"), ridingProfit: r.ridingProfit ?? null, tokensRiding: r.tokensRiding || 0 };
   }
   return { set, meta, size: set.size, updated: (leaderboard && leaderboard.updated) || Date.now() };
 }
@@ -35,11 +41,14 @@ export function smartHolders(holders, smartSet, smartMeta = {}, cap = 12) {
   const hits = holders.filter((w) => w && w.bal > 1e-9 && smartSet.has((w.a || "").toLowerCase()));
   if (!hits.length) return null;
   hits.sort((a, b) => b.bal - a.bal);
+  const kindOf = (w) => (smartMeta[(w.a || "").toLowerCase()] || {}).kind || "proven";
   const wallets = hits.slice(0, cap).map((w) => {
     const m = smartMeta[(w.a || "").toLowerCase()] || {};
-    return { a: w.a, bal: Math.round(w.bal), realized: m.realized ?? null, roi: m.roi ?? null, tokensWon: m.tokensWon ?? null, winRate: m.winRate ?? null };
+    return { a: w.a, bal: Math.round(w.bal), kind: m.kind || "proven", realized: m.realized ?? null, roi: m.roi ?? null, tokensWon: m.tokensWon ?? null, winRate: m.winRate ?? null };
   });
-  return { count: hits.length, held: Math.round(hits.reduce((s, w) => s + w.bal, 0)), wallets };
+  const proven = hits.filter((w) => kindOf(w) !== "riding").length;   // proven or both
+  return { count: hits.length, proven, riding: hits.length - proven,
+    held: Math.round(hits.reduce((s, w) => s + w.bal, 0)), wallets };
 }
 
 // Rank the board's tokens by smart-money convergence (how many proven wallets currently hold each).

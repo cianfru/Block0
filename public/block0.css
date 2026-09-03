@@ -46,6 +46,8 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .panel-hover:hover{transform:translateY(-3px);border-color:rgba(255,255,255,.16);box-shadow:inset 0 1px 0 rgba(255,255,255,.10),0 22px 50px -18px rgba(0,0,0,.7)}
 .chip{display:inline-flex;align-items:center;gap:.375rem;border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:10px;padding:.2rem .55rem;font-size:.72rem;letter-spacing:.02em;white-space:nowrap;color:var(--dim)}
 .micro{font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--mute)}
+/* inline monoline icons (B0.ico) — inherit colour + size from context, never a cheap emoji */
+.ic{display:inline-block;width:1em;height:1em;vertical-align:-.14em;flex:0 0 auto}
 .live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--lime);animation:pulsering 2.2s cubic-bezier(.4,0,.6,1) infinite}
 @keyframes pulsering{0%{box-shadow:0 0 0 0 rgba(200,255,77,.45)}70%{box-shadow:0 0 0 10px rgba(200,255,77,0)}100%{box-shadow:0 0 0 0 rgba(200,255,77,0)}}
 
@@ -121,8 +123,10 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 /* smart-money positioning: proven-PnL wallets currently holding this token */
 .smart{margin-top:9px;display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--cyan);
   border:1px solid rgba(53,230,224,.28);background:rgba(53,230,224,.07);border-radius:10px;padding:6px 10px}
-.smart .ic{font-size:.9rem;filter:saturate(1.2)}
+.smart .ic{width:1.05em;height:1.05em}
 .smart b{color:var(--tx);font-variant-numeric:tabular-nums}
+.smart .smb{color:var(--mute);font-size:.72rem;margin-left:2px}
+.smart.conv .smb{color:var(--dim)}
 .smart.conv{color:var(--lime);border-color:rgba(200,255,77,.45);background:rgba(200,255,77,.09);
   box-shadow:0 0 16px rgba(200,255,77,.12)}
 .tcard.smartconv{border-color:rgba(200,255,77,.4)}

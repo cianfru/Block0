@@ -106,7 +106,7 @@ if (Number(process.env.BOARD_DEX ?? 10) > 0) {
 // "follow the smart money" board. Heavy but reuses cached backtests, so it runs infrequently and off-cycle. The
 // result is cached in KV so a restart (or a second instance) serves instantly while the first rebuild runs.
 const LB_REFRESH_MS = Number(process.env.LEADERBOARD_REFRESH_MS || 30 * 60 * 1000);
-const LB_TOKENS = Number(process.env.LEADERBOARD_TOKENS || 40); // how many winners to aggregate over
+const LB_TOKENS = Number(process.env.LEADERBOARD_TOKENS || 100); // how many winners to aggregate over (wider = catches mid-tier runners)
 let _leaderboard = null, _lbRunning = false;
 async function refreshLeaderboard() {
   if (_lbRunning) return; _lbRunning = true;
@@ -118,7 +118,7 @@ async function refreshLeaderboard() {
       .filter((t) => t.address && !seen.has(t.address) && seen.add(t.address))
       .sort((x, y) => (y.mcapUsd || 0) - (x.mcapUsd || 0))
       .slice(0, LB_TOKENS)
-      .map((t) => ({ address: t.address.toLowerCase(), sym: t.sym }));
+      .map((t) => ({ address: t.address.toLowerCase(), sym: t.sym, mcapUsd: t.mcapUsd || 0, graduated: !!t.graduated }));
     if (!tokens.length) return;
     const lb = await buildLeaderboard(tokens, (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 }));
     _leaderboard = lb;
