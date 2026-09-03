@@ -26,6 +26,7 @@ import { traceEvents, discoverDex, recentDexTokens, DEX_CONFIG } from "./dex.mjs
 import { walletIntel } from "./wallet.mjs";
 import { buildLeaderboard } from "./leaderboard.mjs";
 import { walletPnlReport } from "./wallet-pnl.mjs";
+import { buildCards } from "./cards.mjs";
 import { buildGraph } from "./graph.mjs";
 import { resolveFunders, funderLinks } from "./funders.mjs";
 import { rpc, isContract } from "./rpc.mjs";
@@ -202,6 +203,7 @@ async function serveStatic(res, urlPath) {
     : (urlPath === "/wallet" || urlPath === "/wallet.html") ? "wallet.html"
     : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html"
     : (urlPath === "/control" || urlPath === "/control.html") ? "control.html"
+    : (urlPath === "/desk" || urlPath === "/desk.html") ? "desk.html"
     : (urlPath === "/terms" || urlPath === "/terms.html") ? "terms.html" : null;
   const file = route || urlPath.replace(/^\//, "");
   try {
@@ -238,6 +240,20 @@ createServer(async (req, res) => {
       const b = getBoard();
       const out = await readIntel({ boardAge: b.updated ? Date.now() - b.updated : null, provider: PROVIDER, kvBackend: KV_BACKEND });
       return res.end(JSON.stringify(out));
+    }
+
+    if (u.pathname === "/api/cards") { // POST DESK — daily postable cards (summary + ready X text + viz), CONTROL_PW-gated
+      const body = req.method === "POST" ? await readBody(req) : {};
+      const pw = body.pw || u.searchParams.get("pw") || "";
+      res.writeHead(CONTROL_PW && pw === CONTROL_PW ? 200 : 401, { "content-type": "application/json", "cache-control": "no-store" });
+      if (!CONTROL_PW) return res.end(JSON.stringify({ error: "CONTROL_PASSWORD not set on the server" }));
+      if (pw !== CONTROL_PW) return res.end(JSON.stringify({ error: "unauthorized" }));
+      const b = getBoard();
+      let validation = null; try { validation = JSON.parse(await readFile(join(__dir, "study", "validation.json"), "utf8")); } catch { /* study optional */ }
+      let track = null; try { track = await trackRecord(); } catch { /* tracker optional */ }
+      const smartMoney = { tokens: convergence({ cooking: b.cooking, dex: b.dex, graduated: b.graduated }, { minCount: 2 }) };
+      const leaderboard = _leaderboard || await getJSON("leaderboard").catch(() => null);
+      return res.end(JSON.stringify(buildCards({ board: b, validation, track, smartMoney, leaderboard })));
     }
 
     if (u.pathname === "/api/gate") { // token-gated access: config + a read-only balance check (no signing, no custody)

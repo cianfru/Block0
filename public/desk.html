@@ -1,0 +1,261 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>Block0 — post desk</title>
+<meta name="robots" content="noindex">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+<style>
+  .login{max-width:380px;margin:14vh auto 0;text-align:center}
+  .login input{min-height:46px;width:100%;border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:12px;padding:0 16px;font-family:var(--mono);color:var(--tx);outline:none;margin:18px 0 12px}
+  .btn-lime{min-height:46px;border:none;border-radius:12px;background:var(--lime);color:#08080b;font-weight:700;cursor:pointer;font-family:var(--sans)}
+  .muted{color:var(--mute);font-size:.85rem}
+  .deskhead{display:flex;flex-wrap:wrap;align-items:flex-end;justify-content:space-between;gap:14px;margin-top:8px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(340px,1fr));gap:22px;margin-top:24px}
+  .cardbox{border:1px solid var(--line);border-radius:18px;overflow:hidden;background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.012))}
+  .cardbox canvas{width:100%;height:auto;display:block;background:#08080b}
+  .cbody{padding:14px 16px 16px}
+  .cbody .sum{font-size:.9rem;line-height:1.5;color:var(--dim)}
+  .tweet{width:100%;margin-top:12px;min-height:132px;resize:vertical;border:1px solid var(--line);background:rgba(0,0,0,.28);border-radius:12px;padding:11px 12px;color:var(--tx);font-family:var(--sans);font-size:.86rem;line-height:1.5;outline:none}
+  .tweet:focus{border-color:var(--line-2)}
+  .cactions{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-top:10px}
+  .cactions button{min-height:38px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);border-radius:10px;padding:0 13px;font-size:.8rem;font-family:var(--sans);cursor:pointer;transition:border-color .15s,color .15s,background .15s}
+  .cactions button:hover{border-color:var(--line-2);color:var(--tx)}
+  .cactions button.prime{background:var(--lime);color:#08080b;border-color:var(--lime);font-weight:600}
+  .cactions .cc{margin-left:auto;font-family:var(--mono);font-size:.72rem;color:var(--mute)}
+  .cc.over{color:var(--coral)}
+  .flash{color:var(--lime);font-size:.76rem;font-family:var(--mono)}
+</style>
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav">
+      <a href="/board">Board</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/control">Control</a>
+      <a href="/desk" class="on">Desk</a>
+    </nav>
+    <div class="hd-r"><span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <div id="login" class="login" hidden>
+    <p class="micro eye">post desk</p>
+    <h2 style="font-size:1.6rem;margin-top:6px">Daily cards, ready to ship</h2>
+    <input id="pw" type="password" placeholder="control password" autocomplete="off">
+    <button class="btn-lime" id="go" style="width:100%">Unlock</button>
+    <p class="muted" id="loginErr" style="margin-top:12px"></p>
+  </div>
+
+  <section id="desk" hidden style="padding:30px 0">
+    <div class="deskhead">
+      <div><p class="micro eye">post desk</p><h1 style="font-size:2rem">What's happening today</h1></div>
+      <div class="statchips"><span class="chip"><span class="live-dot"></span> <span id="stamp">live</span></span><button class="cactions" id="reload" style="min-height:38px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--dim);border-radius:10px;padding:0 13px;font-size:.8rem;cursor:pointer">↻ refresh</button></div>
+    </div>
+    <p class="muted" style="max-width:74ch;margin-top:10px">Colourful, on-brand cards built from the same reproducible numbers on the site — a plain-language summary and a ready-to-post X text for each. Edit any text before you ship it. Every card carries the honest framing: signal, not proof.</p>
+    <div class="cards" id="cards"><div class="state">Building today's cards…</div></div>
+    <p class="caveat">Cards render on your device from live data — nothing is auto-posted. Download the PNG (or copy the image) and the text, then post from the account. Numbers are reproducible from the public site; keep the honest framing intact.</p>
+  </section>
+</main>
+
+<script>
+const $=(s)=>document.querySelector(s);
+let PW=sessionStorage.getItem("b0_ctrl")||"";
+const A={lime:"#c8ff4d",cyan:"#35e6e0",magenta:"#ff5cf0",amber:"#ffd23d",coral:"#ff3b5c",dim:"#b6b6bd",mute:"#7f7f88",bg:"#08080b"};
+const SERIF='"Instrument Serif",Georgia,serif';
+const SANS='"Inter",system-ui,sans-serif';
+const MONO='ui-monospace,Menlo,monospace';
+
+function show(id){$("#login").hidden=id!=="login";$("#desk").hidden=id!=="desk";}
+
+async function load(){
+  if(!PW){show("login");return;}
+  try{
+    const r=await fetch("/api/cards",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({pw:PW})});
+    if(r.status===401){show("login");$("#loginErr").textContent="Wrong password (or CONTROL_PASSWORD not set on the server).";sessionStorage.removeItem("b0_ctrl");return;}
+    const d=await r.json();
+    if(d.error){show("login");$("#loginErr").textContent=d.error;return;}
+    show("desk");
+    $("#stamp").textContent="updated "+new Date(d.updated||Date.now()).toLocaleTimeString();
+    await (document.fonts?document.fonts.ready:Promise.resolve());
+    renderCards(d.cards||[]);
+  }catch(e){show("login");$("#loginErr").textContent="Couldn't reach the server — try again.";}
+}
+
+function renderCards(cards){
+  const wrap=$("#cards");
+  if(!cards.length){wrap.innerHTML='<div class="state">No cards yet — the board and study are still warming up. Refresh in a minute.</div>';return;}
+  wrap.innerHTML="";
+  cards.forEach((c)=>{
+    const box=document.createElement("div"); box.className="cardbox";
+    const cv=document.createElement("canvas"); cv.width=1080; cv.height=1080; cv.id="cv_"+c.id;
+    box.appendChild(cv);
+    const body=document.createElement("div"); body.className="cbody";
+    body.innerHTML=`<div class="sum">${esc(c.eyebrow)} — ${esc(c.title)}.</div>
+      <textarea class="tweet" spellcheck="false">${esc(c.tweet)}</textarea>
+      <div class="cactions">
+        <button class="prime" data-act="png">Download PNG</button>
+        <button data-act="copyimg">Copy image</button>
+        <button data-act="copytxt">Copy text</button>
+        <span class="flash" data-flash></span>
+        <span class="cc" data-cc></span>
+      </div>`;
+    box.appendChild(body);
+    wrap.appendChild(box);
+    drawCard(cv,c);
+    const ta=body.querySelector(".tweet"), cc=body.querySelector("[data-cc]"), flash=body.querySelector("[data-flash]");
+    const upd=()=>{const n=[...ta.value].length;cc.textContent=n+" / 280";cc.classList.toggle("over",n>280);};
+    upd(); ta.addEventListener("input",upd);
+    const say=(m)=>{flash.textContent=m;setTimeout(()=>{if(flash.textContent===m)flash.textContent="";},1800);};
+    body.querySelector('[data-act="copytxt"]').addEventListener("click",()=>{navigator.clipboard&&navigator.clipboard.writeText(ta.value).then(()=>say("text copied"),()=>say("copy failed"));});
+    body.querySelector('[data-act="png"]').addEventListener("click",()=>{cv.toBlob((b)=>{const u=URL.createObjectURL(b);const a=document.createElement("a");a.href=u;a.download=`block0-${c.id}.png`;a.click();setTimeout(()=>URL.revokeObjectURL(u),4000);say("saved");},"image/png");});
+    body.querySelector('[data-act="copyimg"]').addEventListener("click",()=>{
+      if(!(navigator.clipboard&&window.ClipboardItem)){say("not supported — use Download");return;}
+      cv.toBlob((b)=>{navigator.clipboard.write([new ClipboardItem({"image/png":b})]).then(()=>say("image copied"),()=>say("blocked — use Download"));},"image/png");
+    });
+  });
+}
+const esc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,(m)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+
+/* ============ the card renderer — 1080×1080, colourful, on-brand ============ */
+function drawCard(cv,c){
+  const g=cv.getContext("2d"); const W=1080,H=1080,M=84,acc=c.accent||A.lime;
+  // background
+  g.fillStyle=A.bg; g.fillRect(0,0,W,H);
+  // accent glow top-right
+  let rg=g.createRadialGradient(W-140,120,40,W-140,120,760); rg.addColorStop(0,hexa(acc,.18)); rg.addColorStop(1,hexa(acc,0));
+  g.fillStyle=rg; g.fillRect(0,0,W,H);
+  // faint grid
+  g.strokeStyle="rgba(255,255,255,.035)"; g.lineWidth=1;
+  for(let x=M;x<W;x+=64){g.beginPath();g.moveTo(x,0);g.lineTo(x,H);g.stroke();}
+  for(let y=64;y<H;y+=64){g.beginPath();g.moveTo(0,y);g.lineTo(W,y);g.stroke();}
+  // rainbow hairline
+  let hl=g.createLinearGradient(0,0,W,0); hl.addColorStop(0,A.lime);hl.addColorStop(.5,A.cyan);hl.addColorStop(1,A.magenta);
+  g.fillStyle=hl; g.fillRect(0,0,W,7);
+
+  // wordmark
+  g.textBaseline="alphabetic"; g.textAlign="left";
+  g.font=`44px ${SERIF}`; g.fillStyle="#fff"; g.fillText("block",M,132);
+  const bw=g.measureText("block").width; g.fillStyle=A.lime; g.fillText("0",M+bw+1,132);
+  // top-right tag
+  g.textAlign="right"; g.font=`22px ${MONO}`; g.fillStyle=A.mute;
+  g.fillText("the launch scanner", W-M, 126); g.textAlign="left";
+
+  // eyebrow (spaced caps)
+  spacedCaps(g,(c.eyebrow||"").toUpperCase(),M,210,`600 24px ${SANS}`,acc,4);
+
+  // ----- left text column, right viz column -----
+  const LX=M, colR=700;
+  // hero
+  let hy=400;
+  const hpx=fit(g,c.hero||"",colR-LX-30,190,SERIF);
+  g.font=`${hpx}px ${SERIF}`; g.textAlign="left";
+  g.save(); g.shadowColor=hexa(acc,.55); g.shadowBlur=34; g.fillStyle=acc; g.fillText(c.hero||"",LX,hy); g.restore();
+  // heroSub
+  g.font=`30px ${SANS}`; g.fillStyle=A.dim; wrapText(g,c.heroSub||"",LX,hy+46,colR-LX-20,36);
+  // title
+  let ty=hy+150;
+  g.fillStyle="#fff"; ty=wrapText(g,c.title||"",LX,ty,W-M-LX,64,`58px ${SERIF}`);
+  // supporting lines (constrained to the left column so they never run under the viz)
+  let ly=ty+64;
+  (c.lines||[]).slice(0,3).forEach((ln)=>{
+    g.fillStyle=acc; roundRect(g,LX,ly-15,11,11,3); g.fill();
+    g.fillStyle=A.dim; ly=wrapText(g,ln,LX+30,ly,colR-LX-40,40,`28px ${SANS}`)+48;
+  });
+
+  // viz in the right column, vertically around the hero band
+  drawViz(g,c,{cx:864,cy:360,r:150,acc});
+
+  // footer
+  g.fillStyle=hl; g.fillRect(0,H-7,W,7);
+  g.textBaseline="alphabetic"; g.font=`22px ${MONO}`;
+  spacedCaps(g,"SIGNAL, NOT PROOF",M,H-46,`22px ${MONO}`,A.mute,3);
+  g.textAlign="right"; g.fillStyle=A.mute; g.fillText("block0 · robinhood chain",W-M,H-46); g.textAlign="left";
+}
+
+function drawViz(g,c,o){
+  const v=c.viz; if(!v){ target(g,o.cx,o.cy,o.r,o.acc); return; }
+  if(v.type==="ring") ring(g,o.cx,o.cy,o.r, (v.pct||0)/100, v.color||o.acc, (v.pct||0)+"%");
+  else if(v.type==="gauge") gauge(g,o.cx,o.cy,o.r, clamp(v.value||0,0,1), clamp(v.base||0,0,1), v.color||o.acc);
+  else if(v.type==="bars") vbars(g,o.cx,o.cy,o.r, v.segs||[]);
+  else if(v.type==="dots") dots(g,o.cx,o.cy,o.r, v.n||0, v.color||o.acc);
+  else target(g,o.cx,o.cy,o.r,o.acc);
+}
+
+/* viz primitives */
+function ring(g,cx,cy,r,frac,col,label){
+  const w=42;
+  g.lineWidth=w; g.lineCap="round";
+  g.beginPath(); g.arc(cx,cy,r,0,Math.PI*2); g.strokeStyle="rgba(255,255,255,.08)"; g.stroke();
+  g.beginPath(); g.arc(cx,cy,r,-Math.PI/2,-Math.PI/2+Math.PI*2*clamp(frac,0,1)); g.strokeStyle=col;
+  g.save(); g.shadowColor=hexa(col,.6); g.shadowBlur=26; g.stroke(); g.restore();
+  g.lineCap="butt";
+  g.textAlign="center"; g.fillStyle="#fff"; g.font=`92px ${SERIF}`; g.fillText(label||"",cx,cy+30); g.textAlign="left";
+}
+function gauge(g,cx,cy,r,val,base,col){
+  const w=40, a0=Math.PI*0.9, a1=Math.PI*2.1; // 216°..378° (a wide arc)
+  g.lineWidth=w; g.lineCap="round";
+  g.beginPath(); g.arc(cx,cy,r,a0,a1); g.strokeStyle="rgba(255,255,255,.08)"; g.stroke();
+  g.beginPath(); g.arc(cx,cy,r,a0,a0+(a1-a0)*clamp(val,0,1)); g.strokeStyle=col;
+  g.save(); g.shadowColor=hexa(col,.55); g.shadowBlur=22; g.stroke(); g.restore();
+  // base-rate tick
+  if(base>0){ const a=a0+(a1-a0)*clamp(base,0,1); g.strokeStyle="rgba(255,255,255,.7)"; g.lineWidth=4;
+    g.beginPath(); g.moveTo(cx+Math.cos(a)*(r-w/2-4),cy+Math.sin(a)*(r-w/2-4)); g.lineTo(cx+Math.cos(a)*(r+w/2+4),cy+Math.sin(a)*(r+w/2+4)); g.stroke(); }
+  g.lineCap="butt";
+  g.textAlign="center"; g.fillStyle="#fff"; g.font=`72px ${SERIF}`; g.fillText(Math.round(val*100)+"%",cx,cy+18);
+  if(base>0){ g.font=`20px ${MONO}`; g.fillStyle=A.mute; g.fillText("base "+Math.round(base*100)+"%",cx,cy+52); }
+  g.textAlign="left";
+}
+function vbars(g,cx,cy,r,segs){
+  const max=Math.max(1,...segs.map(s=>s.v||0)); const bw=r*1.7, x0=cx-bw/2; let y=cy-r+30;
+  g.textAlign="left";
+  segs.forEach((s)=>{
+    g.font=`22px ${MONO}`; g.fillStyle=A.dim; g.fillText(s.label,x0,y-8);
+    g.textAlign="right"; g.fillStyle="#fff"; g.font=`22px ${MONO}`; g.fillText(String(s.v),x0+bw,y-8); g.textAlign="left";
+    roundRect(g,x0,y,bw,20,10); g.fillStyle="rgba(255,255,255,.08)"; g.fill();
+    const w=Math.max(20,bw*((s.v||0)/max)); roundRect(g,x0,y,w,20,10); g.fillStyle=s.color; g.save();g.shadowColor=hexa(s.color,.5);g.shadowBlur=14;g.fill();g.restore();
+    y+=86;
+  });
+}
+function dots(g,cx,cy,r,n,col){
+  const cols=6, gap=44, r0=11; const rows=Math.ceil(n/cols);
+  const x0=cx-((cols-1)*gap)/2, y0=cy-((rows-1)*gap)/2;
+  for(let i=0;i<n;i++){ const x=x0+(i%cols)*gap, y=y0+Math.floor(i/cols)*gap;
+    g.beginPath(); g.arc(x,y,r0,0,7); g.fillStyle=col; g.save();g.shadowColor=hexa(col,.6);g.shadowBlur=12;g.fill();g.restore(); }
+}
+function target(g,cx,cy,r,col){
+  for(let i=3;i>=1;i--){ g.beginPath(); g.arc(cx,cy,r*i/3,0,7); g.strokeStyle=hexa(col,.25+i*.12); g.lineWidth=i===1?0:6; if(i>1)g.stroke(); }
+  g.beginPath(); g.arc(cx,cy,16,0,7); g.fillStyle=col; g.save();g.shadowColor=hexa(col,.6);g.shadowBlur=20;g.fill();g.restore();
+  // crosshair ticks
+  g.strokeStyle=hexa(col,.5); g.lineWidth=4;
+  [[0,-1],[0,1],[-1,0],[1,0]].forEach(([dx,dy])=>{g.beginPath();g.moveTo(cx+dx*(r+6),cy+dy*(r+6));g.lineTo(cx+dx*(r+30),cy+dy*(r+30));g.stroke();});
+}
+
+/* text + shape helpers */
+function fit(g,txt,maxW,startPx,font){ let px=startPx; do{ g.font=`${px}px ${font}`; if(g.measureText(txt).width<=maxW)break; px-=6; }while(px>60); return px; }
+function wrapText(g,txt,x,y,maxW,lh,font){ if(font)g.font=font; const words=String(txt).split(/\s+/); let line="",yy=y;
+  for(const w of words){ const t=line?line+" "+w:w; if(g.measureText(t).width>maxW&&line){ g.fillText(line,x,yy); yy+=lh; line=w; } else line=t; }
+  if(line)g.fillText(line,x,yy); return yy; }
+function spacedCaps(g,txt,x,y,font,col,sp){ g.font=font; g.fillStyle=col; g.textAlign="left"; let xx=x;
+  for(const ch of txt){ g.fillText(ch,xx,y); xx+=g.measureText(ch).width+sp; } }
+function roundRect(g,x,y,w,h,r){ r=Math.min(r,w/2,h/2); g.beginPath(); g.moveTo(x+r,y); g.arcTo(x+w,y,x+w,y+h,r); g.arcTo(x+w,y+h,x,y+h,r); g.arcTo(x,y+h,x,y,r); g.arcTo(x,y,x+w,y,r); g.closePath(); }
+function hexa(hex,a){ const h=hex.replace("#",""); const n=parseInt(h.length===3?h.split("").map(c=>c+c).join(""):h,16); return `rgba(${(n>>16)&255},${(n>>8)&255},${n&255},${a})`; }
+function clamp(v,a,b){ return v<a?a:v>b?b:v; }
+
+$("#go").addEventListener("click",()=>{PW=$("#pw").value.trim();sessionStorage.setItem("b0_ctrl",PW);$("#loginErr").textContent="";load();});
+$("#pw").addEventListener("keydown",(e)=>{if(e.key==="Enter")$("#go").click();});
+$("#reload").addEventListener("click",load);
+load();
+</script>
+</body>
+</html>
