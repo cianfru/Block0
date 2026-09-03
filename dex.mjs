@@ -86,8 +86,9 @@ export async function discoverDex({ blocks = 200000, address = AMM, initTopics =
   const topicSet = new Set([...Object.keys(KNOWN), ...initTopics.map((t) => t.toLowerCase())]);
   const latest = await latestBlock();
   const from = Math.max(0, latest - blocks);
-  // one wide scan filtered to the AMM/factory address; classify each log by its topic0
-  const logs = await logsWide({ address }, from, latest);
+  // filter to the pool-creation topics so the node returns ONLY those events (hundreds), not every Swap on the AMM
+  // (hundreds of thousands) — the difference between a fast scan and a timeout.
+  const logs = await logsWide({ address, topics: [[...topicSet]] }, from, latest);
   const tokens = new Map();
   for (const l of logs) {
     const t0 = (l.topics && l.topics[0] || "").toLowerCase();
