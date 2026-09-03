@@ -118,6 +118,14 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .precedent b{color:var(--cyan);font-weight:600}
 .precedent .m{color:var(--mute)}
 .alert{margin-top:8px;font-size:.76rem}
+/* smart-money positioning: proven-PnL wallets currently holding this token */
+.smart{margin-top:9px;display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--cyan);
+  border:1px solid rgba(53,230,224,.28);background:rgba(53,230,224,.07);border-radius:10px;padding:6px 10px}
+.smart .ic{font-size:.9rem;filter:saturate(1.2)}
+.smart b{color:var(--tx);font-variant-numeric:tabular-nums}
+.smart.conv{color:var(--lime);border-color:rgba(200,255,77,.45);background:rgba(200,255,77,.09);
+  box-shadow:0 0 16px rgba(200,255,77,.12)}
+.tcard.smartconv{border-color:rgba(200,255,77,.4)}
 /* every card rises + settles in on load — the staggered cascade (animation-delay is set per-card inline) */
 .tcard{animation:cardin .5s cubic-bezier(.2,.8,.3,1) both}
 @keyframes cardin{0%{opacity:0;transform:translateY(10px) scale(.99)}60%{transform:translateY(-2px) scale(1.003)}100%{opacity:1;transform:none}}

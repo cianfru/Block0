@@ -11,7 +11,8 @@ import { fileURLToPath } from "node:url";
 import { scan, pullTransfers, detectPool, ROUTERS } from "./engine.mjs";
 import { latestBlock } from "./rpc.mjs";
 import { watchLogs, WS_ENABLED } from "./ws.mjs";
-import { refreshBoard, refreshDex, getBoard, ensureFresh } from "./board.mjs";
+import { refreshBoard, refreshDex, getBoard, ensureFresh, setSmartMoney } from "./board.mjs";
+import { smartMoneyFrom, convergence } from "./smart-money.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON } from "./alerts.mjs";
@@ -120,6 +121,7 @@ async function refreshLeaderboard() {
     if (!tokens.length) return;
     const lb = await buildLeaderboard(tokens, (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 }));
     _leaderboard = lb;
+    setSmartMoney(smartMoneyFrom(lb));   // feed proven wallets to the board so every verdict flags smart-money holders
     setJSON("leaderboard", lb).catch(() => {});
   } catch { /* transient — next tick retries */ } finally { _lbRunning = false; }
 }
@@ -358,9 +360,18 @@ createServer(async (req, res) => {
       // array it arrived in. Additive only — every existing field (label, corridor.status, …) is untouched.
       // venue now comes from discovery (uniswap-v2/v3/v4 or a factory label); factory/venues pass through via ...t.
       const tag = (arr, section) => (arr || []).map((t) => ({ ...t, section, venue: t.venue || (section === "dex" ? "dex" : "pons") }));
+      const cooking = tag(b.cooking, "cooking"), graduated = tag(b.graduated, "graduated"), dex = tag(b.dex, "dex");
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify({ updated: b.updated, scanning: b.scanning,
-        cooking: tag(b.cooking, "cooking"), graduated: tag(b.graduated, "graduated"), dex: tag(b.dex, "dex"), stats: b.stats || {} }));
+        cooking, graduated, dex, stats: b.stats || {},
+        convergence: convergence({ cooking, dex, graduated }, { minCount: 2 }) }));
+    }
+    if (u.pathname === "/api/smart-money") { // tokens where proven wallets have converged, ranked
+      const b = ensureFresh(BOARD_REFRESH_MS);
+      const minCount = Math.max(1, Number(u.searchParams.get("min") || 2));
+      const rows = convergence({ cooking: b.cooking, dex: b.dex, graduated: b.graduated }, { minCount });
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify({ updated: b.updated, minCount, count: rows.length, tokens: rows }));
     }
 
     if (u.pathname === "/api/scan") {

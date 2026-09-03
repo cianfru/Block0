@@ -49,7 +49,9 @@ const B0 = (() => {
       : f.insiderSellersNow ? `<p class="alert" style="color:#ff3b5c">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
         : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#c8ff4d">✓ no snipers · no bundles</p>` : "";
     const liveDanger = (r.alert && r.alert.tone === "bad") || f.insiderSellersNow;   // actively being dumped → the card buzzes
-    return `<a class="panel panel-hover tcard${isNew(r) ? " new" : ""}${liveDanger ? " live" : ""}" href="/token?address=${r.address}" style="animation-delay:${Math.min(i * 60, 600)}ms">
+    const sm = r.smart && r.smart.count ? r.smart : null;
+    const smartRow = sm ? `<div class="smart${sm.count >= 2 ? " conv" : ""}" title="${sm.wallets.map((w) => codename(w.a) + (w.tokensWon ? " · " + w.tokensWon + " wins" : "")).join("\n")}"><span class="ic">🧠</span> <b>${sm.count}</b> smart-money wallet${sm.count > 1 ? "s" : ""} holding${sm.count >= 2 ? " · converging" : ""}</div>` : "";
+    return `<a class="panel panel-hover tcard${isNew(r) ? " new" : ""}${liveDanger ? " live" : ""}${sm && sm.count >= 2 ? " smartconv" : ""}" href="/token?address=${r.address}" style="animation-delay:${Math.min(i * 60, 600)}ms">
       <div class="body">
         <div class="top">${icon(r)}
           <div style="min-width:0">
@@ -60,7 +62,7 @@ const B0 = (() => {
         </div>
         <div class="meters">${meters}</div>
         <div class="chiprow">${venue}${bpChips}${curve}</div>
-        ${prec}${al}
+        ${smartRow}${prec}${al}
       </div></a>`;
   }
 

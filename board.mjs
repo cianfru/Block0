@@ -12,6 +12,7 @@ import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { recentDexTokens } from "./dex.mjs";
 import { keep, storeStats } from "./store.mjs";
 import { pathPosition, liveTrajectory, corridorStatus } from "./model.mjs";
+import { getCurrentSmartMoney } from "./smart-money.mjs";
 
 export const PONS_FACTORIES = ["0x0c37a24f5d23a486fa692d1500881d698b1f77a4", "0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb"];
 const N_ACTIVE = Number(process.env.BOARD_ACTIVE || 16); // pre-graduation tokens to verdict per refresh
@@ -23,10 +24,15 @@ const NEW_MS = 150000;
 let CACHE = { updated: 0, scanning: false, cooking: [], graduated: [], stats: {} };
 const FIRST_SEEN = new Map(); let BOOTED = false;
 
+// smart-money set (proven-PnL wallets from the leaderboard) lives in smart-money.mjs as a shared singleton so the
+// board and the token dossier read the same set. setSmartMoney is re-exported for the server's existing call site.
+export { setCurrentSmartMoney as setSmartMoney } from "./smart-money.mjs";
+
 const apeScore = (r) => Math.round((100 - r.risk) + Math.max(-30, Math.min(30, r.momentum)) - (r.flags.insiderSellersNow || 0) * 6);
 
 async function verdict(meta) {
-  const r = await computeIntel(meta.address, meta.sym, { pool: meta.pool, mcapUsd: meta.mcapUsd, graduated: meta.graduated, launchedAt: meta.launchedAt, whales: false });
+  const SMART = getCurrentSmartMoney();
+  const r = await computeIntel(meta.address, meta.sym, { pool: meta.pool, mcapUsd: meta.mcapUsd, graduated: meta.graduated, launchedAt: meta.launchedAt, whales: false, smartSet: SMART.set, smartMeta: SMART.meta });
   r.name = meta.name; r.logo = meta.logo; r.progress = meta.progress; r.graduated = meta.graduated;
   r.launchedAt = meta.launchedAt; r.mcapUsd = Math.round(meta.mcapUsd || r.mcapUsd || 0);
   r.ape = apeScore(r);

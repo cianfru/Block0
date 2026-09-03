@@ -44,6 +44,7 @@
     <input class="search" id="q" placeholder="Search name, symbol, or paste a contract address" autocomplete="off">
     <div class="filters" id="tabs">
       <button class="on" data-f="cooking">About to graduate</button>
+      <button data-f="smart">🧠 Smart money</button>
       <button data-f="blueprint">Blueprint fit</button>
       <button data-f="graduated">Graduated</button>
       <button data-f="dex">DEX listings</button>
@@ -98,6 +99,12 @@ function render(){
   if(FILTER==="dex"){
     $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Tokens listed <b style="color:var(--tx)">directly on the chain\'s AMMs</b> (Uniswap v2 · v3 · v4, every factory), not via the Pons launchpad — discovered on-chain by creation signature and verdicted by the same engine. Live from block one. Cleanest first.</p>'+
       (dexl.length?section(dexl.sort((a,b)=>a.risk-b.risk)):'<div class="state">No DEX listings verdicted yet — the discovery pass runs alongside the board scan.</div>');
+    return;}
+  if(FILTER==="smart"){
+    const conv=cooking.concat(grad,dexl).filter(r=>r.smart&&r.smart.count>=1).sort((a,b)=>(b.smart.count-a.smart.count)||(a.risk-b.risk));
+    const anyConv=conv.some(r=>r.smart.count>=2);
+    $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Tokens where <b style="color:var(--tx)">proven-PnL wallets</b> are currently positioned — the ones who\'ve actually made money on this chain. <b style="color:var(--lime)">Two or more converging</b> on the same token is the high-confidence read. Reconstructed from on-chain holdings; confidence signal, not a recommendation.</p>'+
+      (conv.length?section(conv):'<div class="state">No smart-money positions surfaced yet — the leaderboard builds first, then every verdict is tagged.</div>');
     return;}
   if(FILTER==="graduated"){$("#board").innerHTML=grad.length?section(grad.sort((a,b)=>(b.mcapUsd||0)-(a.mcapUsd||0))):'<div class="state">No graduated tokens yet.</div>';return;}
   let all=cooking.concat(grad,dexl);

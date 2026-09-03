@@ -105,6 +105,17 @@
   .corverdict b.pill{display:inline-block;font-weight:800;font-size:.76rem;letter-spacing:.02em;padding:3px 9px;border-radius:8px;margin-right:8px;color:#08080b}
 
   /* holder tables */
+  .smartpanel{margin:26px 0 4px;border:1px solid rgba(53,230,224,.3);border-radius:16px;
+    background:linear-gradient(180deg,rgba(53,230,224,.06),rgba(53,230,224,.015));overflow:hidden}
+  .smartpanel.conv{border-color:rgba(200,255,77,.45);background:linear-gradient(180deg,rgba(200,255,77,.08),rgba(200,255,77,.02));
+    box-shadow:0 0 26px rgba(200,255,77,.1)}
+  .smartpanel .sph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:1.02rem;color:var(--cyan)}
+  .smartpanel.conv .sph{color:var(--lime)}
+  .smartpanel .sph .ic{font-size:1.05rem} .smartpanel .sph b{color:var(--tx);font-variant-numeric:tabular-nums}
+  .smartpanel .cvt{font-weight:600}
+  .smartpanel .spsub{display:block;margin-top:4px;font-size:.76rem;color:var(--mute)}
+  .smartpanel .wlist{display:grid;grid-template-columns:1fr 1fr;gap:0}
+  @media(max-width:640px){.smartpanel .wlist{grid-template-columns:1fr}}
   .tables{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
   .tbl{border:1px solid var(--line);border-radius:14px;background:var(--glass);overflow:hidden}
   .tbl h3{font-size:.74rem;letter-spacing:.05em;text-transform:uppercase;margin:0;padding:12px 15px;border-bottom:1px solid var(--line);color:var(--dim);display:flex;justify-content:space-between}
@@ -272,6 +283,20 @@ function walletRows(rows,dir){
       ${val}<span class="zl">Zerion ↗</span></a>`;}).join("");
 }
 
+function smartPanel(sm){
+  if(!sm||!sm.count) return "";
+  const conv=sm.count>=2;
+  const rows=(sm.wallets||[]).map(w=>{
+    const rec=[w.tokensWon?`${w.tokensWon} win${w.tokensWon>1?"s":""}`:null,w.winRate!=null?`${w.winRate}% hit`:null,w.realized!=null?`+$${Math.round(w.realized).toLocaleString()} realised`:null].filter(Boolean).join(" · ");
+    return `<a class="wrow" href="${ZBASE}/${w.a}" target="_blank" rel="noopener">${B0.avatar(w.a,30)}
+      <span class="wid"><span class="wn">${B0.codename(w.a)}</span><span class="wm">${rec||"proven wallet"}</span></span>
+      <span class="wv" style="color:var(--dim)">${kT(w.bal)}</span><span class="zl">Zerion ↗</span></a>`;}).join("");
+  return `<div class="smartpanel${conv?" conv":""}">
+    <div class="sph"><span class="ic">🧠</span> <b>${sm.count}</b> smart-money wallet${sm.count>1?"s":""} positioned${conv?' <span class="cvt">· converging</span>':''}
+      <span class="spsub">proven-PnL wallets currently holding — a confidence signal, reconstructed from on-chain holdings, not a recommendation</span></div>
+    <div class="wlist">${rows}</div></div>`;
+}
+
 function render(r){
   EXPLORER=r.explorer||null;
   ZBASE=(r.links&&r.links.zerion)||ZBASE;
@@ -352,6 +377,7 @@ function render(r){
       <div class="bm-legend" id="bmlegend"></div>
     </div>
 
+    ${smartPanel(r.smart)}
     <h2 class="sec">Who's in it</h2>
     <div class="tables">
       <div class="tbl"><h3 class="buy">Adding now <span>net 30m</span></h3><div class="wlist">${walletRows(r.buyers,"buy")}</div></div>

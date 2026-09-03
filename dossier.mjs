@@ -6,6 +6,7 @@
 // Alchemy-preferred): the dossier always resolves fast from the incremental store, so the page shows the full
 // forensic read — snipers, bundles, concentration, who's buying/selling — even if the history chart is still loading.
 import { computeIntel, blueprintMatch, blueprintLabel } from "./intel.mjs";
+import { getCurrentSmartMoney } from "./smart-money.mjs";
 import { pathPosition, precedentValuation, liveTrajectory, corridorStatus } from "./model.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 
@@ -43,9 +44,11 @@ export async function tokenDossier(address) {
   address = address.toLowerCase();
   const all = await ponsMetaAll();
   const meta = all.find((t) => (t.address || "").toLowerCase() === address) || null;
-  // full on-chain read incl. the whale/holder table (who's buying, who's selling now)
+  // full on-chain read incl. the whale/holder table (who's buying, who's selling now) + smart-money positioning
+  const SMART = getCurrentSmartMoney();
   const r = await computeIntel(address, meta?.sym || "?", {
     pool: meta?.pool, mcapUsd: meta?.mcapUsd, graduated: meta?.graduated, launchedAt: meta?.launchedAt, whales: true,
+    smartSet: SMART.set, smartMeta: SMART.meta,
   });
   r.name = meta?.name || null; r.logo = meta?.logo || null; r.progress = meta?.progress ?? null;
   r.graduated = !!meta?.graduated; r.launchedAt = meta?.launchedAt || null;

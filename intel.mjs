@@ -3,6 +3,7 @@
 import { rpc } from "./rpc.mjs";
 import { detectPool, ROUTERS } from "./engine.mjs";
 import { getTransfers } from "./store.mjs";
+import { smartHolders } from "./smart-money.mjs";
 
 const ZERO = "0x0000000000000000000000000000000000000000", DEAD = "0x000000000000000000000000000000000000dead";
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
@@ -169,6 +170,9 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
     out.whales = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 60).map((w) => ({ a: w.a, bal: +w.bal.toFixed(0), first: w.first, bought: +w.bought.toFixed(0), sold: +w.sold.toFixed(0), net: +(w.recvRecent - w.sentRecent).toFixed(0), sniper: w.sniper }));
     out.tsMin = tsMin; out.tsMax = tsMax;
   }
+  // SMART-MONEY POSITIONING: which proven-PnL wallets (from the leaderboard) currently hold this token. Pure set
+  // membership over the holder map we already built — no extra RPC. Present on every token (cooking/dex/graduated).
+  if (opts.smartSet && opts.smartSet.size) out.smart = smartHolders(holders, opts.smartSet, opts.smartMeta);
   return out;
 }
 
