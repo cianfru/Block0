@@ -34,6 +34,13 @@
   table.feed td{padding:6px 8px;border-top:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums;white-space:nowrap}
   table.feed .ty{color:var(--cyan)} .feed .wl{color:var(--magenta);font-family:var(--mono)}
   .feedwrap{max-height:420px;overflow:auto}
+  .covwrap{max-height:360px;overflow:auto;margin-top:8px}
+  table.feed td .ven{font-size:.7rem;text-transform:uppercase;letter-spacing:.06em;padding:2px 7px;border-radius:6px;border:1px solid var(--line)}
+  .ven.v4{color:var(--magenta)} .ven.v3{color:#7aa2ff} .ven.v2{color:var(--amber)}
+  table.feed td .newf{color:var(--lime);font-weight:700;font-size:.7rem}
+  table.feed td .cnt{color:var(--lime);font-weight:700;font-variant-numeric:tabular-nums}
+  table.feed td.addr{font-family:var(--mono);color:var(--dim)}
+  .convrow .wl2{color:var(--cyan);font-family:var(--mono);font-size:.72rem}
   .login{max-width:360px;margin:80px auto;text-align:center;padding:30px}
   .login input{width:100%;min-height:44px;border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:12px;padding:0 14px;color:var(--tx);font-family:var(--mono);outline:none;margin:16px 0}
   .login input:focus{border-color:rgba(200,255,77,.5)}
@@ -70,6 +77,19 @@
       <div class="panel card"><h3>Top pages / tokens</h3><div id="pages"></div></div>
       <div class="panel card"><h3>Referrers</h3><div id="refs"></div></div>
     </div>
+
+    <div class="cols" style="grid-template-columns:1fr">
+      <div class="panel card"><h3>🛰 Coverage — the launch surface</h3>
+        <p class="muted" id="covsum" style="margin:-4px 0 10px">Loading factory census…</p>
+        <div id="covbars"></div>
+        <div class="covwrap"><table class="feed" id="covtbl"></table></div>
+      </div>
+      <div class="panel card"><h3>🧠 Smart-money convergence</h3>
+        <p class="muted" id="convsum" style="margin:-4px 0 10px">Loading proven-wallet positions…</p>
+        <div class="covwrap"><table class="feed" id="convtbl"></table></div>
+      </div>
+    </div>
+
     <div class="panel card" style="margin-top:16px"><h3>Live event feed — including wallet connects</h3>
       <div class="feedwrap"><table class="feed" id="feed"></table></div>
     </div>
@@ -77,9 +97,38 @@
   </div>
 </main>
 
+<script src="/block0-cards.js"></script>
 <script>
 const $=(s)=>document.querySelector(s);
 let PW=sessionStorage.getItem("b0_ctrl")||"";
+const short=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"";
+const venChip=(v)=>{const k=v==="uniswap-v4"?"v4":v==="uniswap-v3"?"v3":v==="uniswap-v2"?"v2":"";return `<span class="ven ${k}">${v||"?"}</span>`;};
+const mc=(n)=>n>=1e6?"$"+(n/1e6).toFixed(2)+"M":n>=1e3?"$"+(n/1e3).toFixed(0)+"K":"$"+(n||0);
+const codename=(a)=>window.B0&&B0.codename?B0.codename(a):short(a);
+async function loadCoverage(){
+  try{
+    const d=await fetch("/api/coverage").then(r=>r.json());
+    const bv=d.byVenue||{};
+    $("#covsum").innerHTML=`<b style="color:var(--tx)">${d.factories}</b> factories producing <b style="color:var(--tx)">${d.tokens}</b> tokens · `+
+      Object.entries(bv).map(([v,n])=>`${venChip(v)} ${n}`).join(" · ")+
+      (d.newFactories?` · <span class="newf">${d.newFactories} new</span>`:"")+
+      `<br><span style="font-size:.72rem">${d.discovery}</span>`;
+    bars("#covbars",Object.entries(bv).map(([k,v])=>({k,v})),venChip);
+    $("#covtbl").innerHTML=(d.list||[]).map(f=>`<tr><td>${venChip(f.venue)}</td><td class="addr">${short(f.addr)}</td><td class="cnt">${f.tokens}</td><td class="muted">blk ${f.newestBlock}</td><td>${f.isNew?'<span class="newf">● NEW</span>':''}</td></tr>`).join("")||'<tr><td class="muted">no factories seen yet</td></tr>';
+  }catch(e){$("#covsum").textContent="Coverage unavailable.";}
+}
+async function loadConvergence(){
+  try{
+    const d=await fetch("/api/smart-money?min=1").then(r=>r.json());
+    const toks=d.tokens||[];
+    const conv=toks.filter(t=>t.count>=2).length;
+    $("#convsum").innerHTML=`<b style="color:var(--tx)">${toks.length}</b> tokens with a proven wallet positioned · <b style="color:var(--lime)">${conv}</b> with 2+ converging`;
+    $("#convtbl").innerHTML=toks.map(t=>{
+      const wl=(t.wallets||[]).slice(0,4).map(w=>`<span class="wl2" title="${(w.tokensWon||0)}w · ${w.winRate!=null?w.winRate+'% hit':''}">${codename(w.a)}</span>`).join(", ");
+      return `<tr class="convrow"><td><b style="color:var(--tx)">${t.sym||"?"}</b></td><td>${venChip(t.venue)}</td><td class="cnt">${t.count}🧠</td><td class="muted">${mc(t.mcapUsd)}</td><td>${wl}</td></tr>`;
+    }).join("")||'<tr><td class="muted">no smart-money positions yet — the leaderboard builds first</td></tr>';
+  }catch(e){$("#convsum").textContent="Convergence unavailable.";}
+}
 const flag=(cc)=>{ if(!cc||cc.length!==2) return "🏳"; return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0))); };
 const fmt=(n)=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(1)+"K":String(n||0);
 const dur=(s)=>{if(s==null)return"—";const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`;};
@@ -103,6 +152,7 @@ async function load(){
   bars("#refs",d.refs.length?d.refs:[]);
   $("#feed").innerHTML=d.events.map(e=>`<tr><td class="muted">${ago(e.ago)} ago</td><td class="ty">${e.type}</td><td>${e.cc?flag(e.cc)+' ':''}${e.city||e.cc||''}</td><td class="lab">${e.path}</td><td class="wl">${e.wallet?e.wallet.slice(0,6)+'…'+e.wallet.slice(-4):''}</td></tr>`).join("")||'<tr><td class="muted">no events yet</td></tr>';
   $("#refreshed").textContent="updated "+new Date().toLocaleTimeString();
+  loadCoverage(); loadConvergence();   // public endpoints — the launch surface + smart-money positioning
 }
 function show(id){$("#login").hidden=id!=="login";$("#dash").hidden=id!=="dash";}
 $("#go").addEventListener("click",()=>{PW=$("#pw").value.trim();sessionStorage.setItem("b0_ctrl",PW);load();});
