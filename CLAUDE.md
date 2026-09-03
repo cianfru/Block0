@@ -77,3 +77,26 @@ dumping — places it against a study of past winners, and shows the wallet inte
   data. Keep new engines the same way.
 - Commit to `main` → Railway deploys. Use `[skip ci]`-style discipline only if a deploy-cost cap ever appears.
 - `.env.example` documents every knob. New cost-affecting behaviour gets an env flag + a sensible cheap default.
+
+## Tokenomics — token-gated access (owner decided 2026-09)
+- **Access = holding a FIXED NUMBER OF TOKENS, not a dollar value.** Rationale (owner): a dollar-pegged threshold
+  makes the required token count fall as price rises, so members hold excess above the bar and have a standing
+  incentive to sell the surplus → sell pressure. A fixed token count means a member must hold exactly N to keep
+  access — no excess to trim — and the market sets the price freely. Less sell pressure, simpler, honest.
+- The gate (`/api/gate`, `block0-gate.js`) already works on a fixed token count: `GATE_THRESHOLD` = whole tokens.
+- Sizing guide (for choosing N): access cost in $ = (N / supply) × mcap. So N as a % of supply fixes the $-cost at
+  any given mcap. Pick N for the mcap where the TYPICAL member is expected to join, not the aspirational top.
+  Example: N = 0.001% of supply → ~$100 access at $10M mcap (~$10 at $1M, ~$1,000 at $100M). Consider a cheaper
+  founding-member bar for the first ~100–200 holders as an early growth lever.
+
+## Roadmap / owner asks (2026-09)
+- **🔲 FORENSIC ANALYTICS + CONTROL PANEL (building):** track who visits — count, country/geo, time, referrer, which
+  tokens/pages viewed, and WALLET CONNECTS (how many wallets, which) — like the rainbow-chart site's intel panel.
+  Plus Railway health/uptime/sustainability (process uptime, memory, board freshness, feed health). Password-gated
+  `/control` dashboard. Storage via store/kv.mjs (events list + unique-visitor set + aggregates). Geo from
+  cf-ipcountry/x-vercel-ip-country headers if present, else a cached best-effort IP lookup.
+- **🔲 LANDING SCROLL HERO (next):** an Apple-style, highly polished winner CONE WITH DEPTH where a PRICE LINE
+  travels through it as the user SCROLLS from the top to the second section (scroll-linked animation), surfacing a
+  few tracked parameters. Adapt the token-page cone renderer to a scroll-driven canvas with perspective/depth.
+- **🔲 Also flagged in the audit:** mobile hamburger nav (most traffic is mobile-from-X), OG images + favicon,
+  out-of-sample model tracking as the cohort grows, explorer URL.

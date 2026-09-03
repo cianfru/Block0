@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/block0.css">
+<script src="/track.js" defer></script>
 <style>
   :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
     --tx:#fff;--dim:#b6b6bd;--mute:#7f7f88;--lime:#c8ff4d;--cyan:#35e6e0;--magenta:#ff5cf0;--amber:#ffd23d;--coral:#ff3b5c;
@@ -688,6 +689,7 @@ async function boot(){
     const r=await fetch(`/api/token?address=${ADDR}`).then(x=>x.json());
     if(r.error){ $("#root").innerHTML=`<div class="state err">${r.error}</div>`; return; }
     document.title=`${r.sym} — Block0 dossier`;
+    try{ if(window.B0T) window.B0T("token_view",{path:"/token/"+((r.sym||"").replace(/[^A-Za-z0-9]/g,"").slice(0,16)||ADDR.slice(0,10))}); }catch(e){}
     render(r);
   }catch(e){ $("#root").innerHTML=`<div class="state err">Couldn't load this token: ${e.message}. The scanner may still be warming up — reload in a moment.</div>`; }
 }

@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Block0 — control</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+<style>
+  .kpis{display:grid;grid-template-columns:repeat(2,1fr);gap:12px;margin-top:20px}
+  @media(min-width:720px){.kpis{grid-template-columns:repeat(4,1fr)}}
+  .kpi{padding:16px 18px}
+  .kpi .v{font-family:var(--serif);font-size:2.1rem;line-height:1;color:var(--lime)}
+  .kpi .k{font-size:.66rem;text-transform:uppercase;letter-spacing:.12em;color:var(--mute);margin-top:6px}
+  .cols{display:grid;grid-template-columns:1fr;gap:16px;margin-top:20px}
+  @media(min-width:820px){.cols{grid-template-columns:1fr 1fr}}
+  .card{padding:16px 18px}
+  .card h3{font-family:var(--serif);font-style:italic;font-size:1.15rem;margin:0 0 12px;color:var(--dim)}
+  .row{display:flex;align-items:center;gap:10px;padding:6px 0;font-size:.86rem;border-top:1px solid rgba(255,255,255,.05)}
+  .row:first-of-type{border-top:none}
+  .row .lab{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--tx)}
+  .row .barw{width:110px;height:7px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;flex:0 0 auto}
+  .row .barw i{display:block;height:100%;background:linear-gradient(90deg,var(--cyan),var(--lime))}
+  .row .n{width:52px;text-align:right;font-variant-numeric:tabular-nums;color:var(--dim);flex:0 0 auto}
+  .health{display:flex;flex-wrap:wrap;gap:8px;margin-top:8px}
+  .hpill{border:1px solid var(--line);border-radius:10px;padding:6px 11px;font-size:.76rem;color:var(--dim);background:rgba(255,255,255,.03)}
+  .hpill b{color:var(--tx);font-variant-numeric:tabular-nums}
+  .hpill.ok{border-color:rgba(200,255,77,.4)} .hpill.warn{border-color:rgba(255,210,61,.5)}
+  table.feed{width:100%;border-collapse:collapse;font-size:.8rem;margin-top:6px}
+  table.feed td{padding:6px 8px;border-top:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums;white-space:nowrap}
+  table.feed .ty{color:var(--cyan)} .feed .wl{color:var(--magenta);font-family:var(--mono)}
+  .feedwrap{max-height:420px;overflow:auto}
+  .login{max-width:360px;margin:80px auto;text-align:center;padding:30px}
+  .login input{width:100%;min-height:44px;border:1px solid var(--line);background:rgba(255,255,255,.03);border-radius:12px;padding:0 14px;color:var(--tx);font-family:var(--mono);outline:none;margin:16px 0}
+  .login input:focus{border-color:rgba(200,255,77,.5)}
+  .muted{color:var(--mute);font-size:.8rem}
+</style>
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+<header class="hd"><div class="hd-in">
+  <a href="/" class="wordmark">block<b>0</b></a>
+  <nav class="nav"><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/methodology">Methodology</a></nav>
+  <div class="hd-r"><span class="chip chainchip">🕵 control</span></div>
+</div></header>
+
+<main class="wrap">
+  <div id="login" class="panel login" hidden>
+    <p class="micro eye">control panel</p>
+    <h2 style="font-size:1.6rem;margin-top:6px">Forensic dashboard</h2>
+    <input id="pw" type="password" placeholder="control password" autocomplete="off">
+    <button class="btn-lime" id="go" style="width:100%">Unlock</button>
+    <p class="muted" id="loginErr" style="margin-top:12px"></p>
+  </div>
+
+  <div id="dash" hidden>
+    <div class="sec-head" style="padding-top:28px">
+      <div><p class="micro eye">forensic dashboard</p><h1 style="font-size:2rem">Who's coming in</h1></div>
+      <div class="statchips"><span class="chip"><span class="live-dot"></span> <span id="refreshed">live</span></span></div>
+    </div>
+    <div class="health" id="health" style="margin-top:16px"></div>
+    <div class="kpis" id="kpis"></div>
+    <div class="cols">
+      <div class="panel card"><h3>By country</h3><div id="countries"></div></div>
+      <div class="panel card"><h3>By city</h3><div id="cities"></div></div>
+      <div class="panel card"><h3>Top pages / tokens</h3><div id="pages"></div></div>
+      <div class="panel card"><h3>Referrers</h3><div id="refs"></div></div>
+    </div>
+    <div class="panel card" style="margin-top:16px"><h3>Live event feed — including wallet connects</h3>
+      <div class="feedwrap"><table class="feed" id="feed"></table></div>
+    </div>
+    <p class="caveat">First-party, cookieless. Raw IPs are never stored — only a salted hash. Geo comes from an edge header (add Cloudflare for reliable country data) or a cached best-effort lookup. Set <code>CONTROL_PASSWORD</code> + optionally <code>INTEL_SALT</code> on the server.</p>
+  </div>
+</main>
+
+<script>
+const $=(s)=>document.querySelector(s);
+let PW=sessionStorage.getItem("b0_ctrl")||"";
+const flag=(cc)=>{ if(!cc||cc.length!==2) return "🏳"; return String.fromCodePoint(...[...cc.toUpperCase()].map(c=>127397+c.charCodeAt(0))); };
+const fmt=(n)=>n>=1e6?(n/1e6).toFixed(1)+"M":n>=1e3?(n/1e3).toFixed(1)+"K":String(n||0);
+const dur=(s)=>{if(s==null)return"—";const d=Math.floor(s/86400),h=Math.floor(s%86400/3600),m=Math.floor(s%3600/60);return d?`${d}d ${h}h`:h?`${h}h ${m}m`:`${m}m`;};
+const ago=(s)=>s<60?s+"s":s<3600?Math.floor(s/60)+"m":s<86400?Math.floor(s/3600)+"h":Math.floor(s/86400)+"d";
+function bars(el,arr,fmtLab){const max=Math.max(1,...arr.map(x=>x.v));$(el).innerHTML=arr.length?arr.map(x=>`<div class="row"><span class="lab">${fmtLab?fmtLab(x.k):x.k}</span><span class="barw"><i style="width:${Math.round(x.v/max*100)}%"></i></span><span class="n">${fmt(x.v)}</span></div>`).join(""):'<p class="muted">no data yet</p>';}
+async function load(){
+  const r=await fetch("/api/intel",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({pw:PW})});
+  if(r.status===401){sessionStorage.removeItem("b0_ctrl");show("login");$("#loginErr").textContent=PW?"Wrong password.":"";return;}
+  const d=await r.json(); if(d.error){show("login");$("#loginErr").textContent=d.error;return;}
+  show("dash");
+  const t=d.totals;
+  $("#kpis").innerHTML=[["Visits",fmt(t.visits)],["Unique visitors",fmt(t.unique)],["Wallet connects",fmt(t.walletConnects)],["Unique wallets",fmt(t.uniqueWallets)]].map(([k,v])=>`<div class="panel kpi"><div class="v">${v}</div><div class="k">${k}</div></div>`).join("");
+  const h=d.health,bad=h.boardAgeS!=null&&h.boardAgeS>600;
+  $("#health").innerHTML=`<span class="hpill ok">uptime <b>${dur(h.uptimeS)}</b></span>`+
+    `<span class="hpill ${bad?'warn':'ok'}">board <b>${h.boardAgeS==null?'—':ago(h.boardAgeS)+' ago'}</b></span>`+
+    `<span class="hpill">mem <b>${h.rssMB}MB</b> rss · <b>${h.heapMB}MB</b> heap</span>`+
+    `<span class="hpill">rpc <b>${h.provider||'—'}</b></span><span class="hpill">store <b>${h.kv||'—'}</b></span><span class="hpill">node <b>${h.node}</b></span>`;
+  bars("#countries",d.countries,(cc)=>`${flag(cc)} ${cc||'??'}`);
+  bars("#cities",d.cities);
+  bars("#pages",d.pages);
+  bars("#refs",d.refs.length?d.refs:[]);
+  $("#feed").innerHTML=d.events.map(e=>`<tr><td class="muted">${ago(e.ago)} ago</td><td class="ty">${e.type}</td><td>${e.cc?flag(e.cc)+' ':''}${e.city||e.cc||''}</td><td class="lab">${e.path}</td><td class="wl">${e.wallet?e.wallet.slice(0,6)+'…'+e.wallet.slice(-4):''}</td></tr>`).join("")||'<tr><td class="muted">no events yet</td></tr>';
+  $("#refreshed").textContent="updated "+new Date().toLocaleTimeString();
+}
+function show(id){$("#login").hidden=id!=="login";$("#dash").hidden=id!=="dash";}
+$("#go").addEventListener("click",()=>{PW=$("#pw").value.trim();sessionStorage.setItem("b0_ctrl",PW);load();});
+$("#pw").addEventListener("keydown",(e)=>{if(e.key==="Enter")$("#go").click();});
+if(PW) load(); else show("login");
+setInterval(()=>{ if(!$("#dash").hidden) load(); },30000);
+</script>
+</body>
+</html>

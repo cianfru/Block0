@@ -25,6 +25,10 @@ import { buildLeaderboard } from "./leaderboard.mjs";
 import { buildGraph } from "./graph.mjs";
 import { resolveFunders, funderLinks } from "./funders.mjs";
 import { rpc } from "./rpc.mjs";
+import { track, readIntel } from "./analytics.mjs";
+
+const readBody = (req, cap = 8192) => new Promise((resolve) => { let d = ""; req.on("data", (c) => { d += c; if (d.length > cap) req.destroy(); }); req.on("end", () => { try { resolve(JSON.parse(d || "{}")); } catch { resolve({}); } }); req.on("error", () => resolve({})); });
+const CONTROL_PW = process.env.CONTROL_PASSWORD || "";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -167,6 +171,7 @@ async function serveStatic(res, urlPath) {
     : (urlPath === "/leaderboard" || urlPath === "/leaderboard.html") ? "leaderboard.html"
     : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
     : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html"
+    : (urlPath === "/control" || urlPath === "/control.html") ? "control.html"
     : (urlPath === "/terms" || urlPath === "/terms.html") ? "terms.html" : null;
   const file = route || urlPath.replace(/^\//, "");
   try {
@@ -187,6 +192,23 @@ createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
+
+    if (u.pathname === "/api/track" && req.method === "POST") { // first-party analytics beacon (fire-and-forget)
+      const body = await readBody(req);
+      track(body, req).catch(() => {});
+      res.writeHead(204); return res.end();
+    }
+
+    if (u.pathname === "/api/intel") { // forensic dashboard data — password-gated (CONTROL_PASSWORD)
+      const body = req.method === "POST" ? await readBody(req) : {};
+      const pw = body.pw || u.searchParams.get("pw") || "";
+      res.writeHead(CONTROL_PW && pw === CONTROL_PW ? 200 : 401, { "content-type": "application/json", "cache-control": "no-store" });
+      if (!CONTROL_PW) return res.end(JSON.stringify({ error: "CONTROL_PASSWORD not set on the server" }));
+      if (pw !== CONTROL_PW) return res.end(JSON.stringify({ error: "unauthorized" }));
+      const b = getBoard();
+      const out = await readIntel({ boardAge: b.updated ? Date.now() - b.updated : null, provider: PROVIDER, kvBackend: KV_BACKEND });
+      return res.end(JSON.stringify(out));
+    }
 
     if (u.pathname === "/api/gate") { // token-gated access: config + a read-only balance check (no signing, no custody)
       const token = (process.env.GATE_TOKEN || "").toLowerCase();

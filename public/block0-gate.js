@@ -27,6 +27,7 @@ const B0GATE = (() => {
     catch { onState("rejected", cfg); return; }
     if (!addr) { onState("rejected", cfg); return; }
     try { localStorage.setItem(ADDRKEY, addr); } catch { /* */ }
+    try { if (window.B0T) window.B0T("wallet_connect", { wallet: addr }); } catch { /* */ } // forensic: which wallets connect
     onState("reading", cfg);
     const r = await check(addr);
     if (!r) { onState("error", cfg); return; }
