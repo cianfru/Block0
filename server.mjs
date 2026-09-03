@@ -121,6 +121,7 @@ export function leaderboardHealth() { return _lbHealth; }
 async function refreshLeaderboard() {
   if (_lbRunning) return; _lbRunning = true;
   const t0 = Date.now();
+  _lbHealth = { ..._lbHealth, building: true, startedAt: t0 };   // legible cold-build state (else zeros look like "failed")
   try {
     const b = getBoard();
     // winners only: graduated launchpad tokens + DEX-listed tokens, biggest first, deduped
@@ -140,7 +141,7 @@ async function refreshLeaderboard() {
     _lbHealth = { updated: Date.now(), wallets: lb.wallets || 0, proven: lb.proven || 0, riding: lb.riding || 0,
       tokensRequested: tokens.length, tokensScanned: lb.tokensScanned || 0, partial: !!lb.partial, buildMs: Date.now() - t0, ok: (lb.wallets || 0) > 0 };
   } catch (e) { _lbHealth = { ..._lbHealth, updated: Date.now(), buildMs: Date.now() - t0, ok: false, error: String(e && e.message || e).slice(0, 120) }; }
-  finally { _lbRunning = false; }
+  finally { _lbRunning = false; _lbHealth = { ..._lbHealth, building: false }; }
 }
 if (Number(process.env.LEADERBOARD_ON ?? 1) > 0) {
   getJSON("leaderboard").then((v) => { if (v) _leaderboard = v; }).catch(() => {});
@@ -264,6 +265,7 @@ createServer(async (req, res) => {
         board: { updated: b.updated || null, ageSeconds: ageMs == null ? null : Math.round(ageMs / 1000), scanning: !!b.scanning,
           cooking: (b.cooking || []).length, graduated: (b.graduated || []).length, dex: (b.dex || []).length, store: b.stats?.store || null },
         leaderboard: { updated: lh.updated || null, ageSeconds: lh.updated ? Math.round((Date.now() - lh.updated) / 1000) : null,
+          building: !!lh.building, buildingSeconds: lh.building && lh.startedAt ? Math.round((Date.now() - lh.startedAt) / 1000) : null,
           wallets: lh.wallets || 0, proven: lh.proven || 0, riding: lh.riding || 0, tokensScanned: lh.tokensScanned || 0,
           tokensRequested: lh.tokensRequested || 0, partial: !!lh.partial, buildSeconds: lh.buildMs ? Math.round(lh.buildMs / 1000) : null,
           ok: !!lh.ok, error: lh.error || null },
