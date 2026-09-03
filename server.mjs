@@ -188,6 +188,29 @@ createServer(async (req, res) => {
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
 
+    if (u.pathname === "/api/gate") { // token-gated access: config + a read-only balance check (no signing, no custody)
+      const token = (process.env.GATE_TOKEN || "").toLowerCase();
+      const enabled = /^0x[0-9a-f]{40}$/.test(token);
+      const decimals = Number(process.env.GATE_DECIMALS || 18);
+      const threshold = Number(process.env.GATE_THRESHOLD || 1000000); // in whole tokens
+      const chainRpc = process.env.GATE_CHAIN_RPC || process.env.DEX_RPC || "https://rpc.mainnet.chain.robinhood.com";
+      const cfg = { enabled, token: enabled ? token : null, symbol: process.env.GATE_SYMBOL || "BLOCK0",
+        threshold, decimals, chain: process.env.GATE_CHAIN_NAME || "Robinhood Chain", buyUrl: process.env.GATE_BUY_URL || null };
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      const address = (u.searchParams.get("address") || "").toLowerCase();
+      if (!address) return res.end(JSON.stringify(cfg)); // just the config
+      if (!/^0x[0-9a-f]{40}$/.test(address)) return res.end(JSON.stringify({ ...cfg, error: "bad address" }));
+      if (!enabled) return res.end(JSON.stringify({ ...cfg, ok: true, open: true, address })); // no token set yet → open
+      try {
+        const data = "0x70a08231" + address.replace(/^0x/, "").padStart(64, "0"); // balanceOf(address)
+        const r = await fetch(chainRpc, { method: "POST", headers: { "content-type": "application/json" },
+          body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "eth_call", params: [{ to: token, data }, "latest"] }) }).then((x) => x.json());
+        const raw = BigInt(r?.result && r.result !== "0x" ? r.result : "0x0");
+        const bal = Number(raw / (10n ** BigInt(Math.max(0, decimals - 6)))) / 1e6; // whole tokens, ~6dp precision
+        return res.end(JSON.stringify({ ...cfg, ok: bal >= threshold, balance: bal, address }));
+      } catch (e) { return res.end(JSON.stringify({ ...cfg, error: "balance read failed", address })); }
+    }
+
     if (u.pathname === "/api/status") { // system health/monitoring — board freshness, alert + store state, RPC provider
       const b = getBoard();
       const ageMs = b.updated ? Date.now() - b.updated : null;

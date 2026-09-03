@@ -198,3 +198,13 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .lb-pnl .v{font-family:var(--serif);font-size:1.5rem;line-height:1}
 .lb-go{display:none;font-size:.76rem;color:var(--lime);white-space:nowrap}
 @media(min-width:560px){.lb-go{display:inline}}
+
+/* ---- token-gated access overlay ---- */
+.gate-overlay{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,8,11,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
+.gate-card{max-width:460px;width:100%;padding:34px;text-align:center}
+.gate-card h2{font-size:2rem;margin-top:6px}
+.gate-sub{margin-top:12px;font-size:.9rem;line-height:1.6;color:var(--dim)}
+.gate-btns{margin-top:22px;display:flex;flex-wrap:wrap;gap:8px;justify-content:center}
+.gate-note{margin-top:16px;font-size:.72rem;color:var(--mute)}
+.gate-peek{display:inline-block;margin-top:14px;font-size:.76rem;color:var(--dim)}
+.gate-peek:hover{color:var(--tx)}

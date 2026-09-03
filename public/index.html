@@ -183,6 +183,7 @@
 </footer>
 
 <script src="/block0-cards.js"></script>
+<script src="/block0-gate.js"></script>
 <script>
 const $=(s,r=document)=>r.querySelector(s);
 const short=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"—";
@@ -690,8 +691,7 @@ async function boot(){
     render(r);
   }catch(e){ $("#root").innerHTML=`<div class="state err">Couldn't load this token: ${e.message}. The scanner may still be warming up — reload in a moment.</div>`; }
 }
-const _cn=$("#connect"); if(_cn) _cn.addEventListener("click",()=>{const g=$("#gatebar");_cn.textContent="Reading balance…";
-  setTimeout(()=>{_cn.textContent="Access granted";g.hidden=false;g.textContent="Read-only balance check — no signing, no transactions, no custody.";},1100);});
+B0GATE.mount({gated:true});
 boot();
 </script>
 </body>

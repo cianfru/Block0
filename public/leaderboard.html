@@ -61,10 +61,10 @@
 </footer>
 
 <script src="/block0-cards.js"></script>
+<script src="/block0-gate.js"></script>
 <script>
 const $=(s)=>document.querySelector(s);
-$("#connect").addEventListener("click",()=>{const b=$("#connect"),g=$("#gatebar");b.textContent="Reading balance…";
-  setTimeout(()=>{b.textContent="Access granted";g.hidden=false;g.textContent="Read-only balance check — no signing, no transactions, no custody.";},1100);});
+B0GATE.mount({gated:true});
 const ZERION="https://app.zerion.io";
 async function load(){try{
   const d=await fetch("/api/leaderboard?n=100").then(r=>r.json());
