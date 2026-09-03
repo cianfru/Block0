@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Block0">
+  <rect width="64" height="64" rx="14" fill="#08080b"/>
+  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none" stroke="#ffffff" stroke-opacity="0.10"/>
+  <!-- b — slanted serif, white -->
+  <text x="7" y="47" font-family="'Instrument Serif', Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" font-size="46" fill="#ffffff">b</text>
+  <!-- 0 — digital slashed zero, green -->
+  <g transform="translate(33,15)" stroke="#c8ff4d" stroke-linecap="round">
+    <ellipse cx="12" cy="17" rx="11" ry="16" fill="none" stroke-width="4.4"/>
+    <line x1="4.5" y1="27.5" x2="19.5" y2="6.5" stroke-width="3.6"/>
+  </g>
+</svg>
