@@ -57,7 +57,13 @@ jobs:
           git config user.name "block0-bot"
           git config user.email "bot@users.noreply.github.com"
           git add model.json study
-          if git diff --cached --quiet; then echo "no model changes"; else
-            git commit -m "Rebuild model (Pons + DEX winners) [skip ci]"
-            git push
-          fi
+          if git diff --cached --quiet; then echo "no model changes"; exit 0; fi
+          git commit -m "Rebuild model (Pons + DEX winners) [skip ci]"
+          # The rebuild runs ~20 min; main may have advanced meanwhile. Rebase our single model commit onto the
+          # latest main and retry the push, so a concurrent code push can't waste the whole (RPC-heavy) run.
+          for i in 1 2 3 4 5; do
+            if git push; then echo "pushed"; exit 0; fi
+            echo "push rejected — rebasing onto latest main (attempt $i)"
+            git pull --rebase origin main || { git rebase --abort || true; git fetch origin main && git rebase origin/main || exit 1; }
+          done
+          echo "::error::could not push the refreshed model after retries"; exit 1
