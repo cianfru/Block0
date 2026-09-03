@@ -6,162 +6,122 @@
 <title>Block0 — Robinhood Chain launch radar</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
-<style>
-  :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
-    --tx:#fff;--dim:#b6b6bd;--mute:#7f7f88;--lime:#c8ff4d;--cyan:#35e6e0;--magenta:#ff5cf0;--amber:#ffd23d;--coral:#ff3b5c;
-    --serif:"Instrument Serif",Georgia,serif;--sans:"Inter",system-ui,sans-serif;}
-  *{box-sizing:border-box}
-  body{margin:0;background:var(--bg);color:var(--tx);font-family:var(--sans);font-size:15px;-webkit-font-smoothing:antialiased;
-    background-image:radial-gradient(1200px 540px at 82% -14%,rgba(200,255,77,.10),transparent 60%),radial-gradient(820px 520px at -8% 6%,rgba(53,230,224,.07),transparent 55%),radial-gradient(700px 640px at 112% 116%,rgba(255,92,240,.05),transparent 60%);}
-  .wrap{max-width:1220px;margin:0 auto;padding:0 22px 70px}
-  a{color:inherit;text-decoration:none}
-  header{display:flex;align-items:center;gap:16px;padding:22px 0 12px;flex-wrap:wrap}
-  .brand{font-family:var(--serif);font-size:2rem;line-height:1}.brand b{font-style:italic;color:var(--lime);font-weight:400}
-  .chain{display:inline-flex;align-items:center;gap:7px;font-size:.76rem;color:var(--dim);border:1px solid var(--line);border-radius:10px;padding:7px 11px;background:var(--glass)}
-  .chain i{width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 8px var(--lime)}
-  form.search{flex:1;min-width:220px;display:flex;align-items:center;gap:10px;border:1px solid var(--line);border-radius:12px;padding:11px 14px;background:var(--glass);backdrop-filter:blur(14px)}
-  form.search input{flex:1;background:none;border:none;outline:none;color:var(--tx);font-size:.92rem}form.search input::placeholder{color:var(--mute)}
-  .connect{border:none;border-radius:12px;padding:11px 18px;background:var(--lime);color:#08080b;font-weight:700;font-size:.9rem;cursor:pointer}
-  .hero{margin:14px 0 8px}
-  .hero h1{font-family:var(--serif);font-size:clamp(2.2rem,5.4vw,3.7rem);line-height:1.02;margin:0 0 8px;font-weight:400}
-  .hero h1 em{font-style:italic;color:var(--lime)}
-  .hero p{color:var(--dim);font-size:1.05rem;max-width:62ch;margin:0}
-  .live{display:inline-flex;align-items:center;gap:8px;font-size:.82rem;color:var(--mute);margin-top:12px}
-  .live i{width:8px;height:8px;border-radius:50%;background:var(--lime);box-shadow:0 0 0 0 rgba(200,255,77,.5);animation:pulse 2.1s infinite}
-  @keyframes pulse{70%{box-shadow:0 0 0 8px rgba(200,255,77,0)}100%{box-shadow:0 0 0 0 rgba(200,255,77,0)}}
-  .bkt{margin-top:26px}
-  .bkt-h{display:flex;align-items:baseline;gap:12px;margin:0 0 12px}
-  .bkt-h .t{font-family:var(--serif);font-style:italic;font-size:1.5rem}
-  .bkt-h .n{font-size:.8rem;color:var(--mute)}
-  .grid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
-  .card{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));backdrop-filter:blur(12px);overflow:hidden;cursor:pointer;transition:transform .14s,border-color .14s;display:block}
-  .card:hover{transform:translateY(-3px);border-color:var(--line-2)}
-  .stripe{height:3px}
-  .cbody{padding:16px 17px}
-  .row1{display:flex;align-items:flex-start;justify-content:space-between;gap:10px}
-  .tk{font-size:1.26rem;font-weight:800;letter-spacing:-.01em}
-  .tk .age{font-size:.72rem;color:var(--mute);font-weight:500;margin-left:8px}
-  .mc{font-size:.82rem;color:var(--cyan);font-weight:600;margin-top:2px}
-  .rk{text-align:right;flex:0 0 auto}.rk .n{font-family:var(--serif);font-size:2rem;line-height:.9}.rk .l{font-size:.64rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;margin-top:2px}
-  .meta{display:flex;gap:10px;color:var(--mute);font-size:.75rem;margin:9px 0 11px}
-  .flagline{display:flex;flex-wrap:wrap;gap:7px}
-  .fl{display:inline-flex;align-items:center;gap:6px;font-size:.73rem;font-weight:600;padding:5px 9px;border-radius:9px;background:rgba(255,255,255,.04);border:1px solid var(--line)}
-  .fl .d{width:7px;height:7px;border-radius:50%}
-  .fl.amber .d{background:var(--amber)}.fl.mag .d{background:var(--magenta)}.fl.coral .d{background:var(--coral)}
-  .fl.dump{color:var(--coral);border-color:rgba(255,59,92,.4);background:rgba(255,59,92,.08)}
-  .fl.clean{color:var(--lime);border-color:rgba(200,255,77,.35);background:rgba(200,255,77,.06)}
-  /* risk-composition meters: snipers / bundles / concentration / live dumping, each a held-supply severity bar */
-  .facs{display:grid;grid-template-columns:1fr 1fr;gap:9px 15px;margin:11px 0 11px}
-  .fac .fh{display:flex;justify-content:space-between;align-items:baseline;font-size:.68rem;color:var(--dim);margin-bottom:4px;font-weight:600;letter-spacing:.02em}
-  .fac .fh b{font-weight:700;font-size:.7rem}
-  .ftrack{height:4px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden}
-  .ffill{height:100%;border-radius:3px;transition:width .3s}
-  /* blueprint-fit chip — how well a fresh launch matches the winner fingerprint */
-  .bpchip{display:inline-flex;align-items:center;gap:7px;margin-top:2px;font-size:.72rem;font-weight:700;padding:5px 10px;border-radius:9px;border:1px solid var(--line);background:rgba(255,255,255,.03)}
-  .bpchip .dia{font-size:.8rem}
-  .bpchip .sc{font-variant-numeric:tabular-nums}
-  .bpchip .lb{font-weight:600;color:var(--mute);font-size:.68rem;letter-spacing:.03em}
-  .chiprow{display:flex;flex-wrap:wrap;gap:7px;margin-top:2px}
-  .chiprow .bpchip{margin-top:0;flex:1;min-width:0}
-  /* live valuation-ladder placement: current wallets → winner precedent, and pace vs the winner band */
-  .pathline{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-top:8px;padding-top:9px;border-top:1px solid var(--line);font-size:.74rem;flex-wrap:wrap}
-  .pathline .pw{color:var(--dim)} .pathline .pw b{color:var(--cyan);font-weight:700}
-  .pathline .ppos{font-weight:700;font-size:.72rem}
-  /* filter tabs */
-  .tabs{display:flex;gap:6px;flex-wrap:wrap;margin:16px 0 4px}
-  .tab{font-size:.86rem;font-weight:600;color:var(--dim);border:1px solid var(--line);border-radius:11px;padding:8px 15px;background:var(--glass);cursor:pointer}
-  .tab.on{border-color:var(--lime);color:var(--lime);background:rgba(200,255,77,.08)}
-  /* token monogram icon */
-  .ic{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;font-weight:800;font-size:1rem;color:#0a0a0a;letter-spacing:-.02em;overflow:hidden}
-  .ic img{width:100%;height:100%;object-fit:cover;display:block}
-  .idn{display:flex;gap:11px;align-items:center}
-  .prog{margin:10px 0 2px}
-  .prog .lab{display:flex;justify-content:space-between;font-size:.7rem;color:var(--mute);margin-bottom:4px}
-  .prog .lab b{color:var(--lime)}
-  .prog .track{height:5px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
-  .prog .fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--lime));border-radius:4px}
-  /* new-launch card: brief pump.fun-style shake + a lingering glow + badge */
-  .card.new{animation:shake .5s ease-in-out 3;border-color:var(--lime);box-shadow:0 0 0 1px var(--lime),0 0 28px rgba(200,255,77,.22)}
-  @keyframes shake{0%,100%{transform:translateX(0)}20%{transform:translateX(-5px) rotate(-.5deg)}40%{transform:translateX(5px) rotate(.5deg)}60%{transform:translateX(-3px)}80%{transform:translateX(3px)}}
-  .newbadge{font-size:.62rem;font-weight:800;letter-spacing:.1em;color:#0a0a0a;background:var(--lime);padding:2px 7px;border-radius:6px;margin-left:8px;vertical-align:middle}
-  @media(prefers-reduced-motion:reduce){.card.new{animation:none}}
-  .state{color:var(--mute);font-size:.9rem;padding:40px 0}
-  .foot{color:var(--mute);font-size:.8rem;margin-top:28px;line-height:1.55;max-width:84ch}
-  @media(max-width:900px){.grid{grid-template-columns:1fr 1fr}}
-  @media(max-width:600px){.grid{grid-template-columns:1fr}}
-</style>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
 </head>
 <body>
-<div class="wrap">
-  <header>
-    <div class="brand">block<b>0</b></div>
-    <div class="chain"><i></i> Robinhood Chain</div>
-    <form class="search" onsubmit="return go(event)"><span>⌕</span><input id="q" placeholder="search by name / symbol, or paste a contract…" autocomplete="off"></form>
-    <a class="chain" href="/methodology" style="text-decoration:none">how it works</a>
-    <button class="connect">Connect</button>
-  </header>
-  <div class="hero">
-    <h1>Every launch, <em>verdicted.</em></h1>
-    <p>Block0 scans every token launched on the Robinhood Chain and grades it for snipers, bundles, concentration and live dumping — so you see what's safe to ape at a glance, without pasting a single contract.</p>
-    <div class="live"><i></i> <span id="live">scanning launches…</span></div>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav">
+      <a href="/" class="on">Board</a>
+      <a href="/token">Dossier</a>
+      <a href="/methodology">Methodology</a>
+      <a href="/terms">Terms</a>
+    </nav>
+    <div class="hd-r">
+      <span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span>
+      <button class="btn-connect" id="connect">Connect</button>
+    </div>
   </div>
-  <div class="tabs" id="tabs">
-    <div class="tab on" data-f="cooking">About to graduate</div>
-    <div class="tab" data-f="blueprint">◆ Blueprint fit</div>
-    <div class="tab" data-f="graduated">Graduated</div>
-    <div class="tab" data-f="dex">◇ DEX listings</div>
-    <div class="tab" data-f="heating">Heating</div>
-    <div class="tab" data-f="safe">Safest</div>
-    <div class="tab" data-f="avoid">Avoid</div>
+  <div class="gatebar" id="gatebar" hidden></div>
+</header>
+
+<main class="wrap">
+  <section class="sec">
+    <div class="sec-head">
+      <div>
+        <p class="micro eye">the board</p>
+        <h1>Every launch, graded at a glance</h1>
+      </div>
+      <div class="statchips" id="statchips"><span class="chip"><span class="live-dot"></span> scanning…</span></div>
+    </div>
+
+    <input class="search" id="q" placeholder="Search name, symbol, or paste a contract address" autocomplete="off">
+    <div class="filters" id="tabs">
+      <button class="on" data-f="cooking">About to graduate</button>
+      <button data-f="blueprint">Blueprint fit</button>
+      <button data-f="graduated">Graduated</button>
+      <button data-f="dex">DEX listings</button>
+      <button data-f="heating">Heating</button>
+      <button data-f="safe">Safest</button>
+      <button data-f="avoid">Avoid</button>
+    </div>
+
+    <div id="board"><div class="state">Loading the board — the first scan takes a moment…</div></div>
+
+    <p class="caveat">Signal, not proof — never a buy recommendation. Ranked cleanest-first inside each bucket; a launch under ~30 minutes old is a measured coin-flip and is labelled <em>too early to call</em>. <b>Risk</b> is a transparent composite of concentration, snipers, bundles and live insider-dumping, reconstructed from public Robinhood-Chain data. Not financial advice. <a href="/methodology">How it works &amp; how well it works →</a></p>
+  </section>
+</main>
+
+<footer class="ft">
+  <div class="ft-in">
+    <div class="ft-top">
+      <div>
+        <a href="/" class="wordmark">block<b>0</b></a>
+        <p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p>
+      </div>
+      <div class="ft-cols">
+        <div><p class="micro">Product</p><a href="/">Board</a><a href="/token">Token dossier</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+      </div>
+    </div>
+    <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
   </div>
-  <div id="board"><div class="state">Loading the board — the first scan takes a moment…</div></div>
-  <div class="foot">Ranked cleanest-first inside each market-cap bucket. Fresh sub-$500k launches are the flagship; bigger caps decay to on-demand once the move has happened. <b>Risk</b> is a transparent composite of concentration, snipers, bundles and live insider-dumping — a position read, <b>signal not proof</b>, never a buy recommendation. Reconstructed from public Robinhood-Chain data. Not financial advice. <a href="/methodology" style="color:var(--lime)">How it works &amp; how well it works →</a> · <a href="/terms" style="color:var(--mute)">Terms &amp; privacy</a></div>
-</div>
+</footer>
+
 <script>
 const $=(s)=>document.querySelector(s);
 const band=(r)=>r>=66?"var(--coral)":r>=45?"var(--amber)":r>=25?"var(--cyan)":"var(--lime)";
-const mcT=(x)=>!x?"—":x>=1e6?"$"+(x/1e6).toFixed(1)+"M":x>=1e3?"$"+Math.round(x/1e3)+"k":"$"+Math.round(x);
-const HUES=["#c8ff4d","#35e6e0","#ff5cf0","#ffd23d","#ff8a5c","#7ee787","#8ab4ff","#ff7ab6"];
-function icon(r){const sym=r.sym||"?";let h=0;for(let i=0;i<sym.length;i++)h=(h*31+sym.charCodeAt(i))|0;const bg=HUES[Math.abs(h)%HUES.length];
-  const ini=sym.replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?";
-  const mono=`<div class="ic" style="background:${bg}">${ini}</div>`;
-  return r.logo?`<div class="ic" style="background:${bg}"><img src="${r.logo}" alt="" loading="lazy" onerror="this.parentNode.textContent='${ini}'"></div>`:mono;}
+const HEX=(r)=>r>=66?"#ff3b5c":r>=45?"#ffd23d":r>=25?"#35e6e0":"#c8ff4d";
+const mcT=(x)=>!x?"—":x>=1e6?"$"+(x/1e6).toFixed(1)+"M":x>=1e3?"$"+Math.round(x/1e3)+"K":"$"+Math.round(x);
+const fmtAge=(h)=>h==null?"—":h<1?Math.round(h*60)+"m":h<48?h.toFixed(1)+"h":Math.round(h/24)+"d";
+const sev=(v)=>v>=66?"#ff3b5c":v>=45?"#ffd23d":v>=25?"#35e6e0":"#c8ff4d";
+function icon(r){const sym=r.sym||"?";const c=HEX(r.risk);const ini=(sym.replace(/[^A-Za-z0-9]/g,"")[0]||"?").toUpperCase();
+  const st=`color:${c};background:${c}12`;
+  return r.logo?`<div class="mono-ic" style="${st}"><img src="${r.logo}" alt="" loading="lazy" onerror="this.parentNode.textContent='${ini}'"></div>`:`<div class="mono-ic" style="${st}">${ini}</div>`;}
 function go(e){e.preventDefault();const v=$("#q").value.trim();if(/^0x[0-9a-fA-F]{40}$/.test(v))location.href="/token?address="+v;return false;}
 let SEARCH="";
 const isNew=(r)=>r.isNew||(r.firstSeenAt&&Date.now()-r.firstSeenAt<150000);
-const sev=(v)=>v>=60?"var(--coral)":v>=30?"var(--amber)":v>=12?"var(--cyan)":"var(--lime)";
-function meter(lab,v,detail){const col=sev(v);return `<div class="fac"><div class="fh"><span>${lab}</span><b style="color:${col}">${detail}</b></div><div class="ftrack"><div class="ffill" style="width:${Math.max(3,Math.min(100,v))}%;background:${col}"></div></div></div>`;}
-function card(r){const f=r.flags,p=r.parts||{},c=band(r.risk);
-  const facs=[
-    meter("Snipers",p.snipers||0,f.snipers?`${f.snipers} · ${f.sniperHeldPct}%`:"none"),
-    meter("Bundles",p.bundles||0,f.bundles?`${f.bundles} · ${f.bundleHeldPct}%`:"none"),
-    meter("Top-10 hold",p.concentration||0,`${f.top10Pct}%`),
-    meter("Dumping now",p.dumping||0,f.insiderSellersNow?`${f.insiderSellersNow} · ${f.insiderDumpNowPct}%`:"none"),
+function meter(lab,v,det){const col=sev(v),d=0;return `<div class="meter"><div class="mh"><span>${lab}</span><b class="tnum" style="color:${col}">${v}</b></div><div class="track"><div class="fill" style="width:${Math.max(2,Math.min(100,v))}%;background:${col}"></div></div>${det?`<div class="det">${det}</div>`:''}</div>`;}
+function chip(txt,color){return `<span class="chip"${color?` style="color:${color}"`:''}>${txt}</span>`;}
+function card(r,i){const f=r.flags||{},p=r.parts||{},c=HEX(r.risk),tooEarly=r.ageH<0.5;
+  const meters=[
+    meter("Snipers",p.snipers||0,f.snipers?`${f.snipers} · ${f.sniperHeldPct}% held`:"none"),
+    meter("Bundles",p.bundles||0,f.bundles?`${f.bundles} · ${f.bundleHeldPct}% held`:"none"),
+    meter("Concentration",p.concentration||0,`top 10 · ${f.top10Pct}%`),
+    meter("Dumping now",p.dumping||0,f.insiderSellersNow?`${f.insiderSellersNow} selling`:"none"),
   ].join("");
-  const alert=f.insiderSellersNow?`<div class="flagline"><span class="fl dump">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow>1?'s':''} selling now</span></div>`
-    :(!f.snipers&&!f.bundles)?`<div class="flagline"><span class="fl clean">✓ no snipers · no bundles</span></div>`:"";
-  const bpc=r.blueprint>=75?"var(--lime)":r.blueprint>=55?"var(--cyan)":r.blueprint>=35?"var(--amber)":"var(--mute)";
-  const bp=(!r.graduated&&r.blueprint!=null)?`<div class="bpchip"><span class="dia" style="color:${bpc}">◆</span><span class="sc" style="color:${bpc}">Blueprint ${r.blueprint}</span><span class="lb">${r.blueprintLabel||''}</span></div>`:"";
-  const CS={"on-track":"var(--lime)","behind":"var(--amber)","failing":"var(--coral)"};
-  const CSL={"on-track":"on winner pace","behind":"behind pace","failing":"stalling"};
-  const cor=(!r.graduated&&r.corridor)?`<div class="bpchip"><span class="dia" style="color:${CS[r.corridor.status]}">▸</span><span class="sc" style="color:${CS[r.corridor.status]}">Corridor ${r.corridor.traj}</span><span class="lb">${CSL[r.corridor.status]}</span></div>`:"";
-  const chips=(bp||cor)?`<div class="chiprow">${bp}${cor}</div>`:"";
-  const PC={ahead:"var(--amber)","on-path":"var(--lime)",lagging:"var(--cyan)","off-path":"var(--mute)"};
-  const PL={ahead:"ahead of pace","on-path":"on the winner path",lagging:"lagging winners","off-path":"off the path"};
-  const pathline=(!r.graduated&&r.path)?`<div class="pathline"><span class="pw">${(r.wallets||0).toLocaleString()} wallets → precedent <b>${mcT(r.path.precedent)}</b></span><span class="ppos" style="color:${PC[r.path.pos]}">${PL[r.path.pos]} · ${r.path.ratio}×</span></div>`:"";
-  const prog=(!r.graduated&&r.progress!=null)?`<div class="prog"><div class="lab"><span>bonding curve</span><b>${r.progress}%</b></div><div class="track"><div class="fill" style="width:${Math.min(100,r.progress)}%"></div></div></div>`:"";
-  return `<a class="card${isNew(r)?' new':''}" href="/token?address=${r.address}"><div class="stripe" style="background:${c}"></div><div class="cbody">
-    <div class="row1"><div class="idn">${icon(r)}<div><div class="tk">${r.sym}${isNew(r)?'<span class="newbadge">NEW</span>':""}</div><div class="mc">${mcT(r.mcapUsd)} mcap</div></div></div>
-    <div class="rk"><div class="n" style="color:${c}">${r.risk}</div><div class="l" style="color:${c}">${r.label}</div></div></div>
-    ${prog}
-    <div class="meta"><span>${f.holders} holders</span><span>·</span><span>${r.momentum>3?'▲ heating':r.momentum<-3?'▼ cooling':'– flat'}</span>${r.venue?`<span>·</span><span style="color:var(--magenta)">◇ ${r.venue.replace('uniswap-','uni ')}</span>`:''}</div>
-    <div class="facs">${facs}</div>
-    ${chips}
-    ${pathline}
-    ${alert}</div></a>`;}
+  const venue=r.venue==="uniswap-v4"?chip("uniswap-v4","#ff5cf0"):chip(r.section==="graduated"?"graduated":"launchpad · pons","#35e6e0");
+  const CS={"on-track":"#c8ff4d","behind":"#ffd23d","drifting":"#ffd23d","failing":"#ff3b5c"};
+  const bpChips=(r.venue!=="uniswap-v4")?[
+    r.blueprint!=null?chip(`blueprint ${r.blueprint} · ${r.blueprintLabel||''}`):"",
+    r.corridor?chip(`corridor ${r.corridor.status}`,CS[r.corridor.status]||"#ffd23d"):"",
+  ].join(""):"";
+  const curve=(r.progress!=null)?chip(`curve ${r.progress}%`):"";
+  const prec=r.path?`<div class="precedent tnum">${(r.flags.wallets||r.flags.holders||0).toLocaleString()} wallets → <b>${mcT(r.path.precedent)}</b> <span class="m">precedent mcap</span></div>`:"";
+  const al=r.alert?`<p class="alert" style="color:${r.alert.tone==='good'?'#c8ff4d':r.alert.tone==='warn'?'#ffd23d':'#ff3b5c'}">${r.alert.tone==='bad'?'▼ ':r.alert.tone==='good'?'✓ ':'! '}${r.alert.text}</p>`
+    :f.insiderSellersNow?`<p class="alert" style="color:#ff3b5c">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow>1?'s':''} selling now</p>`
+    :(!f.snipers&&!f.bundles)?`<p class="alert" style="color:#c8ff4d">✓ no snipers · no bundles</p>`:"";
+  return `<a class="panel panel-hover tcard${isNew(r)?' new':''}" href="/token?address=${r.address}" style="animation-delay:${Math.min(i*60,600)}ms">
+    <div class="stripe" style="background:${c}"></div>
+    <div class="body">
+      <div class="top">${icon(r)}
+        <div style="min-width:0">
+          <div class="tsym">${r.sym||'?'}${isNew(r)?'<span class="newbadge">NEW</span>':''}</div>
+          <div class="micro" style="margin-top:3px">${mcT(r.mcapUsd)} mcap · ${fmtAge(r.ageH)} old</div>
+        </div>
+        <div class="rscore"><span class="n" style="color:${c};text-shadow:0 0 26px ${c}44">${r.risk}</span><span class="l" style="color:${c}">${tooEarly?'Too early':r.label}</span></div>
+      </div>
+      <div class="meters">${meters}</div>
+      <div class="chiprow">${venue}${bpChips}${curve}</div>
+      ${prec}
+      ${al}
+    </div></a>`;}
 let LAST=null, FILTER="cooking";
-function section(title,n,rows){return `<div class="bkt"><div class="bkt-h"><span class="t">${title}</span><span class="n">${n}</span></div><div class="grid">${rows.map(card).join("")}</div></div>`;}
+function section(rows){return `<div class="grid">${rows.map(card).join("")}</div>`;}
 function render(){
   const b=LAST; if(!b||((!b.cooking||!b.cooking.length)&&(!b.graduated||!b.graduated.length))){
     $("#board").innerHTML='<div class="state">'+(b&&b.scanning?"Scanning the launch universe — the first pass takes a moment…":"Waiting for the first scan…")+'</div>';return;}
@@ -169,44 +129,39 @@ function render(){
   if(SEARCH){
     const q=SEARCH.toLowerCase();
     const hits=cooking.concat(grad,dexl).filter(r=>((r.sym||"").toLowerCase().includes(q)||(r.name||"").toLowerCase().includes(q)));
-    $("#board").innerHTML=hits.length?section(`Search · "${SEARCH}"`,`${hits.length} match${hits.length>1?'es':''} in the tracked set`,hits)
-      :`<div class="state">No tracked launch matches "${SEARCH}". The board tracks the most active + graduated tokens — paste a full contract address to scan any token directly.</div>`;
+    $("#board").innerHTML=hits.length?section(hits):`<div class="state">No tracked launch matches "${SEARCH}". Paste a full contract address to scan any token directly.</div>`;
     return;}
-  if(FILTER==="cooking"){$("#board").innerHTML=section("About to graduate",`${cooking.length} · ranked by bonding-curve progress`,cooking);return;}
+  if(FILTER==="cooking"){$("#board").innerHTML=section(cooking.sort((a,b)=>(b.progress||0)-(a.progress||0)));return;}
   if(FILTER==="blueprint"){
     const rows=cooking.slice().sort((a,b)=>(b.blueprint||0)-(a.blueprint||0));
-    const strong=rows.filter(r=>(r.blueprint||0)>=75), rest=rows.filter(r=>(r.blueprint||0)<75);
-    let html='<p style="color:var(--dim);font-size:.9rem;margin:0 0 16px;max-width:76ch">Fresh launches ranked by how well they fit the <b style="color:var(--tx)">winner fingerprint</b> from the 10 biggest graduations — no bundles, a float that opens up, a clean settled score, real adoption. A strong fit is worth watching; it is a pattern, not a promise.</p>';
-    if(strong.length)html+=section("Strong fit — fits the winner pattern",`${strong.length}`,strong);
-    html+=section(strong.length?"The rest":"Blueprint fit","ranked by match",rest);
-    $("#board").innerHTML=html;return;}
+    $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Fresh launches ranked by how well they fit the <b style="color:var(--tx)">winner fingerprint</b> from the biggest graduations — no bundles, a float that opens up, a clean settled score, real adoption. A pattern, not a promise.</p>'+section(rows);return;}
   if(FILTER==="dex"){
-    $("#board").innerHTML='<p style="color:var(--dim);font-size:.9rem;margin:0 0 16px;max-width:78ch">Tokens listed <b style="color:var(--tx)">directly on the Uniswap-v4 AMM</b>, not via the Pons launchpad — discovered on-chain and verdicted by the same engine. No bonding curve, so no "graduation"; these are live from block one. Cleanest first.</p>'+
-      (dexl.length?section("Direct DEX listings",`${dexl.length} · non-Pons`,dexl.slice().sort((a,b)=>a.risk-b.risk)):'<div class="state">No DEX listings verdicted yet — the discovery pass runs alongside the board scan.</div>');
+    $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Tokens listed <b style="color:var(--tx)">directly on the Uniswap-v4 AMM</b>, not via the Pons launchpad — discovered on-chain and verdicted by the same engine. Live from block one. Cleanest first.</p>'+
+      (dexl.length?section(dexl.sort((a,b)=>a.risk-b.risk)):'<div class="state">No DEX listings verdicted yet — the discovery pass runs alongside the board scan.</div>');
     return;}
-  if(FILTER==="graduated"){
-    const tiers=[[1e8,"$100M+"],[1e7,"$10M – $100M"],[1e6,"$1M – $10M"],[0,"under $1M"]];
-    let html="";
-    for(let i=0;i<tiers.length;i++){const lo=tiers[i][0],hi=i===0?Infinity:tiers[i-1][0];
-      const rows=grad.filter(r=>(r.mcapUsd||0)>=lo&&(r.mcapUsd||0)<hi);
-      if(rows.length)html+=section(tiers[i][1],`${rows.length} coin${rows.length>1?'s':''}`,rows);}
-    $("#board").innerHTML=html||section("Graduated","none yet",[]);return;}
+  if(FILTER==="graduated"){$("#board").innerHTML=grad.length?section(grad.sort((a,b)=>(b.mcapUsd||0)-(a.mcapUsd||0))):'<div class="state">No graduated tokens yet.</div>';return;}
   let all=cooking.concat(grad,dexl);
   if(FILTER==="heating") all.sort((a,b)=>(b.momentum||0)-(a.momentum||0));
-  if(FILTER==="safe") all.sort((a,b)=>a.risk-b.risk||(b.ape||0)-(a.ape||0));
-  if(FILTER==="avoid") all.sort((a,b)=>b.risk-a.risk||(b.flags.insiderSellersNow||0)-(a.flags.insiderSellersNow||0));
-  const T={heating:"Heating up",safe:"Cleanest first",avoid:"Highest risk"};
-  $("#board").innerHTML=section(T[FILTER],`${all.length} tokens`,all);
+  if(FILTER==="safe") all.sort((a,b)=>a.risk-b.risk);
+  if(FILTER==="avoid") all=all.filter(r=>r.risk>=45).sort((a,b)=>b.risk-a.risk);
+  $("#board").innerHTML=section(all);
 }
-$("#tabs").addEventListener("click",(e)=>{const t=e.target.closest(".tab");if(!t)return;FILTER=t.dataset.f;document.querySelectorAll("#tabs .tab").forEach(x=>x.classList.toggle("on",x===t));render();});
-$("#q").addEventListener("input",(e)=>{const v=e.target.value.trim();SEARCH=/^0x[0-9a-fA-F]{0,40}$/.test(v)?"":v;document.querySelector("#tabs").style.opacity=SEARCH?".4":"1";render();});
+$("#tabs").addEventListener("click",(e)=>{const t=e.target.closest("button");if(!t)return;FILTER=t.dataset.f;document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===t));render();});
+$("#q").addEventListener("input",(e)=>{const v=e.target.value.trim();SEARCH=/^0x[0-9a-fA-F]{0,40}$/.test(v)?"":v;$("#tabs").style.opacity=SEARCH?".4":"1";render();});
+$("#q").addEventListener("keydown",(e)=>{if(e.key==="Enter")go(e);});
+// Connect = read-only, token-gated access preview (no signing, no custody)
+$("#connect").addEventListener("click",()=>{const b=$("#connect"),g=$("#gatebar");b.textContent="Reading balance…";
+  setTimeout(()=>{b.textContent="Access granted";g.hidden=false;g.textContent="Read-only balance check — no signing, no transactions, no custody. Gate is open while the Block0 token is unset; the threshold check runs client-side.";},1100);});
 async function load(){try{
   const b=await fetch("/api/board").then(r=>r.json());LAST=b;
   const nc=(b.cooking||[]).length,ng=(b.graduated||[]).length,s=b.stats||{};
-  if(!nc&&!ng){$("#live").textContent=b.scanning?"scanning launch universe…":"waiting for first scan…";render();return;}
-  $("#live").textContent=`live · ${s.launchTotal?s.launchTotal.toLocaleString()+" launches · ":""}${s.activeTotal||0} active · ${s.graduatedTotal||0} graduated · updated ${new Date(b.updated).toLocaleTimeString()}`;
+  const sc=$("#statchips");
+  if(!nc&&!ng){sc.innerHTML=`<span class="chip"><span class="live-dot"></span> ${b.scanning?"scanning universe…":"waiting for first scan…"}</span>`;render();return;}
+  sc.innerHTML=`<span class="chip"><span class="live-dot"></span> live</span>`+
+    (s.launchTotal?`<span class="chip tnum">${s.launchTotal.toLocaleString()} launches</span>`:"")+
+    `<span class="chip tnum">${s.activeTotal||nc} active</span><span class="chip tnum">${s.graduatedTotal||ng} graduated</span>`;
   render();
-}catch(e){$("#live").textContent="board unavailable — retrying…";}}
+}catch(e){$("#statchips").innerHTML='<span class="chip">board unavailable — retrying…</span>';}}
 load();setInterval(load,20000);
 </script>
 </body>
