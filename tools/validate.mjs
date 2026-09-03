@@ -14,6 +14,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 const ROOT = new URL("..", import.meta.url);
 const rd = (f) => JSON.parse(readFileSync(new URL(f, ROOT), "utf8"));
 const med = (a) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
+const pctile = (arr, p) => { const s = arr.slice().sort((a, b) => a - b); if (!s.length) return 0; const i = (s.length - 1) * p; const l = Math.floor(i), h = Math.ceil(i); return l === h ? s[l] : s[l] + (s[h] - s[l]) * (i - l); };
 
 const corr = rd("study/corridor_data.json"); // { bins, winners:[{path:[{a,t}]}], losers:[...] }
 const bins = corr.bins.map((b) => ({ lo: b.lo, hi: b.hi, q1: b.q1 }));
@@ -23,21 +24,45 @@ const trajAt = (tok, b) => { const v = (tok.path || []).filter((p) => p.a >= b.l
 // AUC via all-pairs (Mann–Whitney): fraction of (winner,loser) pairs where winner ranks strictly higher (+½ ties)
 function auc(pos, neg) { if (!pos.length || !neg.length) return null; let c = 0; for (const p of pos) for (const n of neg) c += p > n ? 1 : p === n ? 0.5 : 0; return c / (pos.length * neg.length); }
 
+// The product's ACTUAL rule is "is the token at/above the winner corridor's lower band (q1) at this age?".
+// Grade THAT — the number a trader actually acts on — and grade it honestly:
+//   • winners are scored LEAVE-ONE-OUT: each winner is tested against a band rebuilt from the OTHER winners,
+//     so it can't be flattered by having helped define the band it's measured against;
+//   • losers never shaped the corridor at all, so their false-positive rate is already out-of-sample.
+// "catches X% of winners at Y% false alarms" reads at a glance; the gap between the two IS the signal.
 const W = corr.winners, L = corr.losers;
 const perBin = [];
+let poolWHit = 0, poolWtot = 0, poolLHit = 0, poolLtot = 0;   // pooled across every age checkpoint for the headline
 for (const b of bins) {
   const wv = W.map((t) => trajAt(t, b)).filter((x) => x != null);
   const lv = L.map((t) => trajAt(t, b)).filter((x) => x != null);
+  // pooled winner trajectory points in this bin, tagged by token, to rebuild the band leave-one-out
+  const wpts = []; for (const w of W) for (const p of (w.path || [])) if (p.a >= b.lo && p.a < b.hi) wpts.push({ sym: w.sym, t: p.t });
+  const wtok = W.map((w) => ({ sym: w.sym, t: trajAt(w, b) })).filter((x) => x.t != null);
+  let looHit = 0;
+  for (const w of wtok) { const others = wpts.filter((p) => p.sym !== w.sym).map((p) => p.t); const q1b = others.length ? pctile(others, 0.25) : b.q1; if (w.t >= q1b) looHit++; }
+  const catchLOO = wtok.length ? looHit / wtok.length : null;
+  const falsePos = lv.length ? lv.filter((x) => x >= b.q1).length / lv.length : null;
+  poolWHit += looHit; poolWtot += wtok.length; poolLHit += lv.filter((x) => x >= b.q1).length; poolLtot += lv.length;
   perBin.push({
     age: `${b.lo}-${b.hi}h`, q1: b.q1,
     nW: wv.length, nL: lv.length,                                  // how many of each class were still alive at this age
     survW: +(wv.length / W.length).toFixed(2), survL: +(lv.length / L.length).toFixed(2),
     medW: wv.length ? Math.round(med(wv)) : null, medL: lv.length ? Math.round(med(lv)) : null,
-    onW: wv.length ? +(wv.filter((x) => x >= b.q1).length / wv.length).toFixed(2) : null,  // % winners on/above the band
+    onW: wv.length ? +(wv.filter((x) => x >= b.q1).length / wv.length).toFixed(2) : null,  // % winners on/above the band (in-sample)
     onL: lv.length ? +(lv.filter((x) => x >= b.q1).length / lv.length).toFixed(2) : null,  // % losers on/above the band (false positives)
+    catchLOO: catchLOO == null ? null : +catchLOO.toFixed(2),                                // % winners caught, HELD-OUT (the honest recall)
+    falsePos: falsePos == null ? null : +falsePos.toFixed(2),                                // % losers falsely flagged (out-of-sample by construction)
     auc: auc(wv, lv) == null ? null : +auc(wv, lv).toFixed(2),
   });
 }
+// one-line headline: pooled across every age checkpoint (per-observation), held-out winners vs out-of-sample losers
+const headline = {
+  catch: poolWtot ? +(poolWHit / poolWtot).toFixed(2) : null,
+  falsePos: poolLtot ? +(poolLHit / poolLtot).toFixed(2) : null,
+  winnerObs: poolWtot, loserObs: poolLtot,
+  note: "winners held out leave-one-out; losers never shaped the corridor",
+};
 
 // A blunt end-to-end read: classify each token by its LATE-LIFE trajectory (last third of its observed path),
 // the "did it sustain the path" signal. Sweep a threshold, report the best-separating operating point.
@@ -56,6 +81,7 @@ const survivalSignal = [4, 16, 48, 128].map((age) => ({ age: age + "h", winners:
 const out = {
   generatedAt: new Date().toISOString().slice(0, 10),
   cohort: { winners: W.length, losers: L.length, note: "in-sample separation on the study cohort — not out-of-sample proof; refresh as more tokens graduate" },
+  headline,
   perBin,
   lateLife: { aucWinnerVsLoser: lateAuc == null ? null : +lateAuc.toFixed(2), bestThreshold: best },
   survivalSignal,

@@ -36,6 +36,30 @@
   .conehint .arw{width:1px;height:26px;background:linear-gradient(180deg,var(--cyan),transparent);animation:cscroll 1.8s ease-in-out infinite}
   @keyframes cscroll{0%,100%{opacity:.3;transform:scaleY(.6)}50%{opacity:1;transform:scaleY(1)}}
   @media(prefers-reduced-motion:reduce){.conehint .arw{animation:none}}
+
+  /* ---- accuracy: catches winners / false alarms, at a glance ---- */
+  .acc2-head{display:flex;flex-wrap:wrap;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:rgba(255,255,255,.02);margin-bottom:16px}
+  .acc2-head .cell{flex:1 1 220px;padding:20px 22px}
+  .acc2-head .cell+.cell{border-left:1px solid var(--line)}
+  .acc2-head .big{font-family:var(--serif);font-size:2.9rem;line-height:1;display:block}
+  .acc2-head .big.g{color:var(--lime)} .acc2-head .big.c{color:var(--coral)}
+  .acc2-head .lab{font-size:.86rem;color:var(--tx);margin-top:6px;display:block}
+  .acc2-head .sub{font-size:.72rem;color:var(--mute);margin-top:3px;display:block}
+  .acc2-legend{display:flex;gap:20px;flex-wrap:wrap;font-size:.76rem;color:var(--dim);margin:0 2px 14px}
+  .acc2-legend .k{display:inline-flex;align-items:center;gap:8px}
+  .acc2-legend .sw{width:12px;height:12px;border-radius:3px;flex:0 0 auto}
+  .acc2-legend .sw.g{background:var(--lime)} .acc2-legend .sw.c{background:var(--coral)}
+  .ab-row{display:grid;grid-template-columns:66px 1fr auto;align-items:center;gap:16px;padding:11px 0;border-top:1px solid rgba(255,255,255,.055)}
+  .ab-row:first-child{border-top:none}
+  .ab-age{font-size:.84rem;color:var(--dim);font-variant-numeric:tabular-nums}
+  .ab-mid{display:flex;flex-direction:column;gap:6px;min-width:0}
+  .ab-track{position:relative;height:13px;border-radius:7px;background:rgba(255,255,255,.06)}
+  .ab-catch{position:absolute;left:0;top:0;bottom:0;border-radius:7px;background:linear-gradient(90deg,rgba(200,255,77,.5),var(--lime));box-shadow:0 0 10px rgba(200,255,77,.35)}
+  .ab-false{position:absolute;top:-3px;bottom:-3px;width:3px;border-radius:2px;background:var(--coral);box-shadow:0 0 8px var(--coral);transform:translateX(-1px)}
+  .ab-note{font-size:.73rem;color:var(--mute)}
+  .ab-nums{display:flex;align-items:baseline;gap:12px;font-variant-numeric:tabular-nums;white-space:nowrap;text-align:right}
+  .ab-nums .g{color:var(--lime);font-weight:700;font-size:1.02rem} .ab-nums .c{color:var(--coral);font-weight:600;font-size:.9rem}
+  @media(max-width:640px){.ab-row{grid-template-columns:50px 1fr auto;gap:11px}}
 </style>
 </head>
 <body>
@@ -126,9 +150,9 @@
 
   <!-- Accuracy -->
   <section class="sec">
-    <div class="stitle"><p class="micro eye">uncomfortable honesty</p><h2>We publish where the signal doesn't work</h2><p class="sub">A fresh launch's first ~30 minutes is a measured coin-flip. The UI says too early to call — it doesn't fake a verdict. AUC measures how well the model separates eventual winners from losers at each age.</p></div>
+    <div class="stitle"><p class="micro eye">measured, not marketed</p><h2>How often it catches a winner — and how often it's fooled</h2><p class="sub">The model's rule is simple: is a token tracking inside the winner corridor for its age? Here's how that rule scores — each eventual <b style="color:var(--lime)">winner tested against a corridor rebuilt without it</b> (held-out), and every <b style="color:var(--coral)">loser measured against a corridor it never shaped</b>. The gap between the two is the signal.</p></div>
     <div class="panel" id="acc"><div class="state">Loading measured accuracy…</div></div>
-    <p class="caveat">Re-measured on every model rebuild and published in full on the <a href="/methodology">methodology page</a>. In-sample separation on the study cohort — not out-of-sample proof.</p>
+    <p class="caveat">Winners are scored leave-one-out; losers are out-of-sample by construction. A small, young cohort — every count is shown, and this is honest separation, not a long-run track record. Full table on the <a href="/methodology">methodology page</a>, re-measured on every rebuild.</p>
   </section>
 
   <!-- Access -->
@@ -189,13 +213,28 @@ async function loadAcc(){try{
   // honest, checkable hero stat — the real fade rate from the published winner study
   if(v.cohort&&v.cohort.winners!=null&&v.cohort.losers!=null){const w=v.cohort.winners,l=v.cohort.losers,tot=w+l;
     if(tot>0)$("#cohortstat").innerHTML=`<span class="live-dot"></span> ${Math.round(l/tot*100)}% of ${tot} studied launches faded`;}
-  const bins=v.perBin||[];
+  const bins=(v.perBin||[]).filter(r=>r.catchLOO!=null);
   if(!bins.length){$("#acc").innerHTML='<div class="state">Accuracy publishes after the first model build.</div>';return;}
-  $("#acc").innerHTML=bins.map(r=>{
-    const c=r.auc<0.6?"#ff3b5c":r.auc<0.75?"#ffd23d":"#c8ff4d";
-    const note=r.auc<0.6?"a measured coin-flip — too early to call":r.auc<0.75?"first usable separation":r.auc<0.9?"the signal matures":"clean separation";
-    return `<div class="acc-row"><span class="band">${r.age}</span><div class="track"><div class="fill" style="width:${Math.round(r.auc*100)}%;background:${c};box-shadow:0 0 9px ${c}99"></div></div><span class="auc tnum" style="color:${c}">${r.auc.toFixed(2)}</span><span class="note">${note} · ${r.nW}W / ${r.nL}L</span></div>`;
+  const pc=(x)=>x==null?"—":Math.round(x*100)+"%";
+  const h=v.headline||{};
+  const head=`<div class="acc2-head">
+      <div class="cell"><span class="big g">${pc(h.catch)}</span><span class="lab">of eventual winners were already flagged</span><span class="sub">held-out · across ${h.winnerObs||0} winner checkpoints</span></div>
+      <div class="cell"><span class="big c">${pc(h.falsePos)}</span><span class="lab">of losers were falsely flagged</span><span class="sub">out-of-sample · across ${h.loserObs||0} loser checkpoints</span></div>
+    </div>
+    <div class="acc2-legend"><span class="k"><span class="sw g"></span> winners caught (held-out)</span><span class="k"><span class="sw c"></span> false alarms on losers</span><span class="k" style="color:var(--mute)">bar = share caught · coral tick = false-alarm rate</span></div>`;
+  const rows=bins.map(r=>{
+    const catchP=Math.round((r.catchLOO||0)*100), falseP=Math.round((r.falsePos||0)*100);
+    const read=r.falsePos>0.15?"noisy — thin sample here":r.catchLOO>=0.7&&r.falsePos<=0.03?"clean flag":r.catchLOO>=0.55?"usable":"weak here";
+    return `<div class="ab-row">
+      <span class="ab-age">${r.age}</span>
+      <div class="ab-mid">
+        <div class="ab-track"><i class="ab-catch" style="width:${catchP}%"></i><span class="ab-false" style="left:${falseP}%"></span></div>
+        <span class="ab-note">${r.nW} winners / ${r.nL} losers · ${read}</span>
+      </div>
+      <span class="ab-nums" title="${catchP}% of winners caught · ${falseP}% false alarms on losers"><b class="g">${catchP}%</b><b class="c">${falseP}%</b></span>
+    </div>`;
   }).join("");
+  $("#acc").innerHTML=head+rows;
 }catch(e){$("#acc").innerHTML='<div class="state">Accuracy unavailable.</div>';}}
 loadBoard();loadAcc();setInterval(loadBoard,30000);
 
