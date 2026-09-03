@@ -263,9 +263,22 @@ loadBoard();loadAcc();setInterval(loadBoard,30000);
   const smooth=(t)=>t*t*(3-2*t);
   const clamp=(v,a,b)=>v<a?a:v>b?b:v;
 
+  // deterministic 1-D value noise → an organic PRICE-LIKE path (a real trajectory, not a sine worm). Anchored to
+  // world depth z, so the line is a fixed curve in space that the camera flies ALONG — the token's path through the gates.
+  const hh=(n)=>{const s=Math.sin(n*127.1+311.7)*43758.5453;return s-Math.floor(s);};
+  const vn=(x)=>{const i=Math.floor(x),f=x-i,u=f*f*(3-2*f),a=hh(i),b=hh(i+1);return a+(b-a)*u;};
+  const fbm=(x)=>vn(x)*0.6+vn(x*2.17+13.1)*0.28+vn(x*4.51+41.7)*0.12;   // 0..1, layered
+  const nz=(x)=>(fbm(x)-0.5)*2;                                          // -1..1
+
   const N=34;          // rings mouth->apex
   const F=6.2;         // focal length (ring-gap units)
   const TRAVEL=N*0.66; // how deep the camera flies over full scroll
+  // the trajectory's lateral offset at world depth z, as a fraction of the corridor half-width. Tightens toward the
+  // apex (locking onto the target) with a gentle climb — a token's path homing into the winner corridor.
+  function pathXY(z){
+    const taper=Math.max(0.42, 1 - z/(N*1.5));      // gentle narrowing toward the apex — stays a real trajectory
+    return { x: nz(z*0.4+7.3)*0.5*taper, y: (nz(z*0.4+53.1)*0.4 - 0.12)*taper };
+  }
 
   function render(prog,time){
     g.clearRect(0,0,W,H);
@@ -316,39 +329,47 @@ loadBoard();loadAcc();setInterval(loadBoard,30000);
       g.restore();
     }
 
-    // ---- glowing price line travelling toward the apex ----
-    const lead=6.4;               // how far ahead of camera the head sits
-    const headZ=camZ+lead;
+    // ---- the trajectory: a token's price path threading the corridor gates toward the apex ----
+    const lead=5.6, TAIL=1.4;      // draw from just behind the camera to `lead` ahead → a comet with a fading trail
+    const SEG=80;
     const pts=[];
-    for(let s=0;s<=48;s++){
-      const z=camZ+ (s/48)*lead;
-      const relZ=z-camZ; const scale=F/(F+relZ);
-      // lateral wander of the line inside the funnel
-      const amp=Rmax*0.30*(1-z/N*0.80);
-      const px=Math.sin(z*0.55+swirl*3)*amp;
-      const py=Math.cos(z*0.42+swirl*2.4)*amp*0.72;
-      pts.push({x:cx+px*scale, y:cy+py*scale, s:scale, z});
+    for(let s=0;s<=SEG;s++){
+      const z=camZ - TAIL + (s/SEG)*(lead+TAIL);
+      const relZ=z-camZ; const scale=F/(F+relZ); if(scale<=0.01) continue;
+      const funnel=Rmax*(1-z/N*0.80);     // corridor half-width at this depth
+      const o=pathXY(z);
+      pts.push({ x: cx + o.x*funnel*scale, y: cy + o.y*funnel*scale, scale, t: s/SEG });
     }
-    // draw with a green->cyan gradient + glow
+    // comet: draw segment-by-segment so the tail fades to nothing and the head is bright + thick (green tail -> cyan head)
     g.lineCap="round"; g.lineJoin="round";
-    for(let pass=0;pass<2;pass++){
-      g.beginPath(); g.moveTo(pts[0].x,pts[0].y);
-      for(let s=1;s<pts.length-1;s++){ const xc=(pts[s].x+pts[s+1].x)/2, yc=(pts[s].y+pts[s+1].y)/2; g.quadraticCurveTo(pts[s].x,pts[s].y,xc,yc); }
-      const grad=g.createLinearGradient(pts[0].x,pts[0].y,pts[pts.length-1].x,pts[pts.length-1].y);
-      grad.addColorStop(0,"rgba(200,255,77,0.95)"); grad.addColorStop(1,"rgba(53,230,224,0.95)");
-      g.strokeStyle=grad;
-      if(pass===0){ g.lineWidth=7; g.shadowColor="rgba(120,240,160,.7)"; g.shadowBlur=22; g.globalAlpha=.6; }
-      else { g.lineWidth=2.1; g.shadowBlur=0; g.globalAlpha=1; }
-      g.stroke();
+    for(let s=1;s<pts.length;s++){
+      const a=pts[s-1], b=pts[s], t=b.t;
+      const al=Math.pow(t,1.7);           // fade in toward the head
+      if(al<0.02) continue;
+      const R=Math.round(200-150*t), G=Math.round(255-30*t), B=Math.round(77+165*t);
+      g.strokeStyle=`rgba(${R},${G},${B},${(al*0.5).toFixed(3)})`;
+      g.lineWidth=1.5+6*t; g.shadowColor="rgba(90,240,170,.55)"; g.shadowBlur=15*t;
+      g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
+      g.shadowBlur=0;
+      g.strokeStyle=`rgba(${R},${G},${B},${al.toFixed(3)})`;
+      g.lineWidth=0.7+2*t;
+      g.beginPath(); g.moveTo(a.x,a.y); g.lineTo(b.x,b.y); g.stroke();
     }
-    g.globalAlpha=1;
-    // beacon head
+    // GATE nodes: glowing checkpoints the line passes through, evenly along the visible path
+    for(const gt of [0.34,0.56,0.76]){
+      const idx=Math.round(gt*(pts.length-1)); const n=pts[idx]; if(!n) continue;
+      const R=Math.round(200-150*gt), G=Math.round(255-30*gt), B=Math.round(77+165*gt);
+      const r=2.2+3.4*gt;
+      g.beginPath(); g.arc(n.x,n.y,r+3,0,7); g.strokeStyle=`rgba(${R},${G},${B},0.28)`; g.lineWidth=1; g.stroke();
+      g.beginPath(); g.arc(n.x,n.y,r,0,7); g.fillStyle=`rgba(${R},${G},${B},0.9)`; g.shadowColor=`rgba(${R},${G},${B},.8)`; g.shadowBlur=10; g.fill(); g.shadowBlur=0;
+    }
+    // beacon head (the leading point, deep toward the apex)
     const h=pts[pts.length-1];
-    const pulse=reduce?0.6:(0.55+0.45*Math.sin(time*0.006));
-    g.beginPath(); g.arc(h.x,h.y,5.2,0,7);
-    g.fillStyle="#dffef4"; g.shadowColor="rgba(53,230,224,.95)"; g.shadowBlur=18; g.fill();
-    g.beginPath(); g.arc(h.x,h.y,10+8*pulse,0,7);
-    g.strokeStyle=`rgba(53,230,224,${(0.5*(1-pulse)).toFixed(3)})`; g.lineWidth=2; g.shadowBlur=0; g.stroke();
+    if(h){
+      const pulse=reduce?0.6:(0.55+0.45*Math.sin(time*0.006));
+      g.beginPath(); g.arc(h.x,h.y,5,0,7); g.fillStyle="#dffef4"; g.shadowColor="rgba(53,230,224,.95)"; g.shadowBlur=18; g.fill();
+      g.beginPath(); g.arc(h.x,h.y,9+8*pulse,0,7); g.strokeStyle=`rgba(53,230,224,${(0.5*(1-pulse)).toFixed(3)})`; g.lineWidth=2; g.shadowBlur=0; g.stroke();
+    }
 
     // ---- captions cross-fade ----
     for(let c=0;c<caps.length;c++){
