@@ -8,7 +8,7 @@
 // Alchemy-only (uses the enhanced getAssetTransfers to keep tx hashes for the receipt lookups).
 import { detectPool, ROUTERS } from "./engine.mjs";
 import { computeRisk, blueprintMatch } from "./intel.mjs";
-import { rpc, toNum, PROVIDER, getTransferLogs, latestBlock, findDeployBlock } from "./rpc.mjs";
+import { rpc, hx, toNum, PROVIDER, getTransferLogs, latestBlock, findDeployBlock } from "./rpc.mjs";
 import { estimateBlockAt, chainCalibration, parseTs } from "./store.mjs";
 import { liveTrajectory, corridorBins } from "./model.mjs";
 
@@ -85,7 +85,11 @@ async function swapPrice(hash, addr, ethUsd, venues) {
 export async function backtest(addr, opts = {}) {
   addr = addr.toLowerCase();
   const points = opts.points || 90, ethUsd = opts.ethUsd || 3000, grad = !!opts.graduated;
-  const ev = await pullWithHash(addr, opts.cap || 400000, { launchedAt: opts.launchedAt });
+  // The score/wallet/trajectory series is a balance replay: it needs the FULL history but NO tx hashes. So we
+  // reuse the incremental store's already-cached transfers (opts.ev) instead of re-pulling hundreds of Alchemy
+  // pages every time — that re-pull was the ~40s that left charts blank. Only PRICE needs hashes (resolved
+  // per-block, sampled, below). Fall back to a self-pull when no store ev is passed (e.g. the cohort builder).
+  const ev = (opts.ev && opts.ev.length) ? opts.ev : await pullWithHash(addr, opts.cap || 400000, { launchedAt: opts.launchedAt });
   const sorted = ev.filter((e) => e.ts).sort((a, b) => a.ts - b.ts || a.block - b.block);
   if (sorted.length < 8) return { addr, sym: opts.sym, error: "too few timestamped transfers", n: sorted.length };
 
@@ -150,12 +154,29 @@ export async function backtest(addr, opts = {}) {
   // Skipped in profile mode (noPrice) — the cohort blueprint only needs the score/distribution trajectory.
   if (opts.noPrice) return { addr, sym: opts.sym, graduated: grad, points: series.length, firstPoolBlock: firstPool, snipers: snipers.size, bundles: nBundles, t0, t1, transfers: sorted.length, capped: sorted.length >= (opts.cap || 400000), corridor: corridorBins(), series };
   const buckets = Array.from({ length: bounds.length }, () => []);
-  for (const e of sorted) if ((isBuy(e) || isSell(e)) && e.amt > 0 && e.hash) { const k = Math.min(bounds.length - 1, Math.max(0, Math.floor((e.ts - t0) / step))); buckets[k].push(e); }
+  for (const e of sorted) if ((isBuy(e) || isSell(e)) && e.amt > 0) { const k = Math.min(bounds.length - 1, Math.max(0, Math.floor((e.ts - t0) / step))); buckets[k].push(e); }
   const prices = new Array(bounds.length).fill(null);
-  for (let k = 0; k < buckets.length; k++) {
+  // store transfers carry no tx hash, so resolve one per representative swap via a single-block eth_getLogs
+  // (cheap; matches by amount). Sampled to ~45 buckets across the whole timeline to keep it fast; gaps are
+  // forward/back-filled + smoothed below. Cached so a busy block isn't refetched.
+  const hashCache = new Map();
+  const hashFor = async (rep) => {
+    if (rep.hash) return rep.hash;
+    try {
+      let logs = hashCache.get(rep.block);
+      if (!logs) { logs = await rpc("eth_getLogs", [{ address: addr, topics: [TRANSFER], fromBlock: hx(rep.block), toBlock: hx(rep.block) }], 2); hashCache.set(rep.block, logs || []); }
+      let best = null, bd = Infinity;
+      for (const l of logs || []) { const v = Number(big(l.data)) / 1e18, d = Math.abs(v - rep.amt); if (d < bd) { bd = d; best = l.transactionHash; } }
+      return best;
+    } catch { return null; }
+  };
+  const STEP = Math.max(1, Math.round(bounds.length / 45)); // cap price samples to ~45 across the full timeline
+  for (let k = 0; k < buckets.length; k += STEP) {
     const arr = buckets[k]; if (!arr.length) continue;
     arr.sort((a, b) => a.amt - b.amt);
-    const p = await swapPrice(arr[Math.floor(arr.length / 2)].hash, addr, ethUsd, venues);
+    const rep = arr[Math.floor(arr.length / 2)];
+    const hash = await hashFor(rep); if (!hash) continue;
+    const p = await swapPrice(hash, addr, ethUsd, venues);
     if (p) prices[k] = p;
   }
   // local-outlier guard: a real price trends across buckets; a >6× jump vs the local median of sampled prices is

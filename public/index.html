@@ -299,12 +299,18 @@ async function loadHistory(r){
   DOSSIER=r;
   CV=$("#cv"); TIP=$("#tip");
   const note=$("#chnote"), noteC=$("#chnotecor");
+  // immediate loading state so a slow reconstruction reads as "working", never a blank space
+  CV.style.display="none"; note.hidden=false; note.textContent="Reconstructing valuation & score history…";
+  $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="Reconstructing the winner-corridor path…";
+  const fetchBt=async()=>{ const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),75000);
+    try{ return await fetch(`/api/backtest?token=${r.address}`,{signal:ctrl.signal}).then(x=>x.json()); } finally{ clearTimeout(to); } };
   try{
-    const bt=await fetch(`/api/backtest?token=${r.address}`).then(x=>x.json());
+    let bt; try{ bt=await fetchBt(); }catch(e){ note.textContent="Still reconstructing… retrying"; bt=await fetchBt(); }
     if(bt.error||!bt.series||bt.series.length<3){
       CV.style.display="none"; note.hidden=false; note.textContent="Not enough trade history to reconstruct a timeline for this token yet.";
       $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="Not enough history yet to plot the winner corridor.";
       $("#corverdict").innerHTML=""; return; }
+    CV.style.display="block"; note.hidden=true; $("#cvcor").style.display="block"; noteC.hidden=true;
     SERIES=bt.series.map(s=>({t:s.t,risk:s.risk,label:s.label,mcap:s.mcap,price:s.price,wallets:s.wallets,volUsd:s.volUsd,holders:s.holders,top10:s.top10,ageH:s.ageH,traj:s.traj,blueprint:s.blueprint}));
     CORR=bt.corridor||[];
     const pw=$("#pricewarn");
