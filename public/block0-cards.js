@@ -93,19 +93,13 @@ const B0 = (() => {
     return `<span class="w-av" style="width:${size}px;height:${size}px;background:linear-gradient(135deg,hsl(${h1} 90% 60%),hsl(${h2} 85% 55%))"></span>`;
   }
 
-  const shortA = (a) => a ? a.slice(0, 6) + "…" + a.slice(-4) : "";
-  // ---- leaderboard row: avatar + codename + big realised PnL (our engine) + sub-stats. Links to the chain explorer
-  //      when one is configured (EXPLORER_URL); otherwise shows the copyable address. No third-party wallet service. ----
-  function leaderRow(w, rank, explorerBase) {
+  // ---- leaderboard row: avatar + codename + big realised PnL (our engine) + sub-stats. The whole row opens OUR
+  //      per-wallet PnL page (/wallet?a=) — our own reconstruction, not a third-party portfolio service. ----
+  function leaderRow(w, rank /* explorerBase kept for signature compat, unused */) {
     const up = (w.pnl || w.realized) >= 0;
     const col = up ? "#c8ff4d" : "#ff3b5c";
-    const ex = explorerBase ? `${explorerBase}/address/${w.a}` : null;
     const toks = (w.tokens || []).slice(0, 4).map((t) => `<span class="chip">${t.sym}${t.holding ? " ·hold" : ""}</span>`).join("");
-    const tag = ex ? "a" : "div";
-    const attrs = ex ? ` href="${ex}" target="_blank" rel="noopener"` : "";
-    const go = ex ? `<span class="lb-go">Explorer ↗</span>`
-      : `<span class="lb-go addr" title="${w.a}" onclick="event.preventDefault();navigator.clipboard&&navigator.clipboard.writeText('${w.a}')">${shortA(w.a)}</span>`;
-    return `<${tag} class="lb-row panel-hover"${attrs}>
+    return `<a class="lb-row panel-hover" href="/wallet?a=${w.a}">
       <span class="lb-rank">${rank}</span>
       ${avatar(w.a, 38)}
       <span class="lb-id">
@@ -117,8 +111,8 @@ const B0 = (() => {
         <span class="v tnum" style="color:${col};text-shadow:0 0 20px ${col}55">${up ? "+" : "−"}${usd(Math.abs(w.pnl != null ? w.pnl : w.realized))}</span>
         <span class="micro">realised${w.roi != null ? ` · ${w.roi >= 0 ? "+" : ""}${(w.roi * 100).toFixed(0)}% ROI` : ""}</span>
       </span>
-      ${go}
-    </${tag}>`;
+      <span class="lb-go">PnL →</span>
+    </a>`;
   }
 
   return { HEX, mcT, usd, fmtAge, sev, isNew, icon, ico, meter, chip, tokenCard, codename, avatar, leaderRow };

@@ -25,6 +25,7 @@ import { PROVIDER } from "./rpc.mjs";
 import { traceEvents, discoverDex, recentDexTokens, DEX_CONFIG } from "./dex.mjs";
 import { walletIntel } from "./wallet.mjs";
 import { buildLeaderboard } from "./leaderboard.mjs";
+import { walletPnlReport } from "./wallet-pnl.mjs";
 import { buildGraph } from "./graph.mjs";
 import { resolveFunders, funderLinks } from "./funders.mjs";
 import { rpc, isContract } from "./rpc.mjs";
@@ -76,7 +77,7 @@ function anchorToPons(r, ponsMcap) {
 // rebuilds hit the cache (only the cold start pays the full 100-backtest cost, not every cycle).
 const BT_TTL = Number(process.env.BT_TTL_MS || 45 * 60 * 1000);
 const STORE_CAP = 25000;
-async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym }) {
+async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym, walletTrades }) {
   const kvKey = `bt:${key}`;
   const cached = await getJSON(kvKey).catch(() => null);
   if (cached && cached.data && Date.now() - cached.at < BT_TTL) return cached.data;
@@ -84,7 +85,7 @@ async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym }
   const st = await getTransfers(token, 18, { pool: meta?.pool, launchedAt: meta?.launchedAt }).catch(() => ({ ev: null }));
   const complete = st.ev && st.ev.length > 0 && st.ev.length < STORE_CAP - 1000; // store holds the whole history
   const r = anchorToPons({
-    ...(await backtest(token, { sym: meta?.sym || sym || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd, noPrice, cap, ev: complete ? st.ev : null })),
+    ...(await backtest(token, { sym: meta?.sym || sym || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd, noPrice, cap, walletTrades, ev: complete ? st.ev : null })),
     name: meta?.name, logo: meta?.logo, mcapUsd: meta?.mcapUsd, priceUsd: meta?.priceUsd,
   }, meta?.mcapUsd);
   setJSON(kvKey, { at: Date.now(), data: r }).catch(() => {});
@@ -118,23 +119,31 @@ const LB_TOKENS = Number(process.env.LEADERBOARD_TOKENS || 100); // how many win
 let _leaderboard = null, _lbRunning = false;
 let _lbHealth = { updated: 0, wallets: 0, tokensRequested: 0, tokensScanned: 0, buildMs: 0, ok: false };
 export function leaderboardHealth() { return _lbHealth; }
+
+// The chain's WINNER SET — graduated launchpad tokens + DEX-listed tokens, biggest first, deduped, capped.
+// One source of truth so the leaderboard and a single wallet's PnL report scan the exact same tokens (and thus
+// reconcile to the cent). Reads the live board cache; empty until the first board cycle lands.
+function winnerTokens() {
+  const b = getBoard();
+  const seen = new Set();
+  return [...(b.graduated || []), ...(b.dex || [])]
+    .filter((t) => t.address && !seen.has(t.address.toLowerCase()) && seen.add(t.address.toLowerCase()))
+    .sort((x, y) => (y.mcapUsd || 0) - (x.mcapUsd || 0))
+    .slice(0, LB_TOKENS)
+    .map((t) => ({ address: t.address.toLowerCase(), sym: t.sym, mcapUsd: t.mcapUsd || 0, graduated: !!t.graduated }));
+}
+// The generic (wallet-agnostic) backtest a wallet report reuses — same key the leaderboard warms, so it's a cache hit.
+const genericBt = (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 });
 async function refreshLeaderboard() {
   if (_lbRunning) return; _lbRunning = true;
   const t0 = Date.now();
   _lbHealth = { ..._lbHealth, building: true, startedAt: t0 };   // legible cold-build state (else zeros look like "failed")
   try {
-    const b = getBoard();
-    // winners only: graduated launchpad tokens + DEX-listed tokens, biggest first, deduped
-    const seen = new Set();
-    const tokens = [...(b.graduated || []), ...(b.dex || [])]
-      .filter((t) => t.address && !seen.has(t.address) && seen.add(t.address))
-      .sort((x, y) => (y.mcapUsd || 0) - (x.mcapUsd || 0))
-      .slice(0, LB_TOKENS)
-      .map((t) => ({ address: t.address.toLowerCase(), sym: t.sym, mcapUsd: t.mcapUsd || 0, graduated: !!t.graduated }));
+    const tokens = winnerTokens();
     if (!tokens.length) return;
     // time-budgeted so a slow/rate-limited cold start yields PARTIAL smart money rather than running past the next cycle
     const budgetMs = Number(process.env.LEADERBOARD_BUDGET_MS || Math.min(LB_REFRESH_MS * 0.8, 12 * 60 * 1000));
-    const lb = await buildLeaderboard(tokens, (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 }), { budgetMs, isContract });
+    const lb = await buildLeaderboard(tokens, genericBt, { budgetMs, isContract });
     _leaderboard = lb;
     setSmartMoney(smartMoneyFrom(lb));   // feed proven wallets to the board so every verdict flags smart-money holders
     setJSON("leaderboard", lb).catch(() => {});
@@ -190,6 +199,7 @@ async function serveStatic(res, urlPath) {
     : (urlPath === "/board" || urlPath === "/board.html") ? "board.html"
     : (urlPath === "/leaderboard" || urlPath === "/leaderboard.html") ? "leaderboard.html"
     : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
+    : (urlPath === "/wallet" || urlPath === "/wallet.html") ? "wallet.html"
     : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html"
     : (urlPath === "/control" || urlPath === "/control.html") ? "control.html"
     : (urlPath === "/terms" || urlPath === "/terms.html") ? "terms.html" : null;
@@ -352,6 +362,46 @@ createServer(async (req, res) => {
       if (!out) { out = await walletIntel(address); setJSON(key, { at: Date.now(), data: out }).catch(() => {}); }
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(out));
+    }
+
+    if (u.pathname === "/api/wallet-pnl") { // ONE wallet's reconstructed PnL across the winner set — our own engine, no third party
+      const a = (u.searchParams.get("a") || "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(a)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?a=0x…"}'); }
+      const links = { explorer: (process.env.EXPLORER_URL || "").replace(/\/$/, "") || null };
+      const tokens = winnerTokens();
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      if (!tokens.length) return res.end(JSON.stringify({ address: a, computing: true, links, tokens: [], totals: null }));
+      // reuse the leaderboard's warmed backtests; a wallet-scoped cache keeps repeat opens instant
+      const key = `walletpnl:${a}`;
+      const cached = await getJSON(key).catch(() => null);
+      let rep = cached && Date.now() - cached.at < 15 * 60 * 1000 ? cached.data : null;
+      if (!rep) {
+        const budgetMs = Number(process.env.WALLET_PNL_BUDGET_MS || 25000);
+        rep = await walletPnlReport(a, tokens, genericBt, { budgetMs });
+        let contract = false; try { contract = await isContract(a); } catch { /* fail open */ }
+        rep = { ...rep, contract };
+        // on the leaderboard? attach how it earned the board so the page can badge proven/riding
+        const lb = _leaderboard || await getJSON("leaderboard").catch(() => null);
+        const row = lb && (lb.rows || []).find((r) => r.a === a);
+        if (row) rep.board = { rank: (lb.rows.findIndex((r) => r.a === a) + 1) || null, proven: !!row.proven, riding: !!row.riding, kind: row.kind };
+        setJSON(key, { at: Date.now(), data: rep }).catch(() => {});
+      }
+      return res.end(JSON.stringify({ ...rep, links }));
+    }
+
+    if (u.pathname === "/api/wallet-trades") { // "where it bought & sold" points for ONE wallet on ONE token (lazy drill)
+      const a = (u.searchParams.get("a") || "").toLowerCase();
+      const token = (u.searchParams.get("token") || "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(a) || !/^0x[0-9a-f]{40}$/.test(token)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?a=0x…&token=0x…"}'); }
+      const key = `${token}:90:3000:false:${Number(process.env.BT_CAP || 100000)}:w:${a}`;
+      let bt = null; try { bt = await computeBacktest(token, key, { points: 90, ethUsd: 3000, walletTrades: a }); } catch (e) { bt = { error: String(e && e.message || e).slice(0, 120) }; }
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      if (!bt || bt.error) return res.end(JSON.stringify({ address: a, token, error: bt?.error || "no data", trades: [], price: [] }));
+      const pos = (bt.pnl || []).find((x) => x.a === a) || null;
+      // downsample the price line to keep the payload small; the orbs carry their own exact price
+      const series = (bt.series || []).filter((s) => s.price != null).map((s) => ({ t: s.t, price: s.price }));
+      return res.end(JSON.stringify({ address: a, token, sym: bt.sym || null, curPrice: bt.curPrice || null,
+        avgCost: pos ? pos.avgCost : null, position: pos, trades: bt.walletTrades || [], price: series }));
     }
 
     if (u.pathname === "/api/graph") { // wallet-relationship bubble map for one token: nodes/edges/clusters (bundles)

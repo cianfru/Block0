@@ -216,10 +216,29 @@ export async function backtest(addr, opts = {}) {
   const traders = pnl.length;
   const winners = pnl.filter((e) => e.up).length;
 
+  // OPTIONAL per-wallet trade points for the "where it bought & sold" chart on the wallet page. Only built when
+  // asked (opts.walletTrades = an address) so it never bloats the shared/cached generic backtest. Each point is a
+  // POOL buy/sell at its swap-implied price — the same events the PnL engine accounts, so the orbs and the $ figure
+  // are one reconstruction.
+  let walletTrades = null;
+  if (opts.walletTrades) {
+    const wa = String(opts.walletTrades).toLowerCase();
+    walletTrades = [];
+    for (const e of sorted) {
+      if (!(e.amt > 0)) continue;
+      const buy = isBuy(e) && e.to === wa, sell = isSell(e) && e.from === wa;
+      if (!buy && !sell) continue;
+      const p = priceAt(e.ts); if (!(p > 0)) continue;
+      walletTrades.push({ ts: e.ts, side: buy ? "buy" : "sell", price: +p.toFixed(8), qty: +e.amt.toFixed(2) });
+    }
+    walletTrades.sort((a, b) => a.ts - b.ts);
+  }
+
   return {
     addr, sym: opts.sym, graduated: grad, points: series.length, ethUsd, supply,
     firstPoolBlock: firstPool, snipers: snipers.size, bundles: nBundles,
     t0, t1, transfers: sorted.length, corridor: corridorBins(), series,
     curPrice, pnl, pnlStats: { traders, winners, winnerPct: traders ? Math.round((winners / traders) * 100) : null },
+    ...(walletTrades ? { walletTrades } : {}),
   };
 }

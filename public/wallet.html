@@ -1,0 +1,282 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>Wallet PnL — Block0</title>
+<meta name="description" content="One wallet's reconstructed profit and loss across the Robinhood Chain's winners — realised, unrealised, per token, marked at the live swap price. Our own engine, no third-party portfolio service. Signal, not proof.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+<script src="/track.js" defer></script>
+<style>
+  .whead{display:flex;align-items:center;gap:16px;flex-wrap:wrap}
+  .whead .w-av{border-radius:14px;box-shadow:0 8px 26px -10px rgba(0,0,0,.7)}
+  .whead .id{min-width:0}
+  .whead .nm{font-family:var(--serif);font-size:clamp(1.7rem,4.4vw,2.4rem);line-height:1.02}
+  .whead .sub{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:6px}
+  .waddr{font-family:var(--mono);font-size:.78rem;color:var(--mute);cursor:copy;border:1px solid var(--line);border-radius:8px;padding:2px 8px}
+  .waddr:hover{color:var(--dim)}
+  .wbadge{font-size:.64rem;text-transform:uppercase;letter-spacing:.08em;border-radius:7px;padding:2px 8px;border:1px solid var(--line-2);color:var(--dim)}
+  .wbadge.prov{color:var(--lime);border-color:rgba(200,255,77,.4);background:rgba(200,255,77,.08)}
+  .wbadge.ride{color:var(--cyan);border-color:rgba(53,230,224,.4);background:rgba(53,230,224,.08)}
+  .wbadge.ctr{color:var(--amber);border-color:rgba(255,210,61,.4);background:rgba(255,210,61,.08)}
+  .wexp{font-size:.74rem;color:var(--lime)}
+
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:26px}
+  .kpi{padding:18px 18px 16px;border-radius:16px;border:1px solid var(--line);background:linear-gradient(180deg,rgba(255,255,255,.05),rgba(255,255,255,.012));box-shadow:inset 0 1px 0 rgba(255,255,255,.06)}
+  .kpi .k{font-size:.64rem;text-transform:uppercase;letter-spacing:.13em;color:var(--mute)}
+  .kpi .v{font-family:var(--serif);font-size:1.9rem;line-height:1;margin-top:8px;font-variant-numeric:tabular-nums}
+  .kpi .s{font-size:.68rem;color:var(--mute);margin-top:6px}
+  .kpi.hero{grid-column:span 2;background:linear-gradient(180deg,rgba(200,255,77,.07),rgba(255,255,255,.012));border-color:rgba(200,255,77,.22)}
+  .kpi.hero .v{font-size:2.5rem}
+  @media(max-width:520px){.kpi.hero{grid-column:span 2}}
+  .pos{color:var(--lime)} .neg{color:var(--coral)} .flat{color:var(--dim)}
+
+  .counts{display:flex;flex-wrap:wrap;gap:8px;margin-top:14px}
+
+  .toks{display:flex;flex-direction:column;gap:12px;margin-top:14px}
+  .tok{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));overflow:hidden}
+  .tok .row{display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:14px;padding:15px 18px;cursor:pointer}
+  .tok .row:hover{background:rgba(255,255,255,.02)}
+  .tok .tk{min-width:0}
+  .tok .tsym{font-weight:600;font-size:1rem}
+  .tok .tsym .gr{font-size:.58rem;text-transform:uppercase;letter-spacing:.08em;color:var(--cyan);border:1px solid rgba(53,230,224,.35);border-radius:5px;padding:1px 5px;margin-left:6px;vertical-align:middle}
+  .tok .tmeta{font-size:.7rem;color:var(--mute);margin-top:3px}
+  .tok .tp{text-align:right;font-family:var(--mono);font-variant-numeric:tabular-nums}
+  .tok .tp .big{font-family:var(--serif);font-size:1.3rem;line-height:1}
+  .tok .tp .sm{font-size:.68rem;color:var(--mute);margin-top:3px}
+  .tok .caret{color:var(--mute);font-size:.8rem;transition:transform .2s ease}
+  .tok.open .caret{transform:rotate(90deg)}
+  .tok .drill{display:none;border-top:1px solid var(--line);padding:16px 18px}
+  .tok.open .drill{display:block}
+  .tok .dgrid{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:10px 18px;margin-bottom:14px}
+  .tok .dg .dk{font-size:.6rem;text-transform:uppercase;letter-spacing:.1em;color:var(--mute)}
+  .tok .dg .dv{font-family:var(--mono);font-size:.9rem;margin-top:3px;font-variant-numeric:tabular-nums}
+  .chartwrap{position:relative;width:100%;height:220px;border:1px solid var(--line);border-radius:12px;background:rgba(0,0,0,.25);overflow:hidden}
+  .chartwrap canvas{width:100%;height:100%;display:block}
+  .chartnote{font-size:.68rem;color:var(--mute);margin-top:8px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+  .lg{display:inline-flex;align-items:center;gap:5px}
+  .lg .d{width:9px;height:9px;border-radius:50%;background:var(--lime)}
+  .lg .t{width:0;height:0;border-left:5px solid transparent;border-right:5px solid transparent;border-top:8px solid var(--coral)}
+  .lg .ac{width:14px;height:0;border-top:2px dashed var(--cyan)}
+  .drillstate{font-size:.8rem;color:var(--mute);padding:22px 0;text-align:center}
+  .tdossier{display:inline-block;margin-top:12px;font-size:.76rem;color:var(--lime)}
+</style>
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav">
+      <a href="/board">Board</a>
+      <a href="/leaderboard">Leaderboard</a>
+      <a href="/token">Dossier</a>
+      <a href="/methodology">Methodology</a>
+    </nav>
+    <div class="hd-r">
+      <span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span>
+      <button class="btn-connect" id="connect">Connect</button>
+    </div>
+  </div>
+  <div class="gatebar" id="gatebar" hidden></div>
+</header>
+
+<main class="wrap">
+  <section class="sec">
+    <a href="/leaderboard" class="micro" style="color:var(--mute)">← back to the leaderboard</a>
+    <div id="body" style="margin-top:14px"><div class="state">Reconstructing this wallet's trades…</div></div>
+    <p class="caveat" id="cav" hidden>PnL is swap-implied — reconstructed by our own engine from public pool trades, not a broker statement and not a third-party portfolio (Zerion &amp; co. don't index this chain). Realised counts only coins actually sold; unrealised marks still-held coins at the live swap price; coins received by transfer have an unknown cost and are credited zero — so figures understate rather than overstate. Only trades on the chain's <b>winner set</b> are scanned, so a wallet's activity on faded/older tokens isn't shown here. Signal, not proof — never a recommendation to copy a trade.</p>
+  </section>
+</main>
+
+<footer class="ft">
+  <div class="ft-in">
+    <div class="ft-top">
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p></div>
+      <div class="ft-cols">
+        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Token dossier</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+      </div>
+    </div>
+    <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
+  </div>
+</footer>
+
+<script src="/block0-cards.js"></script>
+<script src="/block0-gate.js"></script>
+<script>
+const $=(s)=>document.querySelector(s);
+B0GATE.mount({gated:true});
+const P=new URLSearchParams(location.search);
+const ADDR=(P.get("a")||P.get("address")||"").toLowerCase();
+let EXPLORER=null;
+const short=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"";
+const usd=(n)=>B0.usd(Math.abs(n||0));
+const sgn=(n)=>n>0?"+":n<0?"−":"";
+const cls=(n)=>n>0?"pos":n<0?"neg":"flat";
+const copy=(a)=>{navigator.clipboard&&navigator.clipboard.writeText(a);};
+
+if(!/^0x[0-9a-f]{40}$/.test(ADDR)){
+  $("#body").innerHTML='<div class="state">No wallet address. Open a wallet from the <a href="/leaderboard" style="color:var(--lime)">leaderboard</a> or a token dossier.</div>';
+}else{ load(); }
+
+async function load(){
+  try{
+    const d=await fetch("/api/wallet-pnl?a="+ADDR).then(r=>r.json());
+    EXPLORER=(d.links&&d.links.explorer)||null;
+    if(d.computing){ $("#body").innerHTML='<div class="state">The winner set is still warming up — reconstructions run on the first board cycle. Check back in a moment.</div>'; setTimeout(load,20000); return; }
+    render(d);
+  }catch(e){ $("#body").innerHTML='<div class="state">Couldn\'t load this wallet — retrying…</div>'; setTimeout(load,10000); }
+}
+
+function render(d){
+  const t=d.totals||{};
+  const found=d.found&&(d.tokens||[]).length;
+  const nm=B0.codename(d.address);
+  const exLink=EXPLORER?`<a class="wexp" href="${EXPLORER}/address/${d.address}" target="_blank" rel="noopener">explorer ↗</a>`:"";
+  const badges=[];
+  if(d.board){ if(d.board.proven) badges.push(`<span class="wbadge prov">proven${d.board.rank?` · #${d.board.rank}`:""}</span>`); if(d.board.riding&&!d.board.proven) badges.push('<span class="wbadge ride">riding a winner</span>'); }
+  if(d.contract) badges.push('<span class="wbadge ctr" title="this address has deployed bytecode — a contract, bot, router or pool, not a person">contract</span>');
+
+  const head=`<div class="whead">
+    ${B0.avatar(d.address,58)}
+    <div class="id">
+      <div class="nm">${nm}</div>
+      <div class="sub">
+        <span class="waddr" title="${d.address}" onclick="copy('${d.address}')">${short(d.address)}</span>
+        ${badges.join("")}
+        ${exLink}
+      </div>
+    </div>
+  </div>`;
+
+  if(!found){
+    $("#body").innerHTML=head+`<div class="state" style="text-align:left;padding:30px 0">No reconstructed trades for this wallet on the chain's winner set${d.contract?" — and this address is a contract (bot/router/pool), not a trader":""}.<br><span style="color:var(--mute)">We only scan the top winners; activity on faded or very new tokens isn't reflected here.</span></div>`;
+    $("#cav").hidden=false; return;
+  }
+
+  const total=t.pnl||0, real=t.realized||0, unre=t.unrealized||0;
+  const roiPct=t.roi!=null?Math.round(t.roi*100):null;
+  const kpis=`<div class="kpis">
+    <div class="kpi hero"><div class="k">Total PnL · reconstructed</div><div class="v ${cls(total)}">${sgn(total)}${usd(total)}</div><div class="s">realised + unrealised, across ${t.tokensTraded} token${t.tokensTraded===1?"":"s"}</div></div>
+    <div class="kpi"><div class="k">Realised · cash out</div><div class="v ${cls(real)}">${sgn(real)}${usd(real)}</div><div class="s">on coins actually sold</div></div>
+    <div class="kpi"><div class="k">Unrealised · live</div><div class="v ${cls(unre)}">${sgn(unre)}${usd(unre)}</div><div class="s">still-held, marked at swap price</div></div>
+    <div class="kpi"><div class="k">Deployed</div><div class="v">${usd(t.invested)}</div><div class="s">capital put in (tracked buys)</div></div>
+    <div class="kpi"><div class="k">Blended ROI</div><div class="v ${roiPct==null?"flat":cls(roiPct)}">${roiPct==null?"—":sgn(roiPct)+Math.abs(roiPct)+"%"}</div><div class="s">total ÷ deployed</div></div>
+  </div>
+  <div class="counts">
+    <span class="chip">${t.tokensWon} win${t.tokensWon===1?"":"s"}</span>
+    <span class="chip">${t.tokensLost} in loss</span>
+    <span class="chip">${t.tokensHeld} still holding</span>
+    ${t.tokensRiding?`<span class="chip">${t.tokensRiding} riding a gain</span>`:""}
+    ${d.partial?'<span class="chip" title="scan hit its time budget — a few smaller tokens may be missing">partial scan</span>':""}
+  </div>`;
+
+  const toks=`<div class="toks">`+(d.tokens||[]).map((tk,i)=>tokCard(tk,i)).join("")+`</div>`;
+  $("#body").innerHTML=head+kpis+`<h2 style="margin-top:34px;font-size:1.3rem">Per token — what our engine reconstructed</h2>`+toks;
+  $("#cav").hidden=false;
+}
+
+function tokCard(tk,i){
+  const pnl=tk.pnl||0;
+  const holding=tk.holding?`<span class="tmeta" style="color:var(--cyan)">holding ${fmtQty(tk.qty)} · avg $${fmtPx(tk.avgCost)}${tk.curPrice?` · now $${fmtPx(tk.curPrice)}`:""}</span>`:`<span class="tmeta">exited · ${tk.nBuys} buy${tk.nBuys===1?"":"s"} / ${tk.nSells} sell${tk.nSells===1?"":"s"}</span>`;
+  const roiPct=tk.roi!=null?Math.round(tk.roi*100):null;
+  return `<div class="tok" data-token="${tk.address}" data-i="${i}">
+    <div class="row" onclick="toggle(${i})">
+      <div class="tk">
+        <div class="tsym">${tk.sym}${tk.graduated?'<span class="gr">graduated</span>':""}</div>
+        ${holding}
+      </div>
+      <div class="tp">
+        <div class="big ${cls(pnl)}">${sgn(pnl)}${usd(pnl)}</div>
+        <div class="sm">${roiPct==null?"":sgn(roiPct)+Math.abs(roiPct)+"% ROI"}</div>
+      </div>
+      <span class="caret">▸</span>
+    </div>
+    <div class="drill" id="drill${i}"></div>
+  </div>`;
+}
+
+function toggle(i){
+  const el=document.querySelector(`.tok[data-i="${i}"]`); if(!el) return;
+  const open=el.classList.toggle("open");
+  if(open && !el._loaded){ el._loaded=true; loadDrill(i, el.getAttribute("data-token")); }
+}
+
+async function loadDrill(i, token){
+  const box=$("#drill"+i);
+  box.innerHTML='<div class="drillstate">reconstructing this wallet\'s buys &amp; sells on '+token.slice(0,8)+'…</div>';
+  try{
+    const d=await fetch(`/api/wallet-trades?a=${ADDR}&token=${token}`).then(r=>r.json());
+    if(d.error||!(d.trades&&d.trades.length)){ box.innerHTML='<div class="drillstate">No priced pool trades to chart — this wallet\'s position here came through transfers we can\'t price, or the price series is too thin.</div>'+dossierLink(token); return; }
+    const p=d.position||{};
+    const dgrid=`<div class="dgrid">
+      ${dg("Buys",p.nBuys!=null?p.nBuys:d.trades.filter(t=>t.side==="buy").length)}
+      ${dg("Sells",p.nSells!=null?p.nSells:d.trades.filter(t=>t.side==="sell").length)}
+      ${dg("Avg cost",d.avgCost?"$"+fmtPx(d.avgCost):"—")}
+      ${dg("Now",d.curPrice?"$"+fmtPx(d.curPrice):"—")}
+      ${p.realized!=null?dg("Realised",(p.realized>0?"+":p.realized<0?"−":"")+usd(p.realized),cls(p.realized)):""}
+      ${p.unrealized!=null?dg("Unrealised",(p.unrealized>0?"+":p.unrealized<0?"−":"")+usd(p.unrealized),cls(p.unrealized)):""}
+    </div>`;
+    box.innerHTML=dgrid+`<div class="chartwrap"><canvas id="cv${i}"></canvas></div>
+      <div class="chartnote"><span class="lg"><span class="d"></span> buy (size = amount)</span><span class="lg"><span class="t"></span> sell</span><span class="lg"><span class="ac"></span> avg cost</span><span>price is swap-implied</span></div>`+dossierLink(token);
+    box.parentElement._data=d;
+    drawTrades($("#cv"+i), d);
+  }catch(e){ box.innerHTML='<div class="drillstate">Couldn\'t reconstruct this token — try again shortly.</div>'+dossierLink(token); }
+}
+function dossierLink(token){ return `<a class="tdossier" href="/token?address=${token}">full token dossier ↗</a>`; }
+function dg(k,v,c){ return `<div class="dg"><div class="dk">${k}</div><div class="dv ${c||""}">${v}</div></div>`; }
+
+// ---- the "where it bought & sold" chart: price line + green buy orbs (sized by amount) + red sell markers,
+//      with the wallet's average cost as a dashed reference. Pure canvas, DPR-aware, static (no animation). ----
+function drawTrades(cv, d){
+  const wrap=cv.parentElement, dpr=Math.min(2,window.devicePixelRatio||1);
+  const W=wrap.clientWidth, H=wrap.clientHeight;
+  cv.width=Math.round(W*dpr); cv.height=Math.round(H*dpr);
+  const g=cv.getContext("2d"); g.setTransform(dpr,0,0,dpr,0,0);
+  const padL=8, padR=8, padT=14, padB=16;
+  const price=d.price||[], trades=d.trades||[];
+  const xs=[], ps=[];
+  for(const s of price){ xs.push(s.t); ps.push(s.price); }
+  for(const t of trades){ xs.push(t.ts); ps.push(t.price); }
+  if(d.avgCost) ps.push(d.avgCost); if(d.curPrice) ps.push(d.curPrice);
+  if(!xs.length) return;
+  const tMin=Math.min(...xs), tMax=Math.max(...xs);
+  let pMin=Math.min(...ps.filter(v=>v>0)), pMax=Math.max(...ps);
+  if(!(pMin>0)) pMin=pMax/10; if(pMax<=pMin) pMax=pMin*1.5;
+  const lgMin=Math.log(pMin*0.9), lgMax=Math.log(pMax*1.08);
+  const X=(t)=> padL + (tMax>tMin?(t-tMin)/(tMax-tMin):0.5)*(W-padL-padR);
+  const Y=(p)=>{ const lp=Math.log(Math.max(p,pMin*0.5)); return padT + (1-(lp-lgMin)/(lgMax-lgMin))*(H-padT-padB); };
+
+  // price line
+  if(price.length>1){
+    g.beginPath();
+    price.forEach((s,idx)=>{ const x=X(s.t), y=Y(s.price); idx?g.lineTo(x,y):g.moveTo(x,y); });
+    g.strokeStyle="rgba(255,255,255,.22)"; g.lineWidth=1.4; g.stroke();
+  }
+  // avg cost dashed line
+  if(d.avgCost>0){ const y=Y(d.avgCost); g.setLineDash([5,4]); g.beginPath(); g.moveTo(padL,y); g.lineTo(W-padR,y); g.strokeStyle="rgba(53,230,224,.75)"; g.lineWidth=1.2; g.stroke(); g.setLineDash([]); }
+  // now price dashed line
+  if(d.curPrice>0){ const y=Y(d.curPrice); g.setLineDash([2,3]); g.beginPath(); g.moveTo(padL,y); g.lineTo(W-padR,y); g.strokeStyle="rgba(255,255,255,.5)"; g.lineWidth=1; g.stroke(); g.setLineDash([]); }
+
+  const qmax=Math.max(1,...trades.map(t=>t.qty||0));
+  const r=(q)=>3+Math.sqrt((q||0)/qmax)*9;
+  // sells (draw first so buys sit on top)
+  for(const t of trades){ if(t.side!=="sell") continue; const x=X(t.ts), y=Y(t.price), s=r(t.qty);
+    g.beginPath(); g.moveTo(x,y-s); g.lineTo(x-s,y+s*0.8); g.lineTo(x+s,y+s*0.8); g.closePath();
+    g.fillStyle="rgba(255,59,92,.9)"; g.fill(); }
+  for(const t of trades){ if(t.side!=="buy") continue; const x=X(t.ts), y=Y(t.price), s=r(t.qty);
+    g.beginPath(); g.arc(x,y,s,0,7); g.fillStyle="rgba(200,255,77,.9)"; g.shadowColor="rgba(200,255,77,.5)"; g.shadowBlur=6; g.fill(); g.shadowBlur=0; }
+}
+
+function fmtQty(q){ q=Math.abs(q||0); if(q>=1e9)return (q/1e9).toFixed(2)+"B"; if(q>=1e6)return (q/1e6).toFixed(2)+"M"; if(q>=1e3)return (q/1e3).toFixed(1)+"K"; return q.toFixed(0); }
+function fmtPx(p){ p=Math.abs(p||0); if(!p) return "0"; if(p>=1) return p.toFixed(3); return p.toPrecision(3).replace(/0+$/,""); }
+addEventListener("resize",()=>{ document.querySelectorAll(".tok.open").forEach(el=>{ const i=el.getAttribute("data-i"); const cv=$("#cv"+i); if(cv&&el._data) drawTrades(cv,el._data); }); });
+</script>
+</body>
+</html>

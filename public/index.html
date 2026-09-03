@@ -220,11 +220,9 @@ const q=new URLSearchParams(location.search), ADDR=(q.get("address")||"").toLowe
 let EXPLORER=null;
 const exHref=(a)=>EXPLORER?`${EXPLORER}/address/${a}`:null;
 const shortA=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"";
-// A wallet row links to the chain explorer when EXPLORER_URL is configured; otherwise it is a
-// non-navigating row whose address is click-to-copy. No third-party wallet service (Zerion doesn't index this chain).
-function wGo(a){const h=exHref(a);
-  return h?{tag:"a",attrs:` href="${h}" target="_blank" rel="noopener"`,go:`<span class="zl">Explorer ↗</span>`}
-          :{tag:"div",attrs:"",go:`<span class="zl addr" title="${a}" onclick="event.preventDefault();navigator.clipboard&&navigator.clipboard.writeText('${a}')">${shortA(a)}</span>`};}
+// A wallet row opens OUR per-wallet PnL page (/wallet?a=) — our own reconstruction, not a third-party
+// portfolio service (Zerion & co. don't index this chain). The explorer link lives on the wallet page.
+function wGo(a){ return {tag:"a",attrs:` href="/wallet?a=${a}"`,go:`<span class="zl">PnL →</span>`}; }
 const addrLink=(a,cls="")=>{const h=exHref(a);return h?`<a href="${h}" target="_blank" rel="noreferrer" class="${cls}">${short(a)}</a>`:`<span class="${cls}">${short(a)}</span>`;};
 
 function icon(r){const sym=r.sym||"?";let h=0;for(let i=0;i<sym.length;i++)h=(h*31+sym.charCodeAt(i))|0;
@@ -719,8 +717,7 @@ function wireBM(){
     BMTIP.style.display="block"; const rect=GBM.getBoundingClientRect(); const x=e.clientX-rect.left, tw=BMTIP.offsetWidth;
     BMTIP.style.left=Math.max(6,Math.min(GBM.clientWidth-tw-6,x-tw/2))+"px"; BMTIP.style.top=Math.max(6,(e.clientY-rect.top)-52)+"px";});
   GBM.addEventListener("pointerleave",()=>{BMTIP.style.display="none";drawBM();});
-  GBM.addEventListener("click",(e)=>{const i=bmHit(e);if(i<0)return;const h=exHref(GNODES[i].a);
-    if(h)window.open(h,"_blank","noopener");else if(navigator.clipboard)navigator.clipboard.writeText(GNODES[i].a);});
+  GBM.addEventListener("click",(e)=>{const i=bmHit(e);if(i>=0)window.open(`/wallet?a=${GNODES[i].a}`,"_blank","noopener");});
   addEventListener("resize",()=>drawBM());
   $("#bmColor").addEventListener("click",()=>{BMMODE=BMMODE==="flow"?"role":"flow";
     $("#bmColor").textContent=BMMODE==="flow"?"colour: buying / selling":"colour: wallet role"; drawBM();});
