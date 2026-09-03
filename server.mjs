@@ -20,6 +20,7 @@ import { getTransfers } from "./store.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { PROVIDER } from "./rpc.mjs";
 import { traceEvents, discoverDex, recentDexTokens, DEX_CONFIG } from "./dex.mjs";
+import { walletIntel } from "./wallet.mjs";
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -211,6 +212,17 @@ createServer(async (req, res) => {
       try { const buf = await readFile(join(__dir, "study", "validation.json"));
         res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=3600" }); return res.end(buf);
       } catch { res.writeHead(404, { "content-type": "application/json" }); return res.end('{"error":"no validation data"}'); }
+    }
+
+    if (u.pathname === "/api/wallet") { // cross-token wallet intelligence — what it traded, holds vs exited
+      const address = (u.searchParams.get("address") || "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(address)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?address=0x…"}'); }
+      const key = `wallet:${address}`;
+      const cached = await getJSON(key).catch(() => null);
+      let out = cached && Date.now() - cached.at < 15 * 60 * 1000 ? cached.data : null;
+      if (!out) { out = await walletIntel(address); setJSON(key, { at: Date.now(), data: out }).catch(() => {}); }
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify(out));
     }
 
     if (u.pathname === "/api/token") {
