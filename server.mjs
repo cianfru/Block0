@@ -37,7 +37,13 @@ function anchorToPons(r, ponsMcap) {
   let lastMcap = null;
   for (let i = r.series.length - 1; i >= 0; i--) { const m = r.series[i].mcap; if (m != null && isFinite(m) && m > 0) { lastMcap = m; break; } }
   if (!lastMcap) return r;
+  // Only pin to Pons's CURRENT mcap when the reconstruction actually reaches ~now. If the pull was capped (a
+  // mega-token whose history we couldn't fully fetch), the last point is an OLD value — scaling the whole early
+  // curve up to today's mcap would grossly inflate it. In that case leave the (correct-for-its-window) values and
+  // just flag it rough.
+  const reachesNow = r.t1 && (Date.now() / 1000 - r.t1) < 6 * 3600;
   const ratio = ponsMcap / lastMcap;
+  if (!reachesNow) { r.priceRough = true; return r; }
   if (!isFinite(ratio) || ratio <= 0) return r;
   r.priceAnchor = +ratio.toFixed(4);
   r.priceRough = ratio > 20 || ratio < 0.05; // reconstruction level was far off Pons — treat the shape as rough
@@ -155,7 +161,7 @@ createServer(async (req, res) => {
       const token = (u.searchParams.get("token") || "").toLowerCase();
       if (!/^0x[0-9a-f]{40}$/.test(token)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?token=0x…"}'); }
       const points = Number(u.searchParams.get("points") || 90), ethUsd = Number(u.searchParams.get("eth") || 3000);
-      const noPrice = u.searchParams.get("price") === "0", cap = Number(u.searchParams.get("cap") || 400000);
+      const noPrice = u.searchParams.get("price") === "0", cap = Number(u.searchParams.get("cap") || process.env.BT_CAP || 100000);
       const key = `${token}:${points}:${ethUsd}:${noPrice}:${cap}`;
       if (!_btCache.has(key)) {
         _btCache.set(key, computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym: u.searchParams.get("sym") })
