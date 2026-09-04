@@ -330,7 +330,13 @@ function tickerFrom(b){
   if(stats.length) out.push(...stats);
   if(!out.length) out.push({t:"scanning the launch universe…",c:"#b6b6bd"});
   const run=out.concat(out);
-  $("#ticker").innerHTML=run.map(x=>`<span style="color:${x.c}">${x.t}</span>`).join("");
+  const el=$("#ticker");
+  el.innerHTML=run.map(x=>`<span style="color:${x.c}">${x.t}</span>`).join("");
+  // Constant, calm scroll speed regardless of how much is on the tape: one copy of the content should take
+  // (width / SPEED) seconds to pass. The animation translates -50% (exactly one copy), so measure half the run.
+  const SPEED=34; // px per second — deliberately slow/readable
+  const half=el.scrollWidth/2;
+  if(half>0) el.style.animationDuration=Math.max(40,Math.round(half/SPEED))+"s";
 }
 async function loadBoard(){try{
   const b=await fetch("/api/board").then(r=>r.json());

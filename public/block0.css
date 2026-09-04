@@ -176,7 +176,7 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .herochips{margin-top:20px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
 .herochips a.chip{color:var(--lime)}
 .ticker{margin-top:48px;overflow:hidden;border:1px solid var(--line);background:rgba(255,255,255,.02);border-radius:12px;padding:10px 0}
-.ticker .run{display:flex;gap:32px;white-space:nowrap;width:max-content;padding:0 16px;font-size:.76rem;animation:tick 46s linear infinite}
+.ticker .run{display:flex;gap:32px;white-space:nowrap;width:max-content;padding:0 16px;font-size:.76rem;animation:tick 90s linear infinite}
 @keyframes tick{0%{transform:translateX(0)}100%{transform:translateX(-50%)}}
 
 /* ---- pillars / corridor / accuracy / access ---- */
