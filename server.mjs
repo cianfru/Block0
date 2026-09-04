@@ -82,10 +82,19 @@ function anchorToPons(r, ponsMcap) {
 // rebuilds hit the cache (only the cold start pays the full 100-backtest cost, not every cycle).
 const BT_TTL = Number(process.env.BT_TTL_MS || 45 * 60 * 1000);
 const STORE_CAP = 25000;
+// In-process hot cache for backtests. The leaderboard warms every winner token through the SAME genericBt keys
+// every refresh, so a per-wallet PnL report (which reuses those keys) reads them straight from memory — no ~100
+// Redis round-trips, no recompute. Bounded so it can't grow without limit. Redis stays the cross-instance/restart
+// cache underneath.
+const _btMem = new Map();                       // kvKey -> { at, data }
+const _btMemGet = (k) => { const e = _btMem.get(k); if (e && Date.now() - e.at < BT_TTL) return e.data; if (e) _btMem.delete(k); return null; };
+const _btMemSet = (k, data) => { _btMem.set(k, { at: Date.now(), data }); if (_btMem.size > 400) _btMem.delete(_btMem.keys().next().value); };
 async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym, walletTrades }) {
   const kvKey = `bt:${key}`;
+  const mem = _btMemGet(kvKey);
+  if (mem) return mem;                           // instant: served from this process's memory
   const cached = await getJSON(kvKey).catch(() => null);
-  if (cached && cached.data && Date.now() - cached.at < BT_TTL) return cached.data;
+  if (cached && cached.data && Date.now() - cached.at < BT_TTL) { _btMemSet(kvKey, cached.data); return cached.data; }
   const meta = await ponsMeta(token);
   const st = await getTransfers(token, 18, { pool: meta?.pool, launchedAt: meta?.launchedAt }).catch(() => ({ ev: null }));
   const complete = st.ev && st.ev.length > 0 && st.ev.length < STORE_CAP - 1000; // store holds the whole history
@@ -93,6 +102,7 @@ async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym, 
     ...(await backtest(token, { sym: meta?.sym || sym || "?", pool: meta?.pool, graduated: !!meta?.graduated, launchedAt: meta?.launchedAt, points, ethUsd, noPrice, cap, walletTrades, ev: complete ? st.ev : null })),
     name: meta?.name, logo: meta?.logo, mcapUsd: meta?.mcapUsd, priceUsd: meta?.priceUsd,
   }, meta?.mcapUsd);
+  _btMemSet(kvKey, r);
   setJSON(kvKey, { at: Date.now(), data: r }).catch(() => {});
   return r;
 }

@@ -14,13 +14,29 @@ export async function walletPnlReport(address, tokens, computeBt, opts = {}) {
   address = (address || "").toLowerCase();
   const minRealized = opts.minRealized ?? 100;         // a "win" = at least this much cash actually taken out
   const budgetMs = opts.budgetMs || 0;                 // 0 = scan all; else stop early (partial) so it can't run long
+  const conc = Math.max(1, opts.concurrency || 20);    // fetch the per-token backtests in PARALLEL, not one-by-one
   const start = Date.now();
   const rows = [];
   let scanned = 0, partial = false;
-  for (const t of tokens) {
-    if (budgetMs && Date.now() - start > budgetMs) { partial = true; break; }
-    let bt = null;
-    try { bt = await computeBt(t.address); } catch { /* a token that won't backtest is skipped, never fatal */ }
+
+  // The reports reuse the leaderboard's WARMED backtests, so per token this is usually a single cache read — but a
+  // sequential await over ~100 tokens is still ~100 serial round-trips (seconds). Fetch them with a bounded worker
+  // pool so a warm report resolves in roughly one round-trip; the budget still caps a cold (RPC) scan.
+  const bts = new Array(tokens.length).fill(null);
+  let next = 0, stopped = false;
+  const worker = async () => {
+    for (;;) {
+      if (stopped) return;
+      const i = next++; if (i >= tokens.length) return;
+      if (budgetMs && Date.now() - start > budgetMs) { stopped = true; partial = true; return; }
+      try { bts[i] = await computeBt(tokens[i].address); } catch { /* a token that won't backtest is skipped, never fatal */ }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(conc, tokens.length) }, worker));
+
+  // build rows in token order (then sort) so output is identical regardless of fetch interleaving
+  for (let i = 0; i < tokens.length; i++) {
+    const t = tokens[i], bt = bts[i];
     if (!bt || !Array.isArray(bt.pnl)) continue;
     scanned++;
     const p = bt.pnl.find((x) => x.a === address);
