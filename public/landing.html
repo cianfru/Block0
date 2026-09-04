@@ -10,6 +10,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/block0.css">
+<script src="/blockclock.js" defer></script>
 <script src="/track.js" defer></script>
 <style>
   /* premium motion: a soft rise-in, staggered; disabled for reduced-motion */
@@ -48,6 +49,7 @@
   .hc-top{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;position:relative}
   .hc-sym{font-family:var(--serif);font-size:1.7rem;line-height:1}
   .hc-meta{display:block;font-size:.7rem;color:var(--mute);margin-top:5px;text-transform:uppercase;letter-spacing:.06em}
+  .hc-clock{font-family:var(--mono);font-size:.6rem;color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums;letter-spacing:.02em}
   .hc-mid{display:flex;align-items:center;gap:20px;margin:22px 0 2px;position:relative}
   .hc-dial{--p:0;--c:var(--lime);width:112px;height:112px;border-radius:50%;flex:0 0 auto;display:grid;place-items:center;position:relative;
     background:conic-gradient(var(--c) calc(var(--p)*1%),rgba(255,255,255,.09) 0);box-shadow:0 0 30px -8px var(--c)}
@@ -119,7 +121,7 @@
       <a href="/methodology">How it works</a>
     </nav>
     <div class="hd-r">
-      <span class="chip chainchip">Robinhood Chain</span>
+      <span class="chip chainchip">Robinhood Chain</span><span class="chip blockclock"></span>
       <button class="btn-connect" id="connect">Connect</button>
     </div>
   </div>
@@ -232,7 +234,7 @@ async function scan(e){
     if(r&&!r.error&&(r.risk!=null)){
       r.address=r.address||v;
       card.style.opacity="0";
-      setTimeout(()=>{ card.innerHTML=heroCardHTML(r); setAcc(card,r.risk||0); card.style.opacity="1"; },160);
+      setTimeout(()=>{ card.innerHTML=heroCardHTML(r); setAcc(card,r.risk||0); card.style.opacity="1"; window.B0CLOCK&&B0CLOCK.paint(); },160);
       $("#hcap").innerHTML='your scan — the verdict is free · full dossier unlocks below';
       $("#hdots").innerHTML='<i class="on"></i>';
       $("#hdots").insertAdjacentHTML("beforeend",' <button id="rescan" style="margin-left:8px;background:none;border:none;color:var(--mute);font-size:.7rem;cursor:pointer;font-family:var(--sans)">scan another</button>');
@@ -266,6 +268,7 @@ function heroCardHTML(r){
   const venue=r.venue==="uniswap-v4"?"uniswap":r.graduated?"graduated":r.progress!=null?"cooking":"launch";
   return `<div class="hc-top">
       <div><span class="hc-sym">${esc(r.sym||"?")}</span><span class="hc-meta">${venue} · ${B0.fmtAge(r.ageH)} · ${B0.mcT(r.mcapUsd)}</span></div>
+      <span class="hc-clock blockclock"></span>
     </div>
     <div class="hc-mid">
       <div class="hc-dial" style="--p:${risk};--c:${col}"><div class="hc-dt"><div class="hc-dnum">${risk}</div><div class="hc-dlab">risk</div></div></div>
@@ -299,7 +302,7 @@ function showDemo(i){
   if(!DEMO.length||window.__pinned) return;
   di=(i+DEMO.length)%DEMO.length; const r=DEMO[di]; const card=$("#herocard");
   card.style.opacity="0";
-  setTimeout(()=>{ card.innerHTML=heroCardHTML(r); setAcc(card,r.risk||0); card.style.opacity="1"; },180);
+  setTimeout(()=>{ card.innerHTML=heroCardHTML(r); setAcc(card,r.risk||0); card.style.opacity="1"; window.B0CLOCK&&B0CLOCK.paint(); },180);
   const dots=$("#hdots"); dots.innerHTML=DEMO.map((_,k)=>`<i class="${k===di?"on":""}" data-k="${k}"></i>`).join("");
   dots.querySelectorAll("i").forEach(el=>el.addEventListener("click",()=>{clearInterval(dtimer);showDemo(+el.dataset.k);dtimer=setInterval(()=>showDemo(di+1),6000);}));
 }

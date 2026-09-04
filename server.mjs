@@ -36,6 +36,8 @@ import { track, readIntel } from "./analytics.mjs";
 const readBody = (req, cap = 8192) => new Promise((resolve) => { let d = ""; req.on("data", (c) => { d += c; if (d.length > cap) req.destroy(); }); req.on("end", () => { try { resolve(JSON.parse(d || "{}")); } catch { resolve({}); } }); req.on("error", () => resolve({})); });
 const CONTROL_PW = process.env.CONTROL_PASSWORD || "";
 const newUid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+// chain head cache — one eth_blockNumber every ~10s, shared to every visitor's block-clock (cheap by design).
+let _head = { block: 0, at: 0 };
 
 // find a token's Pons metadata (pool / graduated / launchedAt / symbol) by address, for the backtest
 const _btCache = new Map();
@@ -227,6 +229,13 @@ createServer(async (req, res) => {
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
+
+    if (u.pathname === "/api/head") { // chain head for the live block-clock — cached ~10s, so N visitors ≠ N RPC calls
+      const now = Date.now();
+      if (now - _head.at > 10000) { try { _head = { block: await latestBlock(), at: now }; } catch { _head.at = now; } }
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify({ block: _head.block || 0, ts: Date.now() }));
+    }
 
     if (u.pathname === "/api/track" && req.method === "POST") { // first-party analytics beacon (fire-and-forget)
       const body = await readBody(req);
