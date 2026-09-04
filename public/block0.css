@@ -56,7 +56,7 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .hd{display:block;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line);background:rgba(8,8,11,.8);backdrop-filter:blur(20px);padding:0}
 .hd-in{display:flex;align-items:center;gap:16px;height:56px;max-width:1120px;margin:0 auto;padding:0 20px}
 .wordmark{font-family:var(--serif);font-size:1.35rem;line-height:1;letter-spacing:-.02em}
-.wordmark b{font-style:italic;color:var(--lime);font-weight:400}
+.wordmark b{display:inline-block;width:.6em;height:.82em;vertical-align:-.11em;margin:0 .01em 0 .02em;overflow:hidden;text-indent:-9999px;font-style:normal;background:left center/contain no-repeat url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='33 15 24 33'%3E%3Cg fill='%23c8ff4d' shape-rendering='crispEdges'%3E%3Crect x='39' y='15' width='12' height='3'/%3E%3Crect x='36' y='18' width='6' height='3'/%3E%3Crect x='48' y='18' width='6' height='3'/%3E%3Crect x='33' y='21' width='6' height='21'/%3E%3Crect x='51' y='21' width='6' height='21'/%3E%3Crect x='36' y='42' width='6' height='3'/%3E%3Crect x='48' y='42' width='6' height='3'/%3E%3Crect x='39' y='45' width='12' height='3'/%3E%3Crect x='39' y='36' width='3' height='3'/%3E%3Crect x='42' y='33' width='3' height='3'/%3E%3Crect x='45' y='30' width='3' height='3'/%3E%3Crect x='48' y='27' width='3' height='3'/%3E%3C/g%3E%3C/svg%3E")}
 .nav{display:none;align-items:center;gap:2px}
 @media(min-width:768px){.nav{display:flex}}
 .nav a{border-radius:10px;padding:8px 12px;font-size:.82rem;color:var(--dim);transition:background .15s,color .15s}
