@@ -35,7 +35,18 @@ const B0 = (() => {
     bolt: '<path d="M13 2 5 13h5l-1 9 10-13h-5l1-7z" stroke-linejoin="round"/>',
     warn: '<path d="M12 3.2 22 20H2z" stroke-linejoin="round"/><path d="M12 9v5"/><circle cx="12" cy="17.4" r=".65" fill="currentColor" stroke="none"/>',
     trend: '<path d="M3 16.5 9.5 10l4 3.5L21 6"/><path d="M15.5 6H21v5.5"/>',
+    trenddown: '<path d="M3 7.5 9.5 14l4-3.5L21 18"/><path d="M15.5 18H21v-5.5"/>',
     check: '<path d="M4 12.5 9.5 18 20 5.5"/>',
+    // snipers — rifle-scope reticle (aim/pointer)
+    scope: '<circle cx="12" cy="12" r="8"/><path d="M12 2.5v19M2.5 12h19"/><circle cx="12" cy="12" r="1.5" fill="currentColor" stroke="none"/>',
+    // bundles — connected bubbles (one actor, many wallets)
+    cluster: '<circle cx="6.5" cy="8" r="2.5"/><circle cx="17.5" cy="7" r="2.5"/><circle cx="12" cy="17" r="2.5"/><path d="M8.9 8.4 15.1 7.2M7.8 10.2 10.7 14.9M15.7 9.1 13.1 14.9"/>',
+    // concentration — four arrows converging to the centre
+    converge: '<path d="M9 9 3.5 3.5M9 5v4H5"/><path d="M15 9l5.5-5.5M15 5v4h4"/><path d="M9 15l-5.5 5.5M9 19v-4H5"/><path d="M15 15l5.5 5.5M15 19v-4h4"/>',
+    // holder growth — a group of people
+    users: '<path d="M16 20v-1.6a3.6 3.6 0 0 0-3.6-3.6H6.6A3.6 3.6 0 0 0 3 18.4V20"/><circle cx="9.5" cy="8" r="3.6"/><path d="M21 20v-1.6a3.6 3.6 0 0 0-2.7-3.48"/><path d="M15.5 4.6a3.6 3.6 0 0 1 0 6.96"/>',
+    // smart money — a brain
+    brain: '<path d="M12 5.2a2.7 2.7 0 0 0-5.2-1 3 3 0 0 0-2 4.4 3 3 0 0 0 .5 5.4A2.7 2.7 0 0 0 8 18.2 2.7 2.7 0 0 0 12 19.4Z"/><path d="M12 5.2a2.7 2.7 0 0 1 5.2-1 3 3 0 0 1 2 4.4 3 3 0 0 1-.5 5.4A2.7 2.7 0 0 1 16 18.2 2.7 2.7 0 0 1 12 19.4Z"/><path d="M8.4 9.2a2.4 2.4 0 0 0 3.6-.9 2.4 2.4 0 0 0 3.6.9"/>',
   };
   const ico = (name, cls = "") => {
     const p = ICONS[name]; if (!p) return "";
