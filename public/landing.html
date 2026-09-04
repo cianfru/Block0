@@ -383,10 +383,13 @@ loadBoard();loadProof();setInterval(loadBoard,30000);
   const cv=$("#corr"); if(!cv) return; const g=cv.getContext("2d");
   const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
   let W=0,H=0,dpr=1,lastW=-1,lastH=-1,curHu=1;
-  // Size the backing store from the canvas's OWN laid-out box (its CSS width:100% / height governs it), never from
-  // hardcoded numbers or the parent — that kept the two in sync and immune to the JS/CSS media-query desync that
-  // drew the curve at the wrong height on mobile. Returns true when the size actually changed.
-  function ensureSize(){ const r=cv.getBoundingClientRect(); const cw=Math.max(1,Math.round(r.width)), ch=Math.max(1,Math.round(r.height));
+  // Size from the PARENT container: its interior width is reliably the full card (measuring the canvas's own box
+  // read too narrow on desktop and squashed the lane into the left), and its height equals the canvas box, so the
+  // drawing fills the full height on mobile too. matchMedia is only a fallback if height hasn't laid out yet.
+  // Returns true when the size actually changed.
+  function ensureSize(){ const box=cv.parentElement;
+    const cw=Math.max(1,Math.round(box.clientWidth));
+    let ch=Math.round(box.clientHeight); if(!ch) ch=window.matchMedia("(max-width:700px)").matches?330:440;
     if(cw===lastW&&ch===lastH)return false; lastW=cw;lastH=ch;dpr=Math.min(2,window.devicePixelRatio||1);W=cw;H=ch;
     cv.width=Math.round(cw*dpr);cv.height=Math.round(ch*dpr);g.setTransform(dpr,0,0,dpr,0,0); return true; }
 
@@ -456,7 +459,7 @@ loadBoard();loadProof();setInterval(loadBoard,30000);
 
   // Keep the backing store matched to the box on any reflow (orientation, font swap, late layout) and repaint the
   // current frame — this is what makes the mobile size self-correct instead of freezing at a stale height.
-  const ro=new ResizeObserver(()=>{ if(ensureSize()) frame(curHu); }); ro.observe(cv);
+  const ro=new ResizeObserver(()=>{ if(ensureSize()) frame(curHu); }); ro.observe(cv.parentElement); ro.observe(cv);
   // Paint a correct resting frame immediately, so it's never blank or mis-sized before it scrolls into view.
   requestAnimationFrame(()=>frame(1));
   if(reduce){ return; }
