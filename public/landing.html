@@ -374,12 +374,13 @@ loadBoard();loadProof();setInterval(loadBoard,30000);
 (function(){
   const cv=$("#corr"); if(!cv) return; const g=cv.getContext("2d");
   const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
-  let W=0,H=0,dpr=1,lastW=-1,lastH=-1;
-  // measure the CONTAINER (reliably full-width) and set the canvas pixel size explicitly — don't depend on the
-  // canvas's own width:100% resolving, which left the drawing half-width.
-  function ensureSize(){ const cw=Math.round(cv.parentElement.clientWidth), ch=window.matchMedia("(max-width:700px)").matches?330:440;
-    if(cw===lastW&&ch===lastH)return; lastW=cw;lastH=ch;dpr=Math.min(2,window.devicePixelRatio||1);W=cw;H=ch;
-    cv.style.width=cw+"px";cv.style.height=ch+"px";cv.width=Math.round(cw*dpr);cv.height=Math.round(ch*dpr);g.setTransform(dpr,0,0,dpr,0,0); }
+  let W=0,H=0,dpr=1,lastW=-1,lastH=-1,curHu=1;
+  // Size the backing store from the canvas's OWN laid-out box (its CSS width:100% / height governs it), never from
+  // hardcoded numbers or the parent — that kept the two in sync and immune to the JS/CSS media-query desync that
+  // drew the curve at the wrong height on mobile. Returns true when the size actually changed.
+  function ensureSize(){ const r=cv.getBoundingClientRect(); const cw=Math.max(1,Math.round(r.width)), ch=Math.max(1,Math.round(r.height));
+    if(cw===lastW&&ch===lastH)return false; lastW=cw;lastH=ch;dpr=Math.min(2,window.devicePixelRatio||1);W=cw;H=ch;
+    cv.width=Math.round(cw*dpr);cv.height=Math.round(ch*dpr);g.setTransform(dpr,0,0,dpr,0,0); return true; }
 
   const smooth=(t)=>t*t*(3-2*t), clamp=(v,a,b)=>v<a?a:v>b?b:v, mix=(a,b,t)=>a+(b-a)*t;
   const GATES=[{u:.17,l:"first hour"},{u:.43,l:"100 holders"},{u:.69,l:"graduation"},{u:.93,l:"real market"}];
@@ -392,7 +393,7 @@ loadBoard();loadProof();setInterval(loadBoard,30000);
     const t=clamp((u-ls.drop)/0.35,0,1); return mix(cvv(ls.drop)-0.02,0.02,t*t); };
 
   function frame(hu){
-    ensureSize();
+    curHu=hu; ensureSize();
     const PL=44,PR=88,PT=40,PB=48; const yT=PT,yB=H-PB,hh=yB-yT;
     const X=(u)=>PL+u*(W-PL-PR), Y=(v)=>yB-clamp(v,0,1)*hh;
     g.clearRect(0,0,W,H);
@@ -445,11 +446,15 @@ loadBoard();loadProof();setInterval(loadBoard,30000);
       g.save(); g.shadowColor="rgba(200,255,77,.5)"; g.shadowBlur=10; g.fillText("WINNER", ex, ey-16); g.restore(); g.globalAlpha=1; }
   }
 
-  if(reduce){ requestAnimationFrame(()=>frame(1)); return; }
-  const DUR=3600, HOLD=1600, CYCLE=DUR+HOLD; let t0=null, vis=true;
-  const io=new IntersectionObserver((es)=>{vis=es[0].isIntersecting;},{threshold:.15}); io.observe(cv);
-  function loop(t){ if(t0==null)t0=t; const e=(t-t0)%CYCLE; const hu=e<DUR?smooth(clamp(e/DUR,0,1)):1;
-    if(vis) frame(hu); requestAnimationFrame(loop); }
+  // Keep the backing store matched to the box on any reflow (orientation, font swap, late layout) and repaint the
+  // current frame — this is what makes the mobile size self-correct instead of freezing at a stale height.
+  const ro=new ResizeObserver(()=>{ if(ensureSize()) frame(curHu); }); ro.observe(cv);
+  // Paint a correct resting frame immediately, so it's never blank or mis-sized before it scrolls into view.
+  requestAnimationFrame(()=>frame(1));
+  if(reduce){ return; }
+  const DUR=3600, HOLD=1600, CYCLE=DUR+HOLD; let t0=null, vis=false;
+  const io=new IntersectionObserver((es)=>{ const on=es[0].isIntersecting; if(on&&!vis)t0=null; vis=on; },{threshold:.15}); io.observe(cv);
+  function loop(t){ if(vis){ if(t0==null)t0=t; const e=(t-t0)%CYCLE; frame(e<DUR?smooth(clamp(e/DUR,0,1)):1); } requestAnimationFrame(loop); }
   requestAnimationFrame(loop);
 })();
 </script>
