@@ -48,7 +48,6 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .micro{font-size:.66rem;text-transform:uppercase;letter-spacing:.14em;color:var(--mute)}
 /* inline monoline icons (B0.ico) — inherit colour + size from context, never a cheap emoji */
 .ic{display:inline-block;width:1em;height:1em;vertical-align:-.14em;flex:0 0 auto}
-.live-dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--lime);box-shadow:0 0 7px rgba(200,255,77,.7)}
 
 /* ---- header / nav ---- */
 .hd{display:block;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line);background:rgba(8,8,11,.8);backdrop-filter:blur(20px);padding:0}

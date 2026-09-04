@@ -63,7 +63,7 @@
       <a href="/control">Control</a>
       <a href="/post" class="on">Post</a>
     </nav>
-    <div class="hd-r"><span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span></div>
+    <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span></div>
   </div>
 </header>
 
@@ -195,7 +195,7 @@ function renderToday(){
 function renderState(st){
   // cadence chips
   const cd=st.cadence||{};
-  $("#cad").innerHTML=`<span class="chip"><span class="live-dot"></span> ${cd.queued||0} queued</span>`+
+  $("#cad").innerHTML=`<span class="chip">${cd.queued||0} queued</span>`+
     `<span class="chip">${cd.week||0} posted this week</span>`+
     `<span class="chip">${cd.last?("last "+(cd.lastAgoH<1?"<1":cd.lastAgoH)+"h ago"):"nothing posted yet"}</span>`;
   // queue

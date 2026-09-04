@@ -24,7 +24,7 @@
       <a href="/methodology">Methodology</a>
     </nav>
     <div class="hd-r">
-      <span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span>
+      <span class="chip chainchip">Robinhood Chain</span>
       <button class="btn-connect" id="connect">Connect</button>
     </div>
   </div>
@@ -38,7 +38,7 @@
         <p class="micro eye">the board</p>
         <h1>Every launch, graded at a glance</h1>
       </div>
-      <div class="statchips" id="statchips"><span class="chip"><span class="live-dot"></span> scanning…</span></div>
+      <div class="statchips" id="statchips"><span class="chip">scanning…</span></div>
     </div>
 
     <input class="search" id="q" placeholder="Search name, symbol, or paste a contract address" autocomplete="off">
@@ -121,8 +121,8 @@ async function load(){try{
   const b=await fetch("/api/board").then(r=>r.json());LAST=b;
   const nc=(b.cooking||[]).length,ng=(b.graduated||[]).length,s=b.stats||{};
   const sc=$("#statchips");
-  if(!nc&&!ng){sc.innerHTML=`<span class="chip"><span class="live-dot"></span> ${b.scanning?"scanning universe…":"waiting for first scan…"}</span>`;render();return;}
-  sc.innerHTML=`<span class="chip"><span class="live-dot"></span> live</span>`+
+  if(!nc&&!ng){sc.innerHTML=`<span class="chip">${b.scanning?"scanning universe…":"waiting for first scan…"}</span>`;render();return;}
+  sc.innerHTML=
     (s.launchTotal?`<span class="chip tnum">${s.launchTotal.toLocaleString()} launches</span>`:"")+
     `<span class="chip tnum">${s.activeTotal||nc} active</span><span class="chip tnum">${s.graduatedTotal||ng} graduated</span>`;
   render();

@@ -25,7 +25,7 @@
       <a href="/methodology">Methodology</a>
     </nav>
     <div class="hd-r">
-      <span class="chip chainchip"><span class="live-dot"></span> Robinhood Chain</span>
+      <span class="chip chainchip">Robinhood Chain</span>
       <button class="btn-connect" id="connect">Connect</button>
     </div>
   </div>
@@ -76,7 +76,7 @@ async function load(){try{
   const botChip = d.contractsFiltered
     ? `<span class="chip tnum" title="contracts (bots, routers, pools) checked with eth_getCode and excluded — this is a list of humans you could follow">${d.contractsFiltered} bots filtered</span>`
     : d.contractsChecked ? `<span class="chip tnum" title="every ranked wallet checked with eth_getCode — none were contracts">✓ bots checked</span>` : "";
-  $("#statchips").innerHTML=`<span class="chip"><span class="live-dot"></span> ${rows.length} wallets</span>`+(d.tokensScanned?`<span class="chip tnum">${d.tokensScanned} winners scanned</span>`:"")+botChip;
+  $("#statchips").innerHTML=`<span class="chip">${rows.length} wallets</span>`+(d.tokensScanned?`<span class="chip tnum">${d.tokensScanned} winners scanned</span>`:"")+botChip;
   $("#lb").innerHTML=rows.map((w,i)=>B0.leaderRow(w,i+1,ex)).join("");
 }catch(e){$("#lb").innerHTML='<div class="state">Leaderboard unavailable — retrying…</div>';setTimeout(load,10000);}}
 load();
