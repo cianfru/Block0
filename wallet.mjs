@@ -22,6 +22,21 @@ async function pullTransfers(params) {
   return ev;
 }
 
+// Lightweight: the SET of ERC-20 token contracts a wallet has ever touched (both directions), no enrichment.
+// Used to pre-filter a per-wallet PnL scan down to only the tokens the wallet actually traded — turning a ~100-token
+// backtest sweep into a handful. Returns a lowercased Set, or null on failure (caller then scans the full set).
+export async function walletTokenSet(addr) {
+  addr = (addr || "").toLowerCase();
+  const base = { fromBlock: "0x0", toBlock: "latest", category: ["erc20"], withMetadata: false, maxCount: "0x3e8", order: "asc", excludeZeroValue: true };
+  const [sent, recv] = await Promise.all([
+    pullTransfers({ ...base, fromAddress: addr }),
+    pullTransfers({ ...base, toAddress: addr }),
+  ]);
+  const set = new Set();
+  for (const t of [...sent, ...recv]) { const a = (t.rawContract?.address || "").toLowerCase(); if (a && !INFRA.has(a)) set.add(a); }
+  return set;
+}
+
 export async function walletIntel(addr, { topN = 30 } = {}) {
   addr = addr.toLowerCase();
   const base = { fromBlock: "0x0", toBlock: "latest", category: ["erc20"], withMetadata: true, maxCount: "0x3e8", order: "asc", excludeZeroValue: true };

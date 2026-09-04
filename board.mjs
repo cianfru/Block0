@@ -46,7 +46,7 @@ async function verdict(meta) {
   const ageH = meta.launchedAt ? (Date.now() - Date.parse(meta.launchedAt)) / 3.6e6 : (r.ageH || 0);
   r.ageH = +ageH.toFixed(1);
   r.trajectory = liveTrajectory({ blueprint: r.blueprint, holders: r.flags.holders, ageH });
-  r.corridor = corridorStatus(ageH, r.trajectory);
+  r.corridor = corridorStatus(ageH, r.trajectory, { wallets: r.flags.wallets ?? r.flags.holders, mcap: r.mcapUsd });
   const known = FIRST_SEEN.has(r.address); if (!known) FIRST_SEEN.set(r.address, Date.now());
   r.firstSeenAt = FIRST_SEEN.get(r.address); r.isNew = BOOTED && !known;
   return r;

@@ -45,8 +45,8 @@ async function verdict(meta) {
   const blueprint = blueprintMatch({ bundles: r.flags.bundles, top10Pct: r.flags.top10Pct, holders: r.flags.holders, risk: r.risk });
   const ageH = meta.launchedAt ? (Date.now() - Date.parse(meta.launchedAt)) / 3.6e6 : (r.ageH || 0);
   const trajectory = liveTrajectory({ blueprint, holders: r.flags.holders, ageH });
-  const corridor = corridorStatus(ageH, trajectory);
   const wallets = r.flags.wallets || r.flags.holders;
+  const corridor = corridorStatus(ageH, trajectory, { wallets, mcap: meta.mcapUsd });
   return { ...r, meta, blueprint, blueprintLabel: blueprintLabel(blueprint), ageH: +ageH.toFixed(1), trajectory, corridor, wallets,
     path: pathPosition(wallets, meta.mcapUsd) };
 }

@@ -276,8 +276,8 @@ function placement(r){
       <div class="psub">The blueprint & launch-corridor signals grade a token's <i>path to graduation</i> — they no longer apply once it's out. The forensic verdict above (concentration, dumping, distribution) is the live read for a graduated coin; the history below shows how its score and valuation evolved.</div></div></div>`;
   }
   const bp=r.blueprint||0, bpc=bp>=75?"var(--lime)":bp>=55?"var(--cyan)":bp>=35?"var(--amber)":"var(--mute)";
-  const cor=r.corridor, CS={"on-track":"var(--lime)","behind":"var(--amber)","failing":"var(--coral)"},
-    CSL={"on-track":"on winner pace","behind":"behind winner pace","failing":"stalling — off pace"};
+  const cor=r.corridor, CS={"on-track":"var(--lime)","adoption-behind":"var(--amber)","behind":"var(--amber)","failing":"var(--coral)"},
+    CSL={"on-track":"on winner pace","adoption-behind":"clean shape · adoption behind pace","behind":"behind winner pace","failing":"stalling — off pace"};
   const p=r.path, pre=r.precedent;
   const PC={ahead:"var(--amber)","on-path":"var(--lime)",lagging:"var(--cyan)","off-path":"var(--mute)"},
     PL={ahead:"ahead of the winner band",lagging:"lagging the winners","on-path":"inside the winner band","off-path":"below the winner band"};
@@ -468,9 +468,16 @@ async function loadHistory(r){
 
 /* ---------------- winner-corridor cone (the study band, drawn on the token) ---------------- */
 let CORR=null, DOSSIER=null, CVC, TIPC, GEOC=null;
-const CORCOL={ontrack:"#c8ff4d",behind:"#ffd23d",failing:"#ff3b5c",na:"#7f7f88"};
+const CORCOL={ontrack:"#c8ff4d",lagging:"#ffd23d",behind:"#ffd23d",failing:"#ff3b5c",na:"#7f7f88"};
 function corBinAt(ageH){ if(!CORR||!CORR.length) return null; return CORR.find(b=>ageH>=b.lo&&ageH<b.hi)||CORR[CORR.length-1]; }
-function corStatus(s){ const b=corBinAt(s.ageH); if(!b||s.traj==null) return "na"; if(s.traj<35) return "failing"; const floor=b.band?b.band[0]:b.q1; return s.traj>=floor?"ontrack":"behind"; }
+// Status on TWO axes that must agree: the SHAPE score (trajectory vs the winners' cone) AND ADOPTION (this token's
+// absolute wallets + mcap vs where winners actually were). The shape score saturates on any clean young launch, so a
+// token can sit above the cone while its float is a fraction of the winners' — that's "lagging", not "on the path".
+function corStatus(s){ const b=corBinAt(s.ageH); if(!b||s.traj==null) return "na"; if(s.traj<35) return "failing";
+  const floor=b.band?b.band[0]:b.q1; const shapeOk=s.traj>=floor;
+  const lagging=(b.twLo&&s.wallets&&s.wallets<b.twLo*0.5)||(b.tm&&s.mcap&&s.mcap<b.tm*0.25);
+  if(shapeOk&&lagging) return "lagging";
+  return shapeOk?"ontrack":"behind"; }
 // continue the current path with a smooth line through pts (assumes the current point is pts[0]); midpoint quadratics
 function smoothFwd(g,pts){ for(let i=1;i<pts.length-1;i++){const xc=(pts[i].x+pts[i+1].x)/2,yc=(pts[i].y+pts[i+1].y)/2;g.quadraticCurveTo(pts[i].x,pts[i].y,xc,yc);} const l=pts[pts.length-1]; if(pts.length>1) g.quadraticCurveTo(l.x,l.y,l.x,l.y); }
 const ageLab=(h)=>h<1?Math.round(h*60)+"m":h<48?Math.round(h)+"h":Math.round(h/24)+"d";
@@ -482,7 +489,7 @@ function setCorVerdict(){
   if(DOSSIER&&DOSSIER.graduated){ el.innerHTML=`<b class="pill" style="background:var(--cyan)">GRADUATED</b>`; return; }
   // the signal barely discriminates in the first ~30 min (measured AUC ~0.55) — don't fake confidence that early
   if((DOSSIER?.ageH??pts[pts.length-1].ageH)<0.5){ el.innerHTML=`<b class="pill" style="background:var(--mute);color:#08080b">TOO EARLY TO CALL</b>`; return; }
-  const T={ontrack:["ON THE WINNER PATH","var(--lime)"],behind:["DRIFTING BELOW THE BAND","var(--amber)"],failing:["OFF PACE — STALLING","var(--coral)"],na:["",""]};
+  const T={ontrack:["ON THE WINNER PATH","var(--lime)"],lagging:["CLEAN SHAPE · ADOPTION LAGGING","var(--amber)"],behind:["DRIFTING BELOW THE BAND","var(--amber)"],failing:["OFF PACE — STALLING","var(--coral)"],na:["",""]};
   const t=T[st]; el.innerHTML=t[0]?`<b class="pill" style="background:${t[1]}">${t[0]}</b>`:"";
 }
 function wireCorridor(){
@@ -569,7 +576,7 @@ function onHoverCor(e){
   const frac=Math.max(0,Math.min(1,(mx-GEOC.padL)/GEOC.iw)), age=Math.pow(10,GEOC.x0+frac*(GEOC.x1-GEOC.x0));
   let idx=0,best=1e18; for(let i=0;i<GEOC.pts.length;i++){const d=Math.abs(GEOC.pts[i].ageH-age);if(d<best){best=d;idx=i;}}
   const s=GEOC.pts[idx]; drawCorridorChart(idx);
-  const st=corStatus(s), col=CORCOL[st], LB={ontrack:"on the winner path",behind:"below the band",failing:"failing",na:""};
+  const st=corStatus(s), col=CORCOL[st], LB={ontrack:"on the winner path",lagging:"shape ahead · adoption behind",behind:"below the band",failing:"failing",na:""};
   const b=corBinAt(s.ageH);
   TIPC.innerHTML=`<div class="d">at ${ageLab(s.ageH)} old</div><b style="color:${col}">trajectory ${s.traj}</b> · ${LB[st]}<br>
     <span style="color:var(--dim)">this token: ${(s.wallets||0).toLocaleString()} wallets · ${mcT(s.mcap)}</span>

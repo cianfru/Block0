@@ -63,7 +63,7 @@ export async function tokenDossier(address) {
   const ageH = r.launchedAt ? (Date.now() - Date.parse(r.launchedAt)) / 3.6e6 : (r.ageH || 0);
   r.ageH = +ageH.toFixed(1);
   r.trajectory = liveTrajectory({ blueprint: r.blueprint, holders: r.flags.holders, ageH });
-  r.corridor = corridorStatus(ageH, r.trajectory);
+  r.corridor = corridorStatus(ageH, r.trajectory, { wallets: r.flags.wallets ?? r.flags.holders, mcap: r.mcapUsd });
 
   // split the holder table into who's adding vs shedding right now (net flow over the live 30-min window),
   // and surface the biggest bags so a graduated token with no recent flow still shows its distribution.

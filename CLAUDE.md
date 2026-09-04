@@ -63,6 +63,22 @@ dumping — places it against a study of past winners, and shows the wallet inte
   `getAssetTransfers` two directions, capped, cached 15 min. `/api/wallet`.
 - **Wallet PnL report (`wallet-pnl.mjs`):** one wallet's reconstructed PnL across the winner set, reusing the cached
   backtests the leaderboard warms (reconciles to the cent). `/api/wallet-pnl?a=`; per-token orbs via `/api/wallet-trades`.
+  - **SPEED (3 layers, all shipped):** (1) in-process backtest memo (`_btMem` in server.mjs) so a warm report is memory
+    reads, not ~100 Redis GETs; (2) `walletPnlReport` fetches per-token backtests with a bounded worker pool (parallel,
+    not sequential); (3) **token PRE-FILTER** — `walletTokenSet(addr)` (wallet.mjs, one `getAssetTransfers` pair) lists
+    the tokens the wallet actually touched, so the endpoint only backtests the intersection with the winner set (~a
+    handful, not 100). Falls back to the full set if the lookup fails, so results never shrink; `tokensRequested` still
+    reports the whole universe. This is what makes a COLD wallet report fast.
+- **Trajectory honesty — SHAPE vs ADOPTION must agree (`model.mjs corridorStatus`, fixed 2026-09).** The trajectory
+  SCORE (`liveTrajectory`) saturates on any clean young launch: `inflow = holders/ageH` explodes at low ages and pins
+  the arrival-rate term at its cap, so a fresh clean token scores ~84 and plots ABOVE the winner cone (57–70) even
+  when its wallets/mcap are a FRACTION of the winners' gate — the "numbers don't match" bug (score said on-track while
+  `path.pos` said lagging). Fix: `corridorStatus(ageH, traj, {wallets, mcap})` now also reads ADOPTION vs the bin's
+  `twLo`/`tm`; a clean shape over a below-floor float (< twLo·0.5 wallets or < tm·0.25 mcap) returns `status:
+  "adoption-behind"` (with `shape`+`adoption` sub-reads), not "on-track". Callers (board/dossier/alerts) pass
+  wallets+mcap; the token-page corridor chart (`index.html corStatus`) has the same gate → a "lagging" (amber) line +
+  "CLEAN SHAPE · ADOPTION LAGGING" verdict. The concrete numbers govern the headline. ⚠ The score axis itself is
+  unchanged (would need a `tools/corridor.mjs` formula change + local model regen via `study/` — feasible, not done).
 - **Contract filter (`rpc.isContract`, `eth_getCode`, cached forever, fails open):** keeps bots/routers/pools off the
   leaderboard ("follow the smart money" = humans); count reported openly on the page.
 - **Post desk (`cards.mjs`):** turns live numbers into postable cards (eyebrow/hero/summary/tweet/viz), each built

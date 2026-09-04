@@ -14,12 +14,27 @@ export function liveTrajectory({ blueprint = 0, holders = 0, ageH = 0 }) {
   const demand = clamp(Math.min(55, 18 * log10(holders + 1)) + Math.min(45, inflow * 1.3));
   return Math.round(0.5 * blueprint + 0.5 * demand);
 }
-// where that score sits vs the winner corridor's healthy zone at this age
-export function corridorStatus(ageH, traj) {
+// where a token sits vs the winner corridor at this age — on TWO honest axes that must agree:
+//   • SHAPE  — the trajectory score (clean distribution + arrival rate) vs the winners' score cone;
+//   • ADOPTION — the ABSOLUTE wallets + market cap vs where winners actually were at this age (the gate).
+// The shape score saturates on any clean young launch (a fresh token trivially maxes the arrival-rate term), so it
+// can read "above the winners" while the token has a fraction of the winners' wallets/mcap. Reporting only the shape
+// was the "numbers don't match" bug: a token 4× below the winners' wallet floor read "on the winner path". We now
+// gate the headline on adoption too — a clean shape can't claim on-track while adoption is well below the pace.
+export function corridorStatus(ageH, traj, { wallets = 0, mcap = 0 } = {}) {
   if (!CORRIDOR.length) return null;
   const b = CORRIDOR.find((x) => ageH >= x.lo && ageH < x.hi) || CORRIDOR[CORRIDOR.length - 1];
-  const status = traj < 35 ? "failing" : traj >= b.q1 ? "on-track" : "behind";
-  return { traj, zoneLo: b.q1, zoneHi: b.q3, med: b.med, status };
+  const shape = traj < 35 ? "failing" : traj >= b.q1 ? "on-track" : "behind";
+  const walletFloor = b.twLo || 0, mcapMed = b.tm || 0;
+  // adoption vs the winners' actual pace: below half the wallet floor OR under a quarter of the median mcap = lagging
+  const lagging = (walletFloor && wallets && wallets < walletFloor * 0.5) || (mcapMed && mcap && mcap < mcapMed * 0.25);
+  const ahead = (walletFloor && wallets >= walletFloor) || (mcapMed && mcap >= mcapMed);
+  const adoption = lagging ? "lagging" : ahead ? "keeping-pace" : "early";
+  // combined verdict — the concrete numbers govern: a clean shape over a lagging float is NOT "on the winner path"
+  let status = shape;
+  if (shape === "on-track" && adoption === "lagging") status = "adoption-behind";
+  return { traj, zoneLo: b.q1, zoneHi: b.q3, med: b.med, status, shape, adoption,
+    walletFloor: walletFloor || null, mcapMed: mcapMed || null, wallets: wallets || null, mcap: mcap || null };
 }
 
 // winner-precedent market cap at a given unique-wallet count (log-interpolated across the ladder rungs)

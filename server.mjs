@@ -23,7 +23,7 @@ import { getTransfers } from "./store.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { PROVIDER } from "./rpc.mjs";
 import { traceEvents, discoverDex, recentDexTokens, DEX_CONFIG } from "./dex.mjs";
-import { walletIntel } from "./wallet.mjs";
+import { walletIntel, walletTokenSet } from "./wallet.mjs";
 import { buildLeaderboard } from "./leaderboard.mjs";
 import { walletPnlReport } from "./wallet-pnl.mjs";
 import { buildCards } from "./cards.mjs";
@@ -471,7 +471,14 @@ createServer(async (req, res) => {
       let rep = cached && Date.now() - cached.at < 15 * 60 * 1000 ? cached.data : null;
       if (!rep) {
         const budgetMs = Number(process.env.WALLET_PNL_BUDGET_MS || 25000);
-        rep = await walletPnlReport(a, tokens, genericBt, { budgetMs });
+        // PRE-FILTER: only backtest the winner tokens this wallet actually TOUCHED (one cheap getAssetTransfers pair),
+        // instead of reconstructing all ~100. A wallet trades a handful, so this collapses a cold report from ~100
+        // backtests to a few. Falls back to the full set if the token-set lookup fails, so results can't shrink.
+        let scanTokens = tokens;
+        try { const traded = await walletTokenSet(a); if (traded && traded.size) scanTokens = tokens.filter((t) => traded.has(t.address)); }
+        catch { /* keep the full set on any failure */ }
+        rep = await walletPnlReport(a, scanTokens, genericBt, { budgetMs });
+        rep.tokensRequested = tokens.length;   // report against the whole winner universe, not just the scanned subset
         let contract = false; try { contract = await isContract(a); } catch { /* fail open */ }
         rep = { ...rep, contract };
         // on the leaderboard? attach how it earned the board so the page can badge proven/riding
