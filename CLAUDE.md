@@ -70,6 +70,17 @@ dumping — places it against a study of past winners, and shows the wallet inte
   `public/desk-cards.js` (shared by `/desk` + `/post`).
 - **Social manager (`social.mjs`):** pure `{queue, log}` reducer (queue/move/posted/unpost/logRemove + cadence),
   persisted in KV. `/api/social` (gated). Powers `/post` — build → queue → mark posted → log. Nothing auto-posts.
+- **Most promising by price bracket (`picks.mjs` + `llm.mjs`):** groups the board into market-cap BRACKETS
+  (`BRACKETS`: fresh <$500k · $500k–$1M · $1M–$5M · $5M–$10M · $10M+) and surfaces the launch in each whose on-chain
+  fingerprint looks most like a real one. **`picks.mjs` is pure + tested:** `promiseScore` (interpretable: blueprint
+  fit + clean risk + adoption + momentum + smart-money − sniper/bundle/insider) pre-ranks candidates and IS the
+  no-LLM fallback; `validatePick` hard-enforces the honesty rail — the model may only pick one of OUR candidates,
+  the reason must cite a real on-chain signal, and any buy/price/moon language is rejected. **`llm.mjs`** is the one
+  LLM touchpoint: OpenRouter, free-model-first (`resolveModels` discovers live `:free` models each ~10 min, seeds +
+  fallback chain, pin via `OPENROUTER_MODEL`/`OPENROUTER_MODELS`), soft-fails on no-key/429/dead → deterministic
+  picks. `/api/picks` (memory + KV cached, background refresh every `PICKS_REFRESH_MS`=15m, ONE call/bracket ≤5).
+  Board tab **◆ Most promising**. LLM does LANGUAGE ONLY over facts we computed — never invents a token or number.
+  ⚠ COST: free models only; if the free key is unset the feature still works (deterministic). Keep it 1 call/bracket.
 - **KV (`store/kv.mjs`):** 3 backends auto-selected (Upstash REST > native `redis://` TCP `store/redis-tcp.mjs` > file).
   `kvPing()` reports backend/connected honestly. Redis is live in prod.
 

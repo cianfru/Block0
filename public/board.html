@@ -45,6 +45,7 @@
     <input class="search" id="q" placeholder="Search name, symbol, or paste a contract address" autocomplete="off">
     <div class="filters" id="tabs">
       <button class="on" data-f="cooking">About to graduate</button>
+      <button data-f="picks">◆ Most promising</button>
       <button data-f="smart"><svg class="ic" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg> Smart money</button>
       <button data-f="blueprint">Blueprint fit</button>
       <button data-f="graduated">Graduated</button>
@@ -107,6 +108,7 @@ function render(){
     $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Tokens where <b style="color:var(--tx)">proven-PnL wallets</b> are currently positioned — the ones who\'ve actually made money on this chain. <b style="color:var(--lime)">Two or more converging</b> on the same token is the high-confidence read. Reconstructed from on-chain holdings; confidence signal, not a recommendation.</p>'+
       (conv.length?section(conv):'<div class="state">No smart-money positions surfaced yet — the leaderboard builds first, then every verdict is tagged.</div>');
     return;}
+  if(FILTER==="picks"){ if(!PICKS){ $("#board").innerHTML='<div class="state">Reading the board by market-cap bracket…</div>'; loadPicks(); } else { $("#board").innerHTML=renderPicks(PICKS); } return; }
   if(FILTER==="graduated"){$("#board").innerHTML=grad.length?section(grad.sort((a,b)=>(b.mcapUsd||0)-(a.mcapUsd||0))):'<div class="state">No graduated tokens yet.</div>';return;}
   let all=cooking.concat(grad,dexl);
   if(FILTER==="heating") all.sort((a,b)=>(b.momentum||0)-(a.momentum||0));
@@ -115,6 +117,45 @@ function render(){
   $("#board").innerHTML=section(all);
 }
 $("#tabs").addEventListener("click",(e)=>{const t=e.target.closest("button");if(!t)return;FILTER=t.dataset.f;document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===t));render();});
+
+// ── Most promising by market-cap bracket (LLM-ranked over our on-chain facts; deterministic without a key) ──
+let PICKS=null,_picksLoading=false;
+async function loadPicks(){ if(_picksLoading)return; _picksLoading=true;
+  try{ const p=await fetch("/api/picks").then(r=>r.json()); PICKS=p; if(FILTER==="picks")$("#board").innerHTML=renderPicks(p); }
+  catch{ if(FILTER==="picks")$("#board").innerHTML='<div class="state">Picks unavailable — retrying…</div>'; }
+  finally{ _picksLoading=false; } }
+const _money=(n)=>B0.mcT?B0.mcT(n):("$"+Math.round(n||0).toLocaleString());
+const _riskChip=(risk,label)=>{const c=risk<25?"var(--lime)":risk<45?"#ffd23d":"#ff3b5c";return `<span class="chip" style="color:${c}">${B0.esc(label||("risk "+risk))}</span>`;};
+function pickBlock(br){
+  const p=br.pick, runner=br.runnerUp?br.candidates.find(c=>c.address===br.runnerUp):null;
+  return `<div class="panel" style="padding:16px 18px;display:grid;gap:10px">
+    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
+      <span class="micro eye">${B0.esc(br.label)}</span>
+      <span class="micro" style="color:var(--dim)">${br.candidateCount} candidate${br.candidateCount>1?"s":""}</span>
+    </div>
+    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+      <a href="/token?address=${p.address}" style="font-size:1.15rem;font-weight:700;color:var(--tx)">$${B0.esc(p.sym)}</a>
+      <span class="chip tnum">${_money(p.mcapUsd)}</span>
+      ${_riskChip(p.risk,p.riskLabel)}
+      ${p.smartMoney?`<span class="chip" style="color:var(--lime)">${p.smartMoney} smart-money</span>`:""}
+      ${p.viaLlm?`<span class="chip" title="reason written by a model over our on-chain facts" style="color:#9a9af5">✦ analyst</span>`:""}
+    </div>
+    <p style="margin:0;color:var(--tx);font-size:.92rem;line-height:1.5">${B0.esc(p.why)}</p>
+    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--dim)">
+      <span>${(p.holders||0).toLocaleString()} holders</span>
+      ${p.top10Pct!=null?`<span>top-10 ${p.top10Pct}%</span>`:""}
+      <span>blueprint ${p.blueprint}/100</span>
+      ${p.bundles?`<span style="color:#ff3b5c">${p.bundles} bundle${p.bundles>1?"s":""}</span>`:""}
+      ${p.snipers?`<span style="color:#ff8f3b">${p.snipers} snipers</span>`:""}
+    </div>
+    ${runner?`<div class="micro" style="color:var(--dim)">runner-up · <a href="/token?address=${runner.address}" style="color:var(--dim)">$${B0.esc(runner.sym)}</a> · ${_money(runner.mcapUsd)}</div>`:""}
+  </div>`;
+}
+function renderPicks(p){
+  if(!p||!p.brackets||!p.brackets.length) return '<div class="state">'+((p&&p.computing)?"Reading the board by bracket…":"No launches to rank yet — the first scan is still running.")+'</div>';
+  const intro=`<p class="caveat" style="margin:0 0 4px">The launch in each <b style="color:var(--tx)">market-cap bracket</b> whose on-chain fingerprint looks most like a real one — clean risk, a float that opens up, real adoption, proven wallets present. ${p.llmUsed?'Plain-language reason written by a model over our numbers — it never invents a token or a figure.':'Ranked by our transparent promise score.'} Signal, not proof — never a buy recommendation.</p>`;
+  return intro+`<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${p.brackets.map(pickBlock).join("")}</div>`;
+}
 $("#q").addEventListener("input",(e)=>{const v=e.target.value.trim();SEARCH=/^0x[0-9a-fA-F]{0,40}$/.test(v)?"":v;$("#tabs").style.opacity=SEARCH?".4":"1";render();});
 $("#q").addEventListener("keydown",(e)=>{if(e.key==="Enter")go(e);});
 B0GATE.mount({gated:true}); // real EVM wallet read; gate is open until a token is configured server-side

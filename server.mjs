@@ -32,6 +32,8 @@ import { buildGraph } from "./graph.mjs";
 import { resolveFunders, funderLinks } from "./funders.mjs";
 import { rpc, isContract } from "./rpc.mjs";
 import { track, readIntel } from "./analytics.mjs";
+import { buildPicks } from "./picks.mjs";
+import { chat as llmChat, hasKey as llmHasKey } from "./llm.mjs";
 
 const readBody = (req, cap = 8192) => new Promise((resolve) => { let d = ""; req.on("data", (c) => { d += c; if (d.length > cap) req.destroy(); }); req.on("end", () => { try { resolve(JSON.parse(d || "{}")); } catch { resolve({}); } }); req.on("error", () => resolve({})); });
 const CONTROL_PW = process.env.CONTROL_PASSWORD || "";
@@ -170,6 +172,28 @@ async function refreshLeaderboard() {
 if (Number(process.env.LEADERBOARD_ON ?? 1) > 0) {
   getJSON("leaderboard").then((v) => { if (v) _leaderboard = v; }).catch(() => {});
   setTimeout(() => { refreshLeaderboard(); setInterval(refreshLeaderboard, LB_REFRESH_MS); }, 90000);
+}
+
+// MOST-PROMISING-BY-PRICE-BRACKET — an LLM read over the board, refreshed on a slow timer and cached (memory + KV).
+// The LLM only RANKS + EXPLAINS candidates we already computed on-chain (see picks.mjs). No key → deterministic
+// picks, so the feature always works; with a free OpenRouter key it upgrades to model-written reasons. One LLM call
+// per bracket per refresh (≤5, every 15 min) keeps it inside free-model limits.
+const PICKS_REFRESH_MS = Number(process.env.PICKS_REFRESH_MS || 15 * 60 * 1000);
+let _picks = null, _picksRunning = false;
+function boardTokens() { const b = getBoard(); return [...(b.graduated || []), ...(b.dex || []), ...(b.cooking || [])]; }
+async function refreshPicks() {
+  if (_picksRunning) return; _picksRunning = true;
+  try {
+    const tokens = boardTokens();
+    if (!tokens.length) return;
+    const p = await buildPicks(tokens, llmHasKey() ? llmChat : null);   // no key → deterministic ranking
+    _picks = p; setJSON("picks", p).catch(() => {});
+  } catch { /* keep last good picks */ }
+  finally { _picksRunning = false; }
+}
+if (Number(process.env.PICKS_ON ?? 1) > 0) {
+  getJSON("picks").then((v) => { if (v) _picks = v; }).catch(() => {});
+  setTimeout(() => { refreshPicks(); setInterval(refreshPicks, PICKS_REFRESH_MS); }, 120000);
 }
 
 const __dir = fileURLToPath(new URL(".", import.meta.url));
@@ -420,6 +444,18 @@ createServer(async (req, res) => {
       if (!out) { out = await walletIntel(address); setJSON(key, { at: Date.now(), data: out }).catch(() => {}); }
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(out));
+    }
+
+    if (u.pathname === "/api/picks") { // most-promising launches by market-cap bracket (LLM-ranked over our on-chain facts)
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      if (_picks) return res.end(JSON.stringify(_picks));
+      // cold (before the first background refresh): build the DETERMINISTIC ranking on demand so the first hit isn't
+      // empty — instant, no LLM in the request path; the timer upgrades it with model-written reasons shortly after.
+      const tokens = boardTokens();
+      if (!tokens.length) return res.end(JSON.stringify({ updated: Date.now(), brackets: [], computing: true }));
+      const p = await buildPicks(tokens, null);
+      _picks = _picks || p;
+      return res.end(JSON.stringify(p));
     }
 
     if (u.pathname === "/api/wallet-pnl") { // ONE wallet's reconstructed PnL across the winner set — our own engine, no third party
