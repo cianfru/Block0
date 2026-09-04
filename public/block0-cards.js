@@ -64,11 +64,13 @@ const B0 = (() => {
     const al = r.alert ? `<p class="alert" style="color:${r.alert.tone === "good" ? "#c8ff4d" : r.alert.tone === "warn" ? "#ffd23d" : "#ff3b5c"}">${r.alert.tone === "bad" ? "▼ " : r.alert.tone === "good" ? "✓ " : "! "}${r.alert.text}</p>`
       : f.insiderSellersNow ? `<p class="alert" style="color:#ff3b5c">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
         : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#c8ff4d">✓ no snipers · no bundles</p>` : "";
+    // BUNDLES are the loudest red flag on a launch — one actor wearing many wallets. Flag it hard, up top.
+    const bundleFlag = f.bundles ? `<div class="bundleflag">${ico("warn")}<span><b>${f.bundles} bundle${f.bundles > 1 ? "s" : ""} detected</b>${f.bundleHeldPct ? ` — ${f.bundleHeldPct}% of supply bought as one` : " — coordinated same-block buys"}</span></div>` : "";
     const liveDanger = (r.alert && r.alert.tone === "bad") || f.insiderSellersNow;   // actively being dumped → the card buzzes
     const sm = r.smart && r.smart.count ? r.smart : null;
     const smBreak = sm && sm.riding ? ` <span class="smb">${sm.proven} proven · ${sm.riding} riding</span>` : "";
     const smartRow = sm ? `<div class="smart${sm.count >= 2 ? " conv" : ""}" title="${sm.wallets.map((w) => codename(w.a) + (w.kind ? " (" + w.kind + ")" : "") + (w.tokensWon ? " · " + w.tokensWon + " wins" : "")).join("\n")}">${ico("target")} <b>${sm.count}</b> smart-money wallet${sm.count > 1 ? "s" : ""} holding${sm.count >= 2 ? " · converging" : ""}${smBreak}</div>` : "";
-    return `<a class="panel panel-hover tcard${isNew(r) ? " new" : ""}${liveDanger ? " live" : ""}${sm && sm.count >= 2 ? " smartconv" : ""}" href="/token?address=${r.address}" style="animation-delay:${Math.min(i * 60, 600)}ms">
+    return `<a class="panel panel-hover tcard${isNew(r) ? " new" : ""}${liveDanger ? " live" : ""}${f.bundles ? " bundled" : ""}${sm && sm.count >= 2 ? " smartconv" : ""}" href="/token?address=${r.address}" style="animation-delay:${Math.min(i * 60, 600)}ms">
       <div class="body">
         <div class="top">${icon(r)}
           <div style="min-width:0">
@@ -77,6 +79,7 @@ const B0 = (() => {
           </div>
           <div class="rscore"><span class="n" style="color:${c};text-shadow:0 0 26px ${c}66">${r.risk}</span><span class="l" style="color:${c}">${tooEarly ? "Too early" : r.label}</span></div>
         </div>
+        ${bundleFlag}
         <div class="meters">${meters}</div>
         <div class="chiprow">${venue}${bpChips}${curve}</div>
         ${smartRow}${prec}${al}

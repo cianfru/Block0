@@ -156,8 +156,24 @@
   .bm-btn{font-size:.76rem;font-weight:600;color:var(--dim);border:1px solid var(--line);border-radius:9px;padding:6px 12px;background:transparent;cursor:pointer}
   .bm-btn:hover{border-color:var(--line-2);color:var(--tx)}
   .bm-btn.on{border-color:var(--lime);color:var(--lime);background:rgba(200,255,77,.08)}
-  #cvbm{height:440px;cursor:grab}
+  #cvbm{height:460px;cursor:grab;touch-action:none;display:block;width:100%}
   #cvbm:active{cursor:grabbing}
+  /* bundle / wallet panel that opens on click */
+  .bmpanel{position:absolute;top:12px;right:12px;width:min(300px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;z-index:7;
+    background:rgba(11,11,16,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line-2);border-radius:14px;
+    box-shadow:0 24px 60px -24px rgba(0,0,0,.85);padding:14px 15px}
+  .bmp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
+  .bmp-head b{font-size:.95rem}
+  .bmp-sub{display:block;font-size:.7rem;color:var(--mute);margin-top:3px}
+  .bmp-x{background:none;border:none;color:var(--mute);font-size:1rem;cursor:pointer;line-height:1;padding:2px 4px}
+  .bmp-x:hover{color:var(--tx)}
+  .bmp-list{margin-top:11px;display:flex;flex-direction:column;gap:2px}
+  .bmp-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:9px;text-decoration:none;color:var(--tx);transition:background .12s}
+  .bmp-row:hover{background:rgba(255,255,255,.05)}
+  .bmp-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
+  .bmp-nm{font-size:.82rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .bmp-pct{font-family:var(--mono);font-size:.76rem;color:var(--dim)}
+  .bmp-foot{margin-top:10px;font-size:.68rem;color:var(--mute);line-height:1.5}
   .bm-legend{display:flex;gap:14px;flex-wrap:wrap;padding:11px 16px;border-top:1px solid var(--line);font-size:.72rem;color:var(--mute)}
   .bm-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
   .bmtip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;font-size:.74rem;z-index:6;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -391,7 +407,7 @@ function render(r){
           <button class="bm-btn" id="bmFunders">＋ scan common funders</button>
         </div>
       </div>
-      <div style="position:relative"><canvas id="cvbm"></canvas><div class="bmtip" id="bmtip"></div></div>
+      <div style="position:relative"><canvas id="cvbm"></canvas><div class="bmtip" id="bmtip"></div><div class="bmpanel" id="bmpanel" hidden></div></div>
       <div class="bm-legend" id="bmlegend"></div>
     </div>
 
@@ -648,85 +664,150 @@ async function loadGraph(address){
     GRAPH=g;
     if(!g.nodes||g.nodes.length<2){ leg.innerHTML='<span style="color:var(--mute)">Not enough holders yet to map relationships.</span>'; GBM.style.display="none"; return; }
     GBM.style.display="block";
-    layoutGraph(); drawBM(); wireBM();
+    BMFOCUS=null; hidePanel(); layoutGraph(); wireBM(); startBM();
     const nb=g.stats||{}; const fl=g.clusters?g.clusters.filter(c=>c.flag).length:0;
     leg.innerHTML=`<span><i style="background:#c8ff4d"></i>accumulating</span><span><i style="background:#ff3b5c"></i>distributing</span>`+
       `<span style="color:var(--magenta)">◯ ringed = flagged cluster</span>`+
       `<span style="margin-left:auto">${g.nodes.length} wallets · ${g.clusters?g.clusters.length:0} clusters${fl?` · <b style="color:var(--amber)">${fl} to watch</b>`:""}${g.funders?` · ${g.funders.funderGroups} funder groups`:""}</span>`;
   }catch(e){ leg.innerHTML='<span style="color:var(--mute)">Bubble map unavailable.</span>'; GBM.style.display="none"; }
 }
+let BMDRAG=-1, BMHOVER=-1, BMFOCUS=null, bmMoved=false, bmStart={x:0,y:0}, bmProj={s:1,ox:0,oy:0}, bmRAF=0, bmIdle=0, bmSizeDirty=true;
+const hx2=(c)=>{const h=(c||"#888").replace("#","");const n=parseInt(h.length===3?h.split("").map(x=>x+x).join(""):h,16);return [(n>>16)&255,(n>>8)&255,n&255];};
+const lit=(a,t)=>a.map(v=>Math.round(v+(255-v)*t)), drk=(a,t)=>a.map(v=>Math.round(v*(1-t)));
+
 function layoutGraph(){
-  const g=GRAPH, n=g.nodes.length;
+  const g=GRAPH;
   const id2i=new Map(); g.nodes.forEach((nd,i)=>id2i.set(nd.a,i));
   const maxPct=Math.max(...g.nodes.map(nd=>nd.pct||0),0.01);
-  GNODES=g.nodes.map((nd)=>({...nd, r:5+Math.sqrt((nd.pct||0)/maxPct)*22, x:(Math.random()-0.5)*300, y:(Math.random()-0.5)*300, vx:0, vy:0}));
+  GNODES=g.nodes.map((nd)=>({...nd, r:6+Math.sqrt((nd.pct||0)/maxPct)*24, x:(Math.random()-0.5)*300, y:(Math.random()-0.5)*300, vx:0, vy:0, fx:null, fy:null}));
   const edges=(g.edges||[]).map(e=>({a:id2i.get(e.a),b:id2i.get(e.b),kind:e.kind})).filter(e=>e.a!=null&&e.b!=null);
-  // cluster centroids gravity
   const cl=new Map(); GNODES.forEach((nd)=>{ if(nd.cluster){ if(!cl.has(nd.cluster))cl.set(nd.cluster,[]); cl.get(nd.cluster).push(nd);} });
-  const ITER=320;
-  for(let it=0;it<ITER;it++){
-    const t=1-it/ITER, k=t*t;
-    // repulsion
-    for(let i=0;i<n;i++){for(let j=i+1;j<n;j++){const a=GNODES[i],b=GNODES[j];let dx=a.x-b.x,dy=a.y-b.y;let d2=dx*dx+dy*dy||0.01;const d=Math.sqrt(d2);
-      const rep=(a.r+b.r+40)*(a.r+b.r+40)/d2; const fx=dx/d*rep, fy=dy/d*rep; a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}}
-    // edge springs
-    for(const e of edges){const a=GNODES[e.a],b=GNODES[e.b];let dx=b.x-a.x,dy=b.y-a.y;const d=Math.sqrt(dx*dx+dy*dy)||0.01;
-      const ideal=a.r+b.r+34, f=(d-ideal)*0.06; const fx=dx/d*f, fy=dy/d*f; a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}
-    // cluster cohesion + center gravity
-    for(const [,members] of cl){let cx=0,cy=0;for(const m of members){cx+=m.x;cy+=m.y;}cx/=members.length;cy/=members.length;
-      for(const m of members){m.vx+=(cx-m.x)*0.02;m.vy+=(cy-m.y)*0.02;}}
-    for(const nd of GNODES){nd.vx+=(-nd.x)*0.008;nd.vy+=(-nd.y)*0.008; nd.x+=nd.vx*(0.4+0.6*k);nd.y+=nd.vy*(0.4+0.6*k); nd.vx*=0.82;nd.vy*=0.82;}
-  }
-  GRAPH._edges=edges; GRAPH._cl=cl;
+  GRAPH._edges=edges; GRAPH._cl=cl; GRAPH._id2i=id2i;
+  for(let it=0;it<150;it++) stepPhysics(1-it/150); // warm start; the live sim keeps it drag-able after
+}
+// one physics step — repulsion + edge springs + cluster cohesion + gentle centering. Pinned (dragged) nodes hold.
+function stepPhysics(k){
+  k=k==null?0.2:Math.max(0.05,k); const n=GNODES.length; let ke=0;
+  for(let i=0;i<n;i++){for(let j=i+1;j<n;j++){const a=GNODES[i],b=GNODES[j];let dx=a.x-b.x,dy=a.y-b.y;let d2=dx*dx+dy*dy||0.01;const d=Math.sqrt(d2);
+    const rep=(a.r+b.r+40)*(a.r+b.r+40)/d2; const fx=dx/d*rep, fy=dy/d*rep; a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}}
+  for(const e of (GRAPH._edges||[])){const a=GNODES[e.a],b=GNODES[e.b];let dx=b.x-a.x,dy=b.y-a.y;const d=Math.sqrt(dx*dx+dy*dy)||0.01;
+    const ideal=a.r+b.r+34, f=(d-ideal)*0.06; const fx=dx/d*f, fy=dy/d*f; a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}
+  for(const [,members] of (GRAPH._cl||[])){let cx=0,cy=0;for(const m of members){cx+=m.x;cy+=m.y;}cx/=members.length;cy/=members.length;
+    for(const m of members){m.vx+=(cx-m.x)*0.02;m.vy+=(cy-m.y)*0.02;}}
+  for(const nd of GNODES){ if(nd.fx!=null){ nd.x=nd.fx; nd.y=nd.fy; nd.vx=0; nd.vy=0; continue; }
+    nd.vx+=(-nd.x)*0.008;nd.vy+=(-nd.y)*0.008; nd.x+=nd.vx*(0.4+0.6*k);nd.y+=nd.vy*(0.4+0.6*k); nd.vx*=0.82;nd.vy*=0.82; ke+=nd.vx*nd.vx+nd.vy*nd.vy; }
+  return ke;
+}
+function ensureBMSize(){ const W=GBM.clientWidth,H=GBM.clientHeight; if(!bmSizeDirty && GBM.width===Math.round(W*BMDPR))return; bmSizeDirty=false; GBM.width=Math.round(W*BMDPR);GBM.height=Math.round(H*BMDPR); }
+// a shaded sphere → depth
+function bubble(g,px,py,pr,col,dim){
+  const rgb=hx2(col), a=dim?0.42:1;
+  g.save();
+  if(!dim){ g.shadowColor="rgba(0,0,0,.55)"; g.shadowBlur=Math.max(6,pr*0.5); g.shadowOffsetY=Math.max(2,pr*0.18); }
+  const grd=g.createRadialGradient(px-pr*0.38,py-pr*0.42,pr*0.15, px,py,pr);
+  grd.addColorStop(0,`rgba(${lit(rgb,0.55).join(",")},${a})`);
+  grd.addColorStop(0.55,`rgba(${rgb.join(",")},${a})`);
+  grd.addColorStop(1,`rgba(${drk(rgb,0.5).join(",")},${a})`);
+  g.beginPath();g.arc(px,py,pr,0,7);g.fillStyle=grd;g.fill();
+  g.restore();
+  g.beginPath();g.arc(px,py,pr,0,7);g.lineWidth=1;g.strokeStyle=`rgba(${lit(rgb,0.2).join(",")},${dim?0.3:0.7})`;g.stroke();
+  // gloss
+  g.beginPath();g.ellipse(px-pr*0.3,py-pr*0.4,pr*0.42,pr*0.24,-0.5,0,7);g.fillStyle=`rgba(255,255,255,${dim?0.05:0.18})`;g.fill();
 }
 function drawBM(hoverI=-1){
   if(!GNODES.length) return;
-  const W=GBM.clientWidth,H=GBM.clientHeight; GBM.width=W*BMDPR;GBM.height=H*BMDPR;
+  ensureBMSize();
+  const W=GBM.clientWidth,H=GBM.clientHeight;
   const g=GBM.getContext("2d"); g.setTransform(BMDPR,0,0,BMDPR,0,0); g.clearRect(0,0,W,H);
-  // fit
   let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
   for(const nd of GNODES){minX=Math.min(minX,nd.x-nd.r);maxX=Math.max(maxX,nd.x+nd.r);minY=Math.min(minY,nd.y-nd.r);maxY=Math.max(maxY,nd.y+nd.r);}
-  const pad=24, sx=(W-pad*2)/Math.max(1,maxX-minX), sy=(H-pad*2)/Math.max(1,maxY-minY), s=Math.min(sx,sy,2.4);
+  const pad=26, sx=(W-pad*2)/Math.max(1,maxX-minX), sy=(H-pad*2)/Math.max(1,maxY-minY), s=Math.min(sx,sy,2.4);
   const ox=pad-minX*s+(W-pad*2-(maxX-minX)*s)/2, oy=pad-minY*s+(H-pad*2-(maxY-minY)*s)/2;
-  const X=(x)=>x*s+ox, Y=(y)=>y*s+oy;
-  GRAPH._proj={X,Y,s};
-  // cluster rings (flagged first, coloured by cluster flow)
+  bmProj={s,ox,oy}; const X=(x)=>x*s+ox, Y=(y)=>y*s+oy;
+  const inFocus=(nd)=>!BMFOCUS||nd.cluster===BMFOCUS;
+  // cluster rings
   for(const c of (GRAPH.clusters||[])){
     const ms=c.wallets.map(a=>GNODES.find(nd=>nd.a===a)).filter(Boolean); if(ms.length<2) continue;
+    const isF=BMFOCUS&&ms[0].cluster===BMFOCUS;
     let cx=0,cy=0;for(const m of ms){cx+=m.x;cy+=m.y;}cx/=ms.length;cy/=ms.length;
     let rad=0;for(const m of ms){rad=Math.max(rad,Math.hypot(m.x-cx,m.y-cy)+m.r);}
-    const col=FLOWCOL[c.flow||"flat"]; const px=X(cx),py=Y(cy),pr=rad*s+8;
-    g.beginPath();g.arc(px,py,pr,0,7); g.fillStyle=col+"0e"; g.fill();
-    if(c.flag){ g.setLineDash([5,4]); g.strokeStyle=(c.hasFunder?"#ff5cf0":col)+"cc"; g.lineWidth=1.5; g.stroke(); g.setLineDash([]); }
+    const col=FLOWCOL[c.flow||"flat"]; const px=X(cx),py=Y(cy),pr=rad*s+10;
+    const fade=BMFOCUS&&!isF?0.25:1;
+    g.beginPath();g.arc(px,py,pr,0,7); g.fillStyle=col+(isF?"22":"0e"); g.globalAlpha=fade; g.fill();
+    if(c.flag||isF){ g.setLineDash(isF?[]:[5,4]); g.strokeStyle=(c.hasFunder?"#ff5cf0":col)+(isF?"":"cc"); g.lineWidth=isF?2.4:1.5; if(isF){g.shadowColor=col;g.shadowBlur=16;} g.stroke(); g.shadowBlur=0; g.setLineDash([]); }
+    g.globalAlpha=1;
   }
   // edges
-  for(const e of (GRAPH._edges||[])){const a=GNODES[e.a],b=GNODES[e.b];
-    g.strokeStyle=e.kind==="funder"?"rgba(255,92,240,.5)":e.kind==="bundle"?"rgba(200,255,77,.35)":"rgba(255,255,255,.10)";
-    g.lineWidth=e.kind==="transfer"?1:1.4; g.beginPath();g.moveTo(X(a.x),Y(a.y));g.lineTo(X(b.x),Y(b.y));g.stroke();}
-  // nodes
-  GNODES.forEach((nd,i)=>{const c=nodeCol(nd),px=X(nd.x),py=Y(nd.y),pr=nd.r*Math.min(s,1.4);
-    if(i===hoverI){g.beginPath();g.arc(px,py,pr+4,0,7);g.strokeStyle="#fff";g.lineWidth=2;g.stroke();}
-    g.beginPath();g.arc(px,py,pr,0,7); g.fillStyle=c+"e0"; g.shadowColor=c;g.shadowBlur=nd.flow&&nd.flow!=="flat"?10:0; g.fill(); g.shadowBlur=0;
-    g.lineWidth=1;g.strokeStyle=c;g.stroke();});
+  for(const e of (GRAPH._edges||[])){const a=GNODES[e.a],b=GNODES[e.b]; const ef=inFocus(a)&&inFocus(b);
+    g.globalAlpha=BMFOCUS&&!ef?0.12:1;
+    g.strokeStyle=e.kind==="funder"?"rgba(255,92,240,.5)":e.kind==="bundle"?"rgba(200,255,77,.4)":"rgba(255,255,255,.10)";
+    g.lineWidth=e.kind==="transfer"?1:1.5; g.beginPath();g.moveTo(X(a.x),Y(a.y));g.lineTo(X(b.x),Y(b.y));g.stroke();}
+  g.globalAlpha=1;
+  // nodes (3D bubbles)
+  GNODES.forEach((nd,i)=>{const c=nodeCol(nd),px=X(nd.x),py=Y(nd.y),pr=nd.r*Math.min(s,1.4); const dim=BMFOCUS&&!inFocus(nd);
+    bubble(g,px,py,pr,c,dim);
+    if(i===hoverI||(BMFOCUS&&nd.cluster===BMFOCUS&&nd.pct===Math.max(...GNODES.filter(x=>x.cluster===BMFOCUS).map(x=>x.pct)))){
+      g.beginPath();g.arc(px,py,pr+4,0,7);g.strokeStyle="#fff";g.lineWidth=i===hoverI?2:1.4;g.globalAlpha=i===hoverI?1:0.6;g.stroke();g.globalAlpha=1; }
+  });
+}
+function startBM(){ wakeBM(); }
+function wakeBM(){ bmIdle=0; if(!bmRAF) bmRAF=requestAnimationFrame(loopBM); }
+function loopBM(){
+  const ke=stepPhysics(0.2); drawBM(BMHOVER);
+  if(BMDRAG<0 && ke<0.4) bmIdle++; else bmIdle=0;
+  if(bmIdle>45){ bmRAF=0; drawBM(BMHOVER); return; }   // settled → stop the loop
+  bmRAF=requestAnimationFrame(loopBM);
+}
+function bmHit(e){const rect=GBM.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top,p=bmProj;
+  let hit=-1,best=1e9;GNODES.forEach((nd,i)=>{const dx=(nd.x*p.s+p.ox)-mx,dy=(nd.y*p.s+p.oy)-my,d=Math.hypot(dx,dy);const rr=nd.r*Math.min(p.s,1.4)+4;if(d<rr&&d<best){best=d;hit=i;}});return hit;}
+function toGraph(e){const rect=GBM.getBoundingClientRect();return {x:(e.clientX-rect.left-bmProj.ox)/bmProj.s, y:(e.clientY-rect.top-bmProj.oy)/bmProj.s};}
+function hidePanel(){ const p=$("#bmpanel"); if(p){p.hidden=true;p.innerHTML="";} }
+function clearFocus(){ BMFOCUS=null; hidePanel(); wakeBM(); }
+function selectNode(i){
+  const nd=GNODES[i];
+  const c=(GRAPH.clusters||[]).find(x=>x.wallets&&x.wallets.includes(nd.a));
+  const p=$("#bmpanel");
+  if(c && c.wallets.length>1){
+    BMFOCUS=nd.cluster;
+    const mems=c.wallets.map(a=>GNODES.find(g=>g.a===a)).filter(Boolean).sort((x,y)=>(y.pct||0)-(x.pct||0));
+    const pctSum=mems.reduce((s,m)=>s+(m.pct||0),0), flow=c.flow||"flat";
+    p.innerHTML=`<div class="bmp-head"><div><b>${c.flag?"⚠ ":""}Bundle · ${mems.length} wallets</b>`+
+      `<span class="bmp-sub">${pctSum.toFixed(1)}% of supply · ${flow==='sell'?'distributing':flow==='buy'?'accumulating':'flat'}${c.hasFunder?' · shared funder':''}</span></div>`+
+      `<button class="bmp-x" id="bmpx" title="close">✕</button></div>`+
+      `<div class="bmp-list">${mems.map(m=>`<a class="bmp-row" href="/wallet?a=${m.a}" target="_blank" rel="noopener"><span class="bmp-dot" style="background:${FLOWCOL[m.flow||'flat']}"></span><span class="bmp-nm">${B0.codename(m.a)}</span><span class="bmp-pct">${(m.pct||0).toFixed(2)}%</span></a>`).join("")}</div>`+
+      `<div class="bmp-foot">These wallets are linked by same-block buys or fund/drain transfers. Click any → its full reconstructed PnL.</div>`;
+  } else {
+    BMFOCUS=null;
+    p.innerHTML=`<div class="bmp-head"><div><b>${B0.codename(nd.a)}</b><span class="bmp-sub">${(nd.pct||0).toFixed(2)}% of supply · ${nd.role}${nd.flow&&nd.flow!=='flat'?' · '+(nd.flow==='buy'?'accumulating':'distributing'):''}</span></div><button class="bmp-x" id="bmpx" title="close">✕</button></div>`+
+      `<div class="bmp-foot">Not part of a detected bundle.</div><a class="bmp-row" href="/wallet?a=${nd.a}" target="_blank" rel="noopener" style="margin-top:8px;border:1px solid var(--line)"><span class="bmp-dot" style="background:${FLOWCOL[nd.flow||'flat']}"></span><span class="bmp-nm">Open full PnL</span><span class="bmp-pct">↗</span></a>`;
+  }
+  p.hidden=false; const x=$("#bmpx"); if(x)x.onclick=clearFocus;
+  wakeBM();
 }
 function wireBM(){
   if(GBM._wired) return; GBM._wired=true;
-  GBM.addEventListener("pointermove",(e)=>{const i=bmHit(e); drawBM(i);
+  GBM.addEventListener("pointerdown",(e)=>{ try{GBM.setPointerCapture(e.pointerId);}catch(_){}
+    bmStart={x:e.clientX,y:e.clientY}; bmMoved=false; const i=bmHit(e);
+    if(i>=0){ BMDRAG=i; const nd=GNODES[i]; nd.fx=nd.x; nd.fy=nd.y; } else BMDRAG=-2; wakeBM(); });
+  GBM.addEventListener("pointermove",(e)=>{
+    if(BMDRAG>=0){ if(Math.hypot(e.clientX-bmStart.x,e.clientY-bmStart.y)>4)bmMoved=true; const gpt=toGraph(e); const nd=GNODES[BMDRAG]; nd.fx=gpt.x; nd.fy=gpt.y; BMTIP.style.display="none"; wakeBM(); return; }
+    const i=bmHit(e); BMHOVER=i; if(!bmRAF)drawBM(i);
     if(i<0){BMTIP.style.display="none";return;} const nd=GNODES[i];
-    BMTIP.innerHTML=`<b>${B0.codename(nd.a)}</b><br><span style="color:var(--mute)">${nd.pct}% of supply · ${nd.role}</span><br><span style="color:${FLOWCOL[nd.flow||'flat']}">${nd.flow==='buy'?'accumulating':nd.flow==='sell'?'distributing':'flat'}</span>${nd.cluster?` · cluster`:''}`;
-    BMTIP.style.display="block"; const rect=GBM.getBoundingClientRect(); const x=e.clientX-rect.left, tw=BMTIP.offsetWidth;
-    BMTIP.style.left=Math.max(6,Math.min(GBM.clientWidth-tw-6,x-tw/2))+"px"; BMTIP.style.top=Math.max(6,(e.clientY-rect.top)-52)+"px";});
-  GBM.addEventListener("pointerleave",()=>{BMTIP.style.display="none";drawBM();});
-  GBM.addEventListener("click",(e)=>{const i=bmHit(e);if(i>=0)window.open(`/wallet?a=${GNODES[i].a}`,"_blank","noopener");});
-  addEventListener("resize",()=>drawBM());
+    BMTIP.innerHTML=`<b>${B0.codename(nd.a)}</b><br><span style="color:var(--mute)">${nd.pct}% of supply · ${nd.role}</span><br><span style="color:${FLOWCOL[nd.flow||'flat']}">${nd.flow==='buy'?'accumulating':nd.flow==='sell'?'distributing':'flat'}</span>${nd.cluster?` · in a bundle — click to open`:''}`;
+    BMTIP.style.display="block"; const rect=GBM.getBoundingClientRect(); const x=e.clientX-rect.left; const tw=BMTIP.offsetWidth;
+    BMTIP.style.left=Math.max(6,Math.min(GBM.clientWidth-tw-6,x-tw/2))+"px"; BMTIP.style.top=Math.max(6,(e.clientY-rect.top)-58)+"px";});
+  GBM.addEventListener("pointerup",(e)=>{
+    if(BMDRAG>=0){ const nd=GNODES[BMDRAG]; const wasDrag=bmMoved; nd.fx=null; nd.fy=null; const idx=BMDRAG; BMDRAG=-1; if(!wasDrag) selectNode(idx); else wakeBM(); return; }
+    if(BMDRAG===-2){ BMDRAG=-1; if(!bmMoved) clearFocus(); }
+  });
+  GBM.addEventListener("pointerleave",()=>{BMHOVER=-1;BMTIP.style.display="none";if(!bmRAF)drawBM();});
+  addEventListener("resize",()=>{bmSizeDirty=true;wakeBM();});
   $("#bmColor").addEventListener("click",()=>{BMMODE=BMMODE==="flow"?"role":"flow";
-    $("#bmColor").textContent=BMMODE==="flow"?"colour: buying / selling":"colour: wallet role"; drawBM();});
+    $("#bmColor").textContent=BMMODE==="flow"?"colour: buying / selling":"colour: wallet role"; wakeBM();});
   $("#bmFunders").addEventListener("click",()=>{ if(BMFUNDERS)return; BMFUNDERS=true;
     const b=$("#bmFunders"); b.textContent="scanning funders…"; b.classList.add("on");
     loadGraph(BMADDR).then(()=>{b.textContent="✓ common funders"; }).catch(()=>{b.textContent="＋ scan common funders";b.classList.remove("on");BMFUNDERS=false;}); });
 }
-function bmHit(e){const p=GRAPH&&GRAPH._proj;if(!p)return -1;const rect=GBM.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top;
-  let hit=-1,best=1e9;GNODES.forEach((nd,i)=>{const dx=p.X(nd.x)-mx,dy=p.Y(nd.y)-my,d=Math.hypot(dx,dy);const rr=nd.r*Math.min(p.s,1.4)+3;if(d<rr&&d<best){best=d;hit=i;}});return hit;}
 
 async function boot(){
   if(!/^0x[0-9a-f]{40}$/.test(ADDR)){ $("#root").innerHTML='<div class="state err">No token address in the URL. Open a token from the board.</div>'; return; }

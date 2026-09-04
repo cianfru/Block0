@@ -236,6 +236,13 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 @media(min-width:560px){.lb-go{display:inline}}
 .ctag{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);border:1px solid rgba(255,255,255,.16);border-radius:5px;padding:1px 5px;margin-left:5px;vertical-align:middle;white-space:nowrap}
 
+/* ---- heavy bundle flag on a token card ---- */
+.tcard.bundled{border-color:rgba(255,59,92,.4);position:relative;overflow:hidden}
+.tcard.bundled::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--coral);border-radius:16px 0 0 16px;box-shadow:0 0 14px rgba(255,59,92,.6)}
+.bundleflag{display:flex;align-items:center;gap:8px;margin:12px 0 2px;padding:9px 12px;border-radius:11px;background:rgba(255,59,92,.13);border:1px solid rgba(255,59,92,.4);color:#ff8093;font-size:.8rem;line-height:1.35}
+.bundleflag .ic{font-size:16px;flex:0 0 auto;color:var(--coral)}
+.bundleflag b{color:#ff3b5c;font-weight:700}
+
 /* ---- token-gated access overlay ---- */
 .gate-overlay{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,8,11,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}
 .gate-card{max-width:460px;width:100%;padding:34px;text-align:center}
