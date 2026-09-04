@@ -92,7 +92,7 @@
   .sig{border:1px solid var(--line);border-radius:14px;padding:18px 18px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008));transition:border-color .2s ease,transform .2s ease,box-shadow .2s ease}
   .sig:hover{border-color:var(--line-2);transform:translateY(-3px);box-shadow:0 20px 40px -26px rgba(0,0,0,.8)}
   .sig .st{display:flex;align-items:center;gap:12px;font-weight:600;font-size:1rem}
-  .sig .sic{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;font-size:19px;transition:transform .2s ease}
+  .sig .sic{width:38px;height:38px;border-radius:11px;flex:0 0 auto;display:grid;place-items:center;font-size:19px;background:rgba(255,255,255,.045);box-shadow:inset 0 0 0 1px var(--line);transition:transform .2s ease}
   .sig:hover .sic{transform:scale(1.06)}
   .sig p{margin:12px 0 0;font-size:.85rem;line-height:1.55;color:var(--dim)}
 
@@ -254,7 +254,9 @@ const SIGNALS=[
   {n:"Holder growth",i:"radar",c:"#35e6e0",d:"Real new wallets arriving over time — or a hollow chart propped up by a few."},
   {n:"Smart money",i:"check",c:"#c8ff4d",d:"Wallets with a track record of winning past launches, showing up again."},
 ];
-$("#signals").innerHTML=SIGNALS.map(s=>`<div class="sig"><div class="st"><span class="sic" style="color:${s.c};background:${s.c}1f;box-shadow:inset 0 0 0 1px ${s.c}33">${B0.ico(s.i)}</span>${s.n}</div><p>${s.d}</p></div>`).join("");
+// Icon chips match the product cards: one neutral chip for all, the monoline glyph carries the semantic colour
+// (red = danger tells, amber = caution, teal/lime = healthy) — not six different coloured squares.
+$("#signals").innerHTML=SIGNALS.map(s=>`<div class="sig"><div class="st"><span class="sic" style="color:${s.c}">${B0.ico(s.i)}</span>${s.n}</div><p>${s.d}</p></div>`).join("");
 
 // ---- the live verdict card (the product, shown) ----
 const vcol=(r)=>r>=66?"c":r>=45?"a":r>=25?"a":"g"; // g lime / a amber / c coral
