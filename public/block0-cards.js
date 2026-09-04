@@ -7,6 +7,9 @@ const B0 = (() => {
   const fmtAge = (h) => h == null ? "—" : h < 1 ? Math.round(h * 60) + "m" : h < 48 ? h.toFixed(1) + "h" : Math.round(h / 24) + "d";
   const sev = (v) => v >= 66 ? "#ff3b5c" : v >= 45 ? "#ffd23d" : v >= 25 ? "#35e6e0" : "#c8ff4d";
   const isNew = (r) => r.isNew || (r.firstSeenAt && Date.now() - r.firstSeenAt < 150000);
+  // HTML-escape — token symbols/names come from on-chain metadata (permissionless), so they are attacker-controlled
+  // and MUST be escaped anywhere they land in innerHTML. Shared as B0.esc so every page uses the same guard.
+  const esc = (s) => String(s == null ? "" : s).replace(/[&<>"']/g, (m) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[m]));
 
   function icon(r) {
     const sym = r.sym || "?"; const c = HEX(r.risk);
@@ -61,7 +64,7 @@ const B0 = (() => {
     ].join("") : "";
     const curve = (r.progress != null) ? chip(`curve ${r.progress}%`) : "";
     const prec = r.path ? `<div class="precedent tnum">${(f.wallets || f.holders || 0).toLocaleString()} wallets → <b>${mcT(r.path.precedent)}</b> <span class="m">precedent mcap</span></div>` : "";
-    const al = r.alert ? `<p class="alert" style="color:${r.alert.tone === "good" ? "#c8ff4d" : r.alert.tone === "warn" ? "#ffd23d" : "#ff3b5c"}">${r.alert.tone === "bad" ? "▼ " : r.alert.tone === "good" ? "✓ " : "! "}${r.alert.text}</p>`
+    const al = r.alert ? `<p class="alert" style="color:${r.alert.tone === "good" ? "#c8ff4d" : r.alert.tone === "warn" ? "#ffd23d" : "#ff3b5c"}">${r.alert.tone === "bad" ? "▼ " : r.alert.tone === "good" ? "✓ " : "! "}${esc(r.alert.text)}</p>`
       : f.insiderSellersNow ? `<p class="alert" style="color:#ff3b5c">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
         : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#c8ff4d">✓ no snipers · no bundles</p>` : "";
     // BUNDLES are the loudest red flag on a launch — one actor wearing many wallets. Flag it hard, up top.
@@ -74,7 +77,7 @@ const B0 = (() => {
       <div class="body">
         <div class="top">${icon(r)}
           <div style="min-width:0">
-            <div class="tsym">${r.sym || "?"}${isNew(r) ? '<span class="newbadge">NEW</span>' : ""}</div>
+            <div class="tsym">${esc(r.sym || "?")}${isNew(r) ? '<span class="newbadge">NEW</span>' : ""}</div>
             <div class="micro" style="margin-top:3px">${mcT(r.mcapUsd)} mcap · ${fmtAge(r.ageH)} old</div>
           </div>
           <div class="rscore"><span class="n" style="color:${c};text-shadow:0 0 26px ${c}66">${r.risk}</span><span class="l" style="color:${c}">${tooEarly ? "Too early" : r.label}</span></div>
@@ -101,7 +104,7 @@ const B0 = (() => {
   function leaderRow(w, rank /* explorerBase kept for signature compat, unused */) {
     const up = (w.pnl || w.realized) >= 0;
     const col = up ? "#c8ff4d" : "#ff3b5c";
-    const toks = (w.tokens || []).slice(0, 4).map((t) => `<span class="chip">${t.sym}${t.holding ? " ·hold" : ""}</span>`).join("");
+    const toks = (w.tokens || []).slice(0, 4).map((t) => `<span class="chip">${esc(t.sym)}${t.holding ? " ·hold" : ""}</span>`).join("");
     return `<a class="lb-row panel-hover" href="/wallet?a=${w.a}">
       <span class="lb-rank">${rank}</span>
       ${avatar(w.a, 38)}
@@ -118,5 +121,5 @@ const B0 = (() => {
     </a>`;
   }
 
-  return { HEX, mcT, usd, fmtAge, sev, isNew, icon, ico, meter, chip, tokenCard, codename, avatar, leaderRow };
+  return { HEX, mcT, usd, fmtAge, sev, isNew, icon, ico, meter, chip, tokenCard, codename, avatar, leaderRow, esc };
 })();

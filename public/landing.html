@@ -313,11 +313,11 @@ function tickerFrom(b){
   const hot=[],reads=[]; let clean=0,risky=0,dumping=0;
   for(const r of all){
     const f=r.flags||{};
-    if(f.insiderSellersNow>0){ hot.push({t:`▼ ${f.insiderSellersNow} dumping ${r.sym}`,c:"#ff3b5c"}); dumping++; }
-    else if(r.risk>=66){ hot.push({t:`⚠ ${r.sym} · high risk (${r.risk})`,c:"#ff3b5c"}); risky++; }
-    else if(r.risk<25){ reads.push({t:`✓ ${r.sym} reads clean`,c:"#c8ff4d"}); clean++; }
-    else if(r.graduated){ reads.push({t:`★ ${r.sym} graduated · ${B0.mcT(r.mcapUsd)}`,c:"#ff5cf0"}); }
-    else if(r.risk!=null){ reads.push({t:`${r.sym} · risk ${r.risk}`,c:"#b6b6bd"}); }
+    if(f.insiderSellersNow>0){ hot.push({t:`▼ ${f.insiderSellersNow} dumping ${esc(r.sym)}`,c:"#ff3b5c"}); dumping++; }
+    else if(r.risk>=66){ hot.push({t:`⚠ ${esc(r.sym)} · high risk (${r.risk})`,c:"#ff3b5c"}); risky++; }
+    else if(r.risk<25){ reads.push({t:`✓ ${esc(r.sym)} reads clean`,c:"#c8ff4d"}); clean++; }
+    else if(r.graduated){ reads.push({t:`★ ${esc(r.sym)} graduated · ${B0.mcT(r.mcapUsd)}`,c:"#ff5cf0"}); }
+    else if(r.risk!=null){ reads.push({t:`${esc(r.sym)} · risk ${r.risk}`,c:"#b6b6bd"}); }
   }
   const s=b.stats||{}, stats=[];
   if(clean||risky) stats.push({t:`${clean} clean · ${risky} high-risk on the board now`,c:"#b6b6bd"});

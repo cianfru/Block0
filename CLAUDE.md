@@ -61,22 +61,58 @@ dumping — places it against a study of past winners, and shows the wallet inte
     (funder is immutable), fan-out guard drops exchange-like common funders. Never on by default.
 - **Wallet intel (`wallet.mjs`):** cross-token footprint for any wallet (held vs exited, flipper vs holder),
   `getAssetTransfers` two directions, capped, cached 15 min. `/api/wallet`.
+- **Wallet PnL report (`wallet-pnl.mjs`):** one wallet's reconstructed PnL across the winner set, reusing the cached
+  backtests the leaderboard warms (reconciles to the cent). `/api/wallet-pnl?a=`; per-token orbs via `/api/wallet-trades`.
+- **Contract filter (`rpc.isContract`, `eth_getCode`, cached forever, fails open):** keeps bots/routers/pools off the
+  leaderboard ("follow the smart money" = humans); count reported openly on the page.
+- **Post desk (`cards.mjs`):** turns live numbers into postable cards (eyebrow/hero/summary/tweet/viz), each built
+  defensively (omit, never fake). `/api/cards` (CONTROL_PASSWORD-gated). Rendered client-side onto a 1080² canvas by
+  `public/desk-cards.js` (shared by `/desk` + `/post`).
+- **Social manager (`social.mjs`):** pure `{queue, log}` reducer (queue/move/posted/unpost/logRemove + cadence),
+  persisted in KV. `/api/social` (gated). Powers `/post` — build → queue → mark posted → log. Nothing auto-posts.
+- **KV (`store/kv.mjs`):** 3 backends auto-selected (Upstash REST > native `redis://` TCP `store/redis-tcp.mjs` > file).
+  `kvPing()` reports backend/connected honestly. Redis is live in prod.
 
 ## Front end
-- **Design lives in Lovable** (owner designs there; it's slicker). Workflow: read Lovable's design, hand-port the
-  good visual bits into our own `public/*.html` — **ONE repo, no parallel app**. Lovable reads this repo's
-  **README.md data contract** to bind the design to the live `/api/*` endpoints (CORS is open).
-- **Token-gated access:** a Block0 token will gate the platform — connect an EVM wallet, read-only balance check,
-  ≥ threshold (e.g. 1M) = in. Tokenomics TBD.
-- **Wallet = a Zerion card, never a raw hex string.** Zerion supports the RH chain; every wallet opens a real
-  portfolio page. Render a Zerion-style preview card (from the bag/PnL/role/flow we return) linking to
-  `${links.zerion}/{address}`. `links` ships on `/api/graph` + `/api/token`.
+- **ONE repo, no parallel app** — hand-written `public/*.html` (+ shared `public/block0-cards.js` renderer + `block0.css`).
+  Terminal aesthetic: near-black `#08080b`, lime `#c8ff4d` accent, cyan/magenta/coral signal colours, Instrument Serif
+  display + Inter body + mono data.
+- **Pages:** `/` landing · `/board` grid · `/token` dossier · `/leaderboard` proven wallets · `/wallet` per-wallet PnL ·
+  `/methodology` · owner-only `/control` (forensics) · `/desk` (daily post cards) · `/post` (social manager).
+- **⭐ LANDING = SHOW THE PRODUCT, not the philosophy (owner, 2026-09; big redesign).** Killed the abstract scroll-tunnel
+  and the "we're honest" sermon. Hero is a LIVE verdict card (real graded token: risk dial + flags), left is one line
+  ("Don't ape blind.") + a scan box that produces a **free verdict right on the landing** (fetch `/api/token`, render the
+  card) with "See the full dossier →" bridging to the gated depth. Then: the **winner-corridor** lateral-profile canvas
+  animation (price line threading stage gates → WINNER, losers fall out), concrete **signal tiles** (icon chips, not
+  prose), a 3-number **proof band**, and a short access section. Honesty is demonstrated (real numbers, one "signal, not
+  proof" line), never preached.
+- **⭐ WALLETS = OUR OWN PnL PAGE, NO THIRD PARTY (Zerion KILLED 2026-09).** Zerion/DeBank don't index the Robinhood Chain
+  ("unsupported address"), so every wallet everywhere (leaderboard, dossier rows, smart-money, bubble map) links to
+  **`/wallet?a=<addr>`** — our reconstruction (`wallet-pnl.mjs`: per-token realized/unrealized across the winner set,
+  reusing cached backtests; a lazy per-token "where it bought & sold" orbs chart via `walletTrades`). The chain block
+  explorer (`EXPLORER_URL`) is the only external link, as a secondary. `r.links = {explorer}` on `/api/token`+`/api/graph`.
+- **⭐ BUBBLE MAP (dossier) — 3D + drag + click-to-open-bundle (2026-09).** Nodes are shaded spheres (depth); a continuous
+  self-settling force sim makes them **drag-able** (bubblemap-style); **click a bubble → focuses its bundle** (dims the
+  rest, lights the cluster ring, panel lists member wallets → each links to its `/wallet` PnL). Hover tips; drag vs click
+  by movement. All in `public/index.html` (canvas, no deps).
+- **⭐ BUNDLES FLAGGED HARD.** Any token card (board + landing preview + hero verdict) shows a loud coral "⚠ N bundles
+  detected" banner + red edge when `flags.bundles>0`.
+- **Design source:** the owner may sketch in Lovable; port the good bits into `public/*.html`. Lovable binds to the live
+  `/api/*` via the README data contract (CORS open).
 
 ## Conventions
-- Feature engines are **pure + injectable + unit-tested** (pnl/leaderboard/graph/funders). Endpoints wire them to
-  data. Keep new engines the same way.
+- Feature engines are **pure + injectable + unit-tested** (pnl/leaderboard/graph/funders/cards/social/wallet-pnl). Endpoints
+  wire them to data. Keep new engines the same way. `npm test` — 55 tests, keep it green before every push.
 - Commit to `main` → Railway deploys. Use `[skip ci]`-style discipline only if a deploy-cost cap ever appears.
 - `.env.example` documents every knob. New cost-affecting behaviour gets an env flag + a sensible cheap default.
+- **⭐ SECURITY — escape all on-chain strings.** Token symbols/names are attacker-controlled (permissionless launchpad),
+  so ANY on-chain string rendered via innerHTML MUST go through `B0.esc()` (shared in block0-cards.js). This bit us once
+  (XSS via a crafted symbol on the public board) — fixed 2026-09; don't reintroduce it. Gated endpoints check
+  `CONTROL_PASSWORD` and fail closed. Auth is password-in-body (not cookies) → CSRF-safe even with `CORS *`.
+- **⭐ THE TOKEN GATE IS A CURTAIN, NOT A WALL (important).** `block0-gate.js` is a client-side localStorage flag + a
+  read-only balance check; the `/api/*` data endpoints are PUBLIC and do not enforce it. Fine for the open/experiment
+  launch (data is public chain data anyway, and the free-verdict/gated-depth split is a UX promise). If the business ever
+  needs REAL gating, the deep feeds must move behind a server-side authed endpoint — that's a separate project.
 
 ## Tokenomics — token-gated access (owner decided 2026-09)
 - **Access = holding a FIXED NUMBER OF TOKENS, not a dollar value.** Rationale (owner): a dollar-pegged threshold
@@ -89,14 +125,21 @@ dumping — places it against a study of past winners, and shows the wallet inte
   Example: N = 0.001% of supply → ~$100 access at $10M mcap (~$10 at $1M, ~$1,000 at $100M). Consider a cheaper
   founding-member bar for the first ~100–200 holders as an early growth lever.
 
-## Roadmap / owner asks (2026-09)
-- **🔲 FORENSIC ANALYTICS + CONTROL PANEL (building):** track who visits — count, country/geo, time, referrer, which
-  tokens/pages viewed, and WALLET CONNECTS (how many wallets, which) — like the rainbow-chart site's intel panel.
-  Plus Railway health/uptime/sustainability (process uptime, memory, board freshness, feed health). Password-gated
-  `/control` dashboard. Storage via store/kv.mjs (events list + unique-visitor set + aggregates). Geo from
-  cf-ipcountry/x-vercel-ip-country headers if present, else a cached best-effort IP lookup.
-- **🔲 LANDING SCROLL HERO (next):** an Apple-style, highly polished winner CONE WITH DEPTH where a PRICE LINE
-  travels through it as the user SCROLLS from the top to the second section (scroll-linked animation), surfacing a
-  few tracked parameters. Adapt the token-page cone renderer to a scroll-driven canvas with perspective/depth.
-- **🔲 Also flagged in the audit:** mobile hamburger nav (most traffic is mobile-from-X), OG images + favicon,
-  out-of-sample model tracking as the cohort grows, explorer URL.
+## Shipped 2026-09 (this build cycle)
+- **✅ Control/forensics `/control`** (audience geo, coverage, convergence, ops health) + **`/desk`** (daily post cards)
+  + **`/post`** (social manager: queue/log, KV-persisted). All CONTROL_PASSWORD-gated.
+- **✅ `/wallet` per-wallet PnL page** + Zerion removed everywhere (our reconstruction only).
+- **✅ Landing rebuilt** (product-first hero, free-verdict scan, winner-corridor animation, signal chips, proof band).
+- **✅ Bubble map** 3D + drag + click-to-open-bundle; **heavy bundle flag** on cards; **contract/bot filter** on the board.
+- **✅ Redis** (native TCP) live for persistence. **✅ XSS hardening** (esc all on-chain strings).
+
+## Roadmap / owner asks (open)
+- **🔲 PRODUCTION SWITCH-ON (owner):** decide open vs token-gated launch; if gated, deploy the BLOCK0 token + set
+  `GATE_TOKEN`/`GATE_THRESHOLD`/`GATE_SYMBOL`/`GATE_DECIMALS`/`GATE_BUY_URL`. Set `EXPLORER_URL`, `PUBLIC_URL` + domain,
+  fill `/terms`. Confirm `CONTROL_PASSWORD` + `REDIS_URL` (both set). Optional Telegram alert vars.
+- **🔲 REAL gating (only if the model needs it):** move the deep feeds behind a server-side authed endpoint (today the
+  gate is a curtain — see Conventions).
+- **🔲 Light per-IP rate limit** on the heavy public endpoints (`/api/token`, `/api/wallet-pnl`) before heavy promotion —
+  they trigger on-chain reconstruction (cached, but a distinct-address spray costs RPC).
+- **🔲 Still flagged:** mobile hamburger nav (most traffic is mobile-from-X), OG images + favicon, out-of-sample model
+  tracking as the cohort grows, scroll-linked replay of the corridor animation.

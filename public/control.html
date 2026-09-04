@@ -143,7 +143,7 @@ async function loadConvergence(){
     $("#convsum").innerHTML=`<b style="color:var(--tx)">${toks.length}</b> tokens with a proven wallet positioned · <b style="color:var(--lime)">${conv}</b> with 2+ converging`;
     $("#convtbl").innerHTML=toks.map(t=>{
       const wl=(t.wallets||[]).slice(0,4).map(w=>`<span class="wl2" title="${(w.tokensWon||0)}w · ${w.winRate!=null?w.winRate+'% hit':''}">${codename(w.a)}</span>`).join(", ");
-      return `<tr class="convrow"><td><b style="color:var(--tx)">${t.sym||"?"}</b></td><td>${venChip(t.venue)}</td><td class="cnt">${t.count} ${IC("target")}</td><td class="muted">${mc(t.mcapUsd)}</td><td>${wl}</td></tr>`;
+      return `<tr class="convrow"><td><b style="color:var(--tx)">${B0.esc(t.sym||"?")}</b></td><td>${venChip(t.venue)}</td><td class="cnt">${t.count} ${IC("target")}</td><td class="muted">${mc(t.mcapUsd)}</td><td>${wl}</td></tr>`;
     }).join("")||'<tr><td class="muted">no smart-money positions yet — the leaderboard builds first</td></tr>';
   }catch(e){$("#convsum").textContent="Convergence unavailable.";}
 }

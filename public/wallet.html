@@ -197,7 +197,7 @@ function bestWorst(tokens){
   let best=null, worst=null;
   tokens.forEach((t,i)=>{ const o={...t,i}; if(t.pnl>0&&(!best||t.pnl>best.pnl)) best=o; if(t.pnl<0&&(!worst||t.pnl<worst.pnl)) worst=o; });
   if(!best&&!worst) return "";
-  const cell=(lbl,o,c)=>o?`<a class="bwcell" href="#" onclick="event.preventDefault();jump(${o.i})"><span class="bwl">${lbl}</span><span class="bwv"><b>${o.sym}</b> <span class="${c}">${o.pnl>0?"+":"−"}${usd(o.pnl)}</span></span></a>`:"";
+  const cell=(lbl,o,c)=>o?`<a class="bwcell" href="#" onclick="event.preventDefault();jump(${o.i})"><span class="bwl">${lbl}</span><span class="bwv"><b>${B0.esc(o.sym)}</b> <span class="${c}">${o.pnl>0?"+":"−"}${usd(o.pnl)}</span></span></a>`:"";
   return `<div class="bw">${cell("Best trade",best,"pos")}${cell("Worst trade",worst,"neg")}</div>`;
 }
 function jump(i){ const el=document.querySelector(`.tok[data-i="${i}"]`); if(!el) return; if(!el.classList.contains("open")) toggle(i); el.scrollIntoView({behavior:"smooth",block:"center"}); }
@@ -209,7 +209,7 @@ function tokCard(tk,i){
   return `<div class="tok" data-token="${tk.address}" data-i="${i}">
     <div class="row" onclick="toggle(${i})">
       <div class="tk">
-        <div class="tsym">${tk.sym}${tk.graduated?'<span class="gr">graduated</span>':""}</div>
+        <div class="tsym">${B0.esc(tk.sym)}${tk.graduated?'<span class="gr">graduated</span>':""}</div>
         ${holding}
       </div>
       <div class="tp">

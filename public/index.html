@@ -258,7 +258,7 @@ function deployerCard(r){
     repeat:["REPEAT DEPLOYER","var(--amber)","has launched before"],
     first:["FIRST LAUNCH","var(--mute)","no prior launches Block0 has seen"]};
   const t=REP[d.reputation]||REP.first;
-  const chips=(d.others||[]).map(o=>`<a class="depchip" href="/token?address=${o.address}">${o.sym}${o.graduated?'<span style="color:var(--cyan)"> ◆</span>':''} <span class="dm">${mcT(o.mcapUsd)}</span></a>`).join("");
+  const chips=(d.others||[]).map(o=>`<a class="depchip" href="/token?address=${o.address}">${B0.esc(o.sym)}${o.graduated?'<span style="color:var(--cyan)"> ◆</span>':''} <span class="dm">${mcT(o.mcapUsd)}</span></a>`).join("");
   return `<div class="depwrap">
     <div class="dephead"><span class="depbadge" style="color:#08080b;background:${t[1]}">${t[0]}</span>
       <span class="depmeta"><b>${d.launched}</b> launch${d.launched>1?'es':''} · <b style="color:${d.graduated?'var(--cyan)':'var(--mute)'}">${d.graduated}</b> graduated — ${t[2]}</span>
@@ -348,8 +348,8 @@ function render(r){
   $("#root").innerHTML=`
     <div class="top">
       <div class="idn">${icon(r)}<div class="who">
-        <div class="sym">${r.sym} ${badge}</div>
-        ${r.name?`<div class="name">${r.name}</div>`:""}
+        <div class="sym">${B0.esc(r.sym)} ${badge}</div>
+        ${r.name?`<div class="name">${B0.esc(r.name)}</div>`:""}
         <div class="addr" title="click to copy" onclick="navigator.clipboard&&navigator.clipboard.writeText('${r.address}')">${r.address}</div>
         <div class="facts">
           <div class="fact"><div class="v" style="color:var(--cyan)">${mcT(r.mcapUsd)}</div><div class="k">market cap</div></div>

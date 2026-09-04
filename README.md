@@ -225,13 +225,14 @@ Notes for the designer — a few exact shapes so the binding is right first time
 - **Wallet lists** already carry the wallet address + whether it's a sniper — make them clickable into the wallet
   view (`/api/wallet`). The `flags.insiderSellersNow` count is the click target for the "N insiders selling now"
   reveal (open the `sellers[]` rows).
-- **Wallet = a Zerion card, never a raw hex string.** Zerion supports the Robinhood chain, so every wallet address
-  opens a real portfolio page. Render each wallet as a compact **Zerion-style preview card** — built from what we
-  already return (bag / % supply / role / this-token PnL / cluster flow) — that clicks through to
-  `${links.zerion}/{address}` (base comes from `/api/graph` and `/api/token` `links.zerion`, default
-  `https://app.zerion.io`; a chain explorer link rides in `links.explorer` when `EXPLORER_URL` is set). Apply this
-  everywhere an address appears: bubble-map nodes, the insider-selling reveal, buyers/sellers/top-holders, the
-  leaderboard, the deployer's other launches.
+- **Wallet = a codename + our own PnL page, never a raw hex string, never a third-party portfolio.** Zerion/DeBank do
+  NOT index the Robinhood Chain (they return "unsupported address"), so wallets link to **our** reconstruction at
+  `/wallet?a={address}` (per-token realized/unrealized across the winner set). Render each as a compact card from what
+  we return (bag / % supply / role / this-token PnL / cluster flow) that clicks through to `/wallet?a={address}`; the
+  chain block explorer (`links.explorer`, set when `EXPLORER_URL` is configured) is the only external link, as a
+  secondary. Apply everywhere an address appears: bubble-map nodes, the insider-selling reveal, buyers/sellers/
+  top-holders, the leaderboard, the deployer's other launches. **⚠ Escape token symbols/names (`B0.esc`) — they're
+  attacker-controlled on a permissionless launchpad.**
 - **Numbers are estimates where noted** — reconstructed prices are swap-implied; the API flags `priceRough` when a
   reconstruction is uncertain. Surface that honestly (a subtle "estimate" affordance), never as a hard quote.
 
