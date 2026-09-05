@@ -39,6 +39,8 @@ jobs:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with: { node-version: "22" }
+      - name: Unit tests (cheap gate, BEFORE the expensive build — a red test must never discard a finished build)
+        run: node --test test/*.test.mjs
       - name: Guard — RPC secret present
         run: |
           if [ -z "$RPC_URL" ]; then echo "::error::No Alchemy endpoint found. Add a GitHub REPO SECRET (not a Railway var) named ALCHEMY_RPC_URL (or RPC_URL) = your Alchemy HTTPS URL, under the repo's Settings → Secrets and variables → Actions → New repository secret."; exit 1; fi
@@ -50,6 +52,19 @@ jobs:
             ${{ (github.event.inputs.dex == 'false') && ' ' || '--dex' }} \
             --dexBlocks="${{ github.event.inputs.dexBlocks || '2500000' }}" \
             --dexCap="${{ github.event.inputs.dexCap || '300' }}"
+      - name: Commit the profile cache FIRST (the expensive part) — so no downstream failure can throw the backtests away
+        run: |
+          git config user.name "block0-bot"
+          git config user.email "bot@users.noreply.github.com"
+          git add study/profiles study/cohort.json study/skips.json 2>/dev/null || true
+          if git diff --cached --quiet; then echo "no new profiles"; exit 0; fi
+          git commit -m "Cohort: profile cache + outcome labels (incremental) [skip ci]"
+          for i in 1 2 3 4 5; do
+            if git push; then echo "pushed"; exit 0; fi
+            echo "push rejected — rebasing onto latest main (attempt $i)"
+            git pull --rebase origin main || { git rebase --abort || true; git fetch origin main && git rebase origin/main || exit 1; }
+          done
+          echo "::error::could not push after retries"; exit 1
       - name: Build the study data + assemble the model + validate
         run: |
           node tools/corridor.mjs
@@ -57,19 +72,17 @@ jobs:
           node tools/extract_blueprint.mjs || echo "blueprint step skipped"
           node tools/gen-model.mjs          # refuses to overwrite model.json below 10 winners (keeps the last good model)
           node tools/validate.mjs
-          node --test test/model.test.mjs test/outcome.test.mjs
-      - name: Commit refreshed cohort + model
+          # smoke the model the site will load (never a unit-test run here: run #5 lost an 87-min build to a pinned test)
+          node -e "import('./model.mjs').then(m => { if (!m.hasModel()) { console.error('model.json unloadable'); process.exit(1); } console.log('model loads:', m.corridorBins().length, 'bins'); })"
+      - name: Commit refreshed study + model (this one redeploys the site)
         run: |
-          git config user.name "block0-bot"
-          git config user.email "bot@users.noreply.github.com"
           git add model.json study
           if git diff --cached --quiet; then echo "no model changes"; exit 0; fi
-          git commit -m "Rebuild model (outcome-labelled cohort, incremental) [skip ci]"
-          # The rebuild runs up to ~2h; main may have advanced meanwhile. Rebase our single commit onto the latest
-          # main and retry the push, so a concurrent code push can't waste the whole (RPC-heavy) run.
+          git commit -m "Rebuild model (outcome-labelled cohort, incremental)"
+          # main may have advanced during the run — rebase our commit and retry so a concurrent push can't waste it
           for i in 1 2 3 4 5; do
             if git push; then echo "pushed"; exit 0; fi
             echo "push rejected — rebasing onto latest main (attempt $i)"
             git pull --rebase origin main || { git rebase --abort || true; git fetch origin main && git rebase origin/main || exit 1; }
           done
-          echo "::error::could not push the refreshed model after retries"; exit 1
+          echo "::error::could not push after retries"; exit 1
