@@ -130,7 +130,7 @@ export function promptFor(bracket) {
 // call at most; any failure falls back to the deterministic pick so the endpoint always returns a complete result.
 export async function buildPicks(tokens, chat, opts = {}) {
   const brackets = bracketize(tokens, opts);
-  let llmUsed = false, model = null;
+  let llmUsed = false, model = null, llmError = null;   // llmError: why the model wasn't used (no_key / no_model / auth / parse)
   const out = [];
   for (const b of brackets) {
     const top = b.candidates[0];
@@ -142,13 +142,14 @@ export async function buildPicks(tokens, chat, opts = {}) {
         let parsed = null; try { parsed = JSON.parse(res.text); } catch { parsed = null; }
         const v = validatePick(parsed, b.candidates);
         if (v) { pick = v.pick; why = v.why; runnerUp = v.runnerUp || runnerUp; viaLlm = true; llmUsed = true; }
-      } catch { /* no key / all models failed → keep the deterministic pick */ }
+        else llmError = llmError || (parsed ? "rejected:" + (String(res.text || "").slice(0, 80)) : "parse");   // model answered but failed the honesty rails
+      } catch (e) { llmError = (e && e.code) || (e && e.message) || "error"; /* no key / all models failed → deterministic pick */ }
     }
     const pc = b.candidates.find((c) => c.address === pick) || top;
     out.push({ key: b.key, label: b.label, tier: b.tier,
       pick: { ...pc, why, viaLlm }, runnerUp,
       candidateCount: b.candidates.length, candidates: b.candidates });
   }
-  return { updated: Date.now(), llmUsed, model, brackets: out,
+  return { updated: Date.now(), llmUsed, model, llmError, hasKey: !!chat, brackets: out,
     note: "Ranks each launch's on-chain fingerprint within its market-cap bracket. Signal, not proof — never a buy recommendation." };
 }
