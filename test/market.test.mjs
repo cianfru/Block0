@@ -1,6 +1,12 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { pickPair, marketSnapshot, normalizeOhlc, tokenMarket } from "../market.mjs";
+import { pickPair, marketSnapshot, normalizeOhlc, tokenMarket, runPhase } from "../market.mjs";
+
+// build hourly candles from a close series (oldest→newest); high/low bracket each close
+const candlesFrom = (closes, startT = 1_700_000_000) => closes.map((c, i) => {
+  const o = i ? closes[i - 1] : c;
+  return { t: startT + i * 3600, o, h: Math.max(o, c) * 1.01, l: Math.min(o, c) * 0.99, c, v: 1000 };
+});
 
 const A = "0x7dbf38976f6d3b9c529e7d9484a71898b409ee6a";
 const pairFor = (addr, liq, vol) => ({ pairAddress: "0xpool" + liq, dexId: "uniswap", url: "u", labels: ["v4"],
@@ -55,4 +61,35 @@ test("tokenMarket: assembles + caches; degrades honestly when no pair", async ()
   const noPair = async () => ({ ok: true, json: async () => ({ pairs: [] }) });
   const m2 = await tokenMarket("0xabc0000000000000000000000000000000000000", "1h", { fetch: noPair, now: () => t });
   assert.equal(m2.hasMarket, false); assert.equal(m2.market, null); assert.ok(m2.note.includes("No indexed market"));
+});
+
+test("runPhase: still climbing near a fresh high → running (chasing)", () => {
+  const p = runPhase(candlesFrom([1, 1.1, 1.3, 1.6, 2.0, 2.4, 2.7, 2.9]));
+  assert.equal(p.phase, "running");
+  assert.equal(p.chasing, true);
+  assert.ok(p.runMult >= 1.8);
+});
+
+test("runPhase: ran, then pulled back off the high → pullback (the dip the trader hunts)", () => {
+  const p = runPhase(candlesFrom([1, 1.5, 2.4, 3.0, 2.6, 2.2, 1.95, 1.9]));
+  assert.equal(p.phase, "pullback");
+  assert.equal(p.chasing, false);
+  assert.ok(p.ddFromHigh >= 30 && p.ddFromHigh < 70, `~37% off the high, got ${p.ddFromHigh}`);
+});
+
+test("runPhase: ran then collapsed → bled (well past a pullback)", () => {
+  const p = runPhase(candlesFrom([1, 1.8, 3.0, 2.0, 1.2, 0.8, 0.62, 0.58]));
+  assert.equal(p.phase, "bled");
+  assert.ok(p.ddFromHigh >= 70);
+});
+
+test("runPhase: no real move → quiet, not chasing", () => {
+  const p = runPhase(candlesFrom([1, 1.02, 0.99, 1.01, 1.0, 1.02, 0.98, 1.0]));
+  assert.equal(p.phase, "quiet");
+  assert.equal(p.chasing, false);
+});
+
+test("runPhase: too few candles → null (never a fabricated read)", () => {
+  assert.equal(runPhase(candlesFrom([1, 2, 3])), null);
+  assert.equal(runPhase([]), null);
 });

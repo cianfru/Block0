@@ -58,6 +58,36 @@ export function normalizeOhlc(json, cap = 300) {
   return out.slice(-cap);
 }
 
+// WHERE IS IT IN ITS RUN — a DESCRIPTIVE entry-timing read, the honest version of "stop buying green candles". It states
+// a fact from the candles (did it run? is it near the high right now, or pulled back off it?) and lets the reader apply
+// their own judgment. It is NOT a buy/sell signal and is never part of the risk verdict — price context, drawn beside it.
+//   phase: quiet | running | peaked | pullback | bled     chasing: true when you'd be entering AT/near a fresh high
+export function runPhase(candles, { windowH = 72 } = {}) {
+  if (!candles || candles.length < 6) return null;
+  const last = candles[candles.length - 1];
+  const win = candles.filter((c) => c.t >= last.t - windowH * 3600);
+  if (win.length < 4) return null;
+  const hi = Math.max(...win.map((c) => c.h)), lo = Math.min(...win.map((c) => c.l));
+  const hiC = win.reduce((a, c) => (c.h >= a.h ? c : a), win[0]);
+  const cur = last.c;
+  const ddFromHigh = hi > 0 ? (hi - cur) / hi : 0;          // how far below the window high the price sits now
+  const runMult = lo > 0 ? hi / lo : 1;                     // how big the move in the window was (high ÷ low)
+  const hoursSinceHigh = (last.t - hiC.t) / 3600;
+  const k = Math.min(3, candles.length - 1);                // recent momentum over the last few candles
+  const ref = candles[candles.length - 1 - k];
+  const mom = ref && ref.c > 0 ? (cur - ref.c) / ref.c : 0;
+  const ran = runMult >= 1.8;                               // ~1.8×+ in the window = it "ran"
+  const wd = Math.round(windowH / 24);
+  let phase, label, chasing = false;
+  if (!ran && Math.abs(mom) < 0.15) { phase = "quiet"; label = `No recent run — ranging inside its ${wd}-day range`; }
+  else if (ddFromHigh <= 0.12 && mom > 0.08) { phase = "running"; label = `Running now — within ${Math.round(ddFromHigh * 100)}% of its ${wd}-day high`; chasing = true; }
+  else if (ddFromHigh <= 0.12) { phase = "peaked"; label = `Sitting at its ${wd}-day high`; chasing = true; }
+  else if (ddFromHigh >= 0.7) { phase = "bled"; label = `Down ${Math.round(ddFromHigh * 100)}% from its ${wd}-day high — well past a pullback`; }
+  else { phase = "pullback"; label = `Pulled back ${Math.round(ddFromHigh * 100)}% from its ${wd}-day high (${hoursSinceHigh < 24 ? Math.round(hoursSinceHigh) + "h" : Math.round(hoursSinceHigh / 24) + "d"} ago)`; }
+  return { phase, label, chasing, windowH, ddFromHigh: +(ddFromHigh * 100).toFixed(0), runMult: +runMult.toFixed(2),
+    hoursSinceHigh: +hoursSinceHigh.toFixed(1), high: hi, low: lo, cur };
+}
+
 // GeckoTerminal timeframe/aggregate for a requested bucket. Their API path is /ohlcv/<timeframe>?aggregate=<n>.
 const TF = { "5m": ["minute", 5], "15m": ["minute", 15], "1h": ["hour", 1], "4h": ["hour", 4], "1d": ["day", 1] };
 
@@ -98,7 +128,7 @@ export async function tokenMarket(address, tf = "1h", { fetch: fetchImpl = fetch
   const data = {
     address, tf, source: "geckoterminal", priceSource: "dexscreener",
     hasMarket: !!(snap && candles.length),
-    market: snap, candles, updated: now(),
+    market: snap, candles, phase: candles.length ? runPhase(candles) : null, updated: now(),
     note: snap ? null : "No indexed market for this token yet — it may be too new or too thin to have a price feed.",
   };
   _cache.set(key, { at: now(), data });

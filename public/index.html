@@ -121,6 +121,10 @@
      linear-gradient(180deg,#0c0e0b,#080809 70%)}
   #mktwrap .ch-h,#mktwrap .mkt-stats,#mktwrap .mkt-src{position:relative;z-index:2}
   #cvmkt{height:320px}
+  .mkt-phase{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:2px 0 10px;padding:9px 13px;border:1px solid var(--line);border-radius:11px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.006))}
+  .mkt-phase .phw{font-weight:700;font-size:.9rem;display:inline-flex;align-items:baseline;gap:7px}
+  .mkt-phase .phi{font-size:.8rem}
+  .mkt-phase .phh{font-size:.78rem;color:var(--dim);flex:1;min-width:180px}
   .mkt-lastpill{position:absolute;right:0;transform:translateY(-50%);font-family:var(--mono);font-size:.68rem;font-weight:700;
     padding:2px 7px;border-radius:5px;pointer-events:none;white-space:nowrap;z-index:3}
   .tip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;font-size:.74rem;z-index:5;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
@@ -420,6 +424,7 @@ function render(r){
         </div>
       </div>
       <div class="mkt-stats" id="mktstats"></div>
+      <div class="mkt-phase" id="mktphase" hidden></div>
       <div style="position:relative"><canvas id="cvmkt"></canvas><div class="mkt-lastpill" id="mktlast" hidden></div><div class="tip" id="tipmkt"></div></div>
       <div class="chnote" id="mktnote" hidden></div>
       <div class="mkt-src" id="mktsrc" hidden></div>
@@ -894,6 +899,21 @@ async function loadMarket(address){
   $("#mkttf").querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(b.dataset.tf===MTF)return; MTF=b.dataset.tf; $("#mkttf").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); fetchMarket(); });
   fetchMarket();
 }
+// "Where is it in its run" — the honest, descriptive version of "stop buying green candles". States the fact and lets
+// you decide; never says buy/sell. Chasing (near a fresh high) reads amber; a pullback reads neutral-cyan; bled reads coral.
+function renderPhase(ph){
+  const el=$("#mktphase"); if(!el) return;
+  if(!ph||!ph.phase){ el.hidden=true; el.innerHTML=""; return; }
+  const M={quiet:["–","var(--mute)","quiet"],running:["▲","var(--amber)","running now"],peaked:["▲","var(--amber)","at the high"],pullback:["◆","var(--cyan)","pulled back"],bled:["▼","var(--coral)","bled out"]};
+  const [ico,col,tag]=M[ph.phase]||M.quiet;
+  const hint=ph.chasing?"you'd be entering near the high — the green candle everyone already saw"
+    :ph.phase==="pullback"?"off its high — a dip, not a chase. Still your call, and only if the coin's still alive."
+    :ph.phase==="bled"?"far below its high and still weak — past a dip, not a pullback"
+    :"no recent run to chase or fade";
+  el.hidden=false;
+  el.innerHTML=`<span class="phw" style="color:${col}"><span class="phi">${ico}</span> ${String(ph.label||"").replace(/[<>&]/g,"")}</span>
+    <span class="phh">${hint}</span>`;
+}
 async function fetchMarket(){
   if(mktBusy)return; mktBusy=true;
   const note=$("#mktnote"), stats=$("#mktstats"), cv=$("#cvmkt"), src=$("#mktsrc");
@@ -916,6 +936,7 @@ async function fetchMarket(){
     ].join("");
     src.hidden=false; { const pill=$("#mktlast"); if(pill) pill.hidden=false; }
     src.innerHTML=`Candles via GeckoTerminal · liquidity &amp; volume via DexScreener${mk.url?` · <a href="${mk.url}" target="_blank" rel="noopener">open on DexScreener ↗</a>`:""}. Price is market data, shown next to the analysis — not part of the verdict.`;
+    renderPhase(m.phase);
     drawCandles();
   }catch(e){ note.hidden=false; note.textContent="Couldn't load the price chart — retry in a moment."; }
   finally{ mktBusy=false; }
