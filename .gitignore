@@ -18,9 +18,10 @@ factory.mjs
 cap.mjs
 issuer.mjs
 
-# legacy cohort dirs from the pre-outcome pipeline (the cache now lives in study/profiles/, which IS committed)
-profiles/
-winners_full/
-losers/
-losers.json
+# legacy cohort dirs from the pre-outcome pipeline — ROOT-ANCHORED so they don't also ignore study/profiles (the
+# committed incremental cache). An unanchored `profiles/` matches at ANY depth and silently kept the cache out of git.
+/profiles/
+/winners_full/
+/losers/
+/losers.json
 data/
