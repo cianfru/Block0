@@ -830,7 +830,7 @@ async function boot(){
     render(r);
   }catch(e){ $("#root").innerHTML=`<div class="state err">Couldn't load this token: ${e.message}. The scanner may still be warming up — reload in a moment.</div>`; }
 }
-B0GATE.mount({gated:true});
+B0GATE.mount({gated:false}); // the single-token lookup is the FREE surface — everything beyond it is token-gated
 boot();
 </script>
 </body>

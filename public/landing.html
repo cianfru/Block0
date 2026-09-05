@@ -6,8 +6,8 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<title>Block0 — Don't ape blind. Scan the launch first.</title>
-<meta name="description" content="Block0 scans every launch on the Robinhood Chain and grades it from on-chain data — snipers, bundles, insider selling, concentration. Trap or real launch, in one look.">
+<title>Block0 — The path to millions starts at block zero</title>
+<meta name="description" content="4.2M tokens have launched on the Robinhood Chain. Block0 reconstructed the history of every one that mattered, mapped the path the winners took, and scores every new launch against it — live.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
@@ -34,9 +34,17 @@
   /* hero: pitch on the left, a LIVE graded token on the right — the product, shown */
   .herowrap{display:grid;grid-template-columns:1.02fr .98fr;gap:46px;align-items:center;margin-top:34px}
   @media(max-width:880px){.herowrap{grid-template-columns:1fr;gap:30px}}
-  .hpitch h1{font-size:clamp(2.6rem,6vw,4rem);line-height:1;margin:14px 0 0}
+  .hpitch h1{font-size:clamp(2.15rem,4.6vw,3.3rem);line-height:1.06;margin:14px 0 0;text-wrap:balance}
   .hpitch h1 em{font-style:italic;color:var(--lime)}
-  .hpitch .sub{margin-top:18px;max-width:52ch;font-size:1.02rem;line-height:1.55;color:var(--dim)}
+  .hpitch .sub{margin-top:16px;max-width:54ch;font-size:.98rem;line-height:1.55;color:var(--dim)}
+  /* the live funnel — real numbers straight off the chain, the total ticking as launches happen */
+  .funnel{display:flex;align-items:baseline;flex-wrap:wrap;gap:6px 12px;margin-top:18px;font-variant-numeric:tabular-nums}
+  .funnel .fs{display:inline-flex;align-items:baseline;gap:7px;white-space:nowrap}
+  .funnel .fn{font-family:var(--mono);font-weight:600;font-size:1.28rem;letter-spacing:.01em;color:var(--tx)}
+  .funnel .fn.dimn{color:var(--dim);font-size:1.05rem}
+  .funnel .fn.limen{color:var(--lime);font-size:1.05rem;text-shadow:0 0 18px rgba(200,255,77,.35)}
+  .funnel .fs i{font-style:normal;font-size:.72rem;text-transform:uppercase;letter-spacing:.09em;color:var(--mute)}
+  .funnel .farr{color:var(--mute);font-size:.85rem}
   .hpitch .proofline{margin-top:16px;display:flex;flex-wrap:wrap;gap:8px 18px;font-size:.82rem;color:var(--mute);font-variant-numeric:tabular-nums}
   .hpitch .proofline b{color:var(--tx)}
   .hpitch .proofline .red{color:var(--coral)}
@@ -108,6 +116,16 @@
   .proof .pn.g{color:var(--lime)} .proof .pn.c{color:var(--coral)}
   .proof .pl{font-size:.9rem;color:var(--tx);margin-top:8px}
   .proof .ps{font-size:.74rem;color:var(--mute);margin-top:4px}
+  /* best-shots teaser: one compact card per stage */
+  .shots{display:grid;grid-template-columns:repeat(auto-fill,minmax(196px,1fr));gap:12px;margin-top:20px}
+  .shot{border:1px solid var(--line);border-radius:14px;padding:15px 16px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008));display:grid;gap:9px;transition:border-color .2s,transform .2s}
+  .shot:hover{border-color:var(--line-2);transform:translateY(-3px)}
+  .shot .stg{font-family:var(--mono);font-size:.62rem;font-weight:600;letter-spacing:.09em;text-transform:uppercase;color:var(--mute);border-left:3px solid var(--lime);padding-left:8px}
+  .shot .sy{display:flex;align-items:baseline;gap:8px}
+  .shot .sy a{font-size:1.08rem;font-weight:700;color:var(--tx)}
+  .shot .sy .mc{font-family:var(--mono);font-size:.74rem;color:var(--dim);font-variant-numeric:tabular-nums}
+  .shot .why{margin:0;font-size:.78rem;line-height:1.5;color:var(--dim);display:-webkit-box;-webkit-line-clamp:3;-webkit-box-orient:vertical;overflow:hidden}
+  .shot .rk{font-family:var(--mono);font-size:.68rem}
 </style>
 </head>
 <body>
@@ -136,15 +154,22 @@
     <div class="herowrap">
       <div class="hpitch rise">
         <p class="micro eye">launch scanner · robinhood chain</p>
-        <h1>Don't ape<br><em>blind.</em></h1>
-        <p class="sub">Block0 watches every launch on the Robinhood Chain and grades each one from on-chain data — who sniped it, who's dumping, who really holds the supply. Trap or real launch, before you put a dollar in.</p>
+        <h1>The path to millions<br>starts at <em>block zero.</em></h1>
+        <div class="funnel" id="funnel" aria-label="the launch funnel, live">
+          <span class="fs"><b class="fn" id="fTotal">—</b><i>launched</i></span>
+          <span class="farr">→</span>
+          <span class="fs"><b class="fn dimn" id="fGrad">—</b><i>graduated</i></span>
+          <span class="farr" id="fWinArr" hidden>→</span>
+          <span class="fs" id="fWinWrap" hidden><b class="fn limen" id="fWin">—</b><i>reached $1M — and held it</i></span>
+        </div>
+        <p class="sub">Almost every launch dies within hours. We reconstructed the full on-chain history of every one that mattered — the few that reached a real valuation and held it, and the many that got there and collapsed — and mapped the path the winners took, wallet by wallet, stage by stage. Every new launch is scored against that path, live.</p>
         <form class="scan" onsubmit="return scan(event)">
-          <input id="addr" placeholder="Got one in mind? Paste its address for the full verdict — free" autocomplete="off">
+          <input id="addr" placeholder="Paste any token address — the verdict is free" autocomplete="off">
           <button class="go" type="submit">Scan</button>
         </form>
         <div class="proofline" id="proofline"><span>Scanning the Robinhood Chain live…</span></div>
         <div class="herochips">
-          <a class="chip" href="/board">Browse the live board →</a>
+          <a class="chip" href="/board">Find the next runner →</a>
           <a class="chip" href="/leaderboard">See who's making money →</a>
         </div>
       </div>
@@ -169,6 +194,13 @@
     </div>
   </section>
 
+  <!-- BEST SHOTS BY STAGE (teaser — the full view lives on the board, behind the token) -->
+  <section class="sec" id="shotsec" hidden>
+    <div class="stitle"><p class="micro eye">best shots · by stage</p><h2>The strongest fingerprint at every stage of the path</h2><p class="sub">At each stage — from block zero to made-it — the launch whose on-chain shape looks most like the winners did at the same point. The full read on every stage lives on the board.</p></div>
+    <div class="shots" id="shots"></div>
+    <a class="seeall" href="/board">Open all stages on the board →</a>
+  </section>
+
   <!-- WHAT IT CHECKS -->
   <section class="sec">
     <div class="stitle"><p class="micro eye">what it reads</p><h2>Every launch, x-rayed in seconds</h2><p class="sub">The same on-chain tells that separate a real launch from a bot trap — read off public data, no insider access, no guessing.</p></div>
@@ -186,7 +218,7 @@
   <section class="sec">
     <div class="stitle"><p class="micro eye">does it actually work?</p><h2>Judge it on the numbers</h2><p class="sub">The model's whole job is one question — is this launch tracking like past winners did? Here's how well that call holds up, measured on launches it had never seen.</p></div>
     <div class="proof" id="proof">
-      <div class="pc"><div class="pn c" id="p1n">—</div><div class="pl" id="p1l">of launches fade within hours</div><div class="ps" id="p1s">the problem we're built for</div></div>
+      <div class="pc"><div class="pn c" id="p1n">—</div><div class="pl" id="p1l">of studied launches faded or died</div><div class="ps" id="p1s">the problem we're built for</div></div>
       <div class="pc"><div class="pn g" id="p2n">—</div><div class="pl" id="p2l">of eventual winners flagged early</div><div class="ps" id="p2s">before they ran</div></div>
       <div class="pc"><div class="pn" id="p3n">—</div><div class="pl" id="p3l">launches scanned</div><div class="ps" id="p3s">every one reconstructed from the chain</div></div>
     </div>
@@ -197,9 +229,9 @@
   <section class="sec">
     <div class="panel access">
       <p class="micro eye">access</p>
-      <h2>The verdict's free. The depth is token-gated.</h2>
-      <p>Every launch's risk read — the answer to "should I ape?" — is open to everyone. Holding BLOCK0 unlocks the deep end: wallet-level dossiers, the bubble maps, exit tracking and the smart-money leaderboard. Connect is a read-only balance check — no signing, no transactions, no custody.</p>
-      <div class="btns"><a class="btn-lime" href="/board">Open the board</a><a class="btn-ghost" href="/token">Scan a token</a></div>
+      <h2>One free lookup for everyone. The rest runs on the token.</h2>
+      <p>Paste any token and get its full verdict, free — that never changes. Holding BLOCK0 unlocks the working product: the graded board, the best shots at every stage of the path, live alerts and the smart-money leaderboard. Connect is a read-only balance check — no signing, no transactions, no custody. And the honest stuff stays public either way: the <a href="/methodology">method</a> and <a href="/track-record">every call we've made, graded</a>.</p>
+      <div class="btns"><a class="btn-lime" href="/board">Unlock the board</a><a class="btn-ghost" href="/token">Free token lookup</a></div>
     </div>
   </section>
 </main>
@@ -210,7 +242,7 @@
       <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">A launch scanner for the Robinhood Chain. Every number is reconstructed from public on-chain data. Signal, not proof — never a buy recommendation.</p></div>
       <div class="ft-cols">
         <div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Scan a token</a></div>
-        <div><p class="micro">Trust</p><a href="/methodology">How it works</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">How it works</a><a href="/track-record">Track record</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
       </div>
     </div>
     <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
@@ -354,6 +386,8 @@ async function loadBoard(){try{
   else if(!window.__warm){ setTimeout(loadBoard,5000); } // cold start: poll faster until the board warms
   // proof: launches scanned
   if(b.stats&&(b.stats.launchTotal||b.stats.graduatedTotal)){ $("#p3n").textContent=(b.stats.launchTotal||b.stats.graduatedTotal).toLocaleString(); }
+  // hero funnel — real, live numbers (the total ticks up to the launchpad's own count)
+  if(b.stats){ if(b.stats.launchTotal)tickTo($("#fTotal"),b.stats.launchTotal); if(b.stats.graduatedTotal)tickTo($("#fGrad"),b.stats.graduatedTotal); }
 }catch(e){$("#preview").innerHTML='<div class="state">Board unavailable — retrying…</div>';setTimeout(loadBoard,8000);}}
 
 // ---- proof numbers (fade rate + winners caught) ----
@@ -363,7 +397,7 @@ async function loadProof(){
       const w=v.cohort.winners,l=v.cohort.losers,tot=w+l;
       if(tot>0){ const fade=Math.round(l/tot*100);
         $("#p1n").textContent=fade+"%";
-        $("#p1s").textContent=`${l} of ${tot} studied faded fast`;
+        $("#p1s").textContent=`${l} of ${tot} with settled outcomes`;
       }
     }
     const h=v.headline||{};
@@ -372,13 +406,45 @@ async function loadProof(){
   // proofline in hero
   try{ const [v,b]=await Promise.all([fetch("/api/validation").then(r=>r.json()),fetch("/api/board").then(r=>r.json())]);
     const parts=[];
-    if(v.cohort&&v.cohort.losers!=null&&v.cohort.winners!=null){const tot=v.cohort.winners+v.cohort.losers; if(tot>0)parts.push(`<span class="red">${Math.round(v.cohort.losers/tot*100)}%</span> of launches fade within hours`);}
+    if(v.cohort&&v.cohort.losers!=null&&v.cohort.winners!=null){const tot=v.cohort.winners+v.cohort.losers; if(tot>0)parts.push(`<span class="red">${Math.round(v.cohort.losers/tot*100)}%</span> of studied launches faded`);}
     const scanned=(b.stats&&(b.stats.launchTotal||b.stats.graduatedTotal))||0;
     if(scanned)parts.push(`<b>${scanned.toLocaleString()}</b> scanned`);
     if(parts.length)$("#proofline").innerHTML=parts.map(p=>`<span>${p}</span>`).join("");
   }catch(e){}
 }
-loadBoard();loadProof();setInterval(loadBoard,30000);
+// count a number up to its live target (eased, tabular so nothing jitters); later calls retarget smoothly
+function tickTo(el,target){
+  if(!el||!(target>0))return;
+  const from=Number((el.textContent||"").replace(/[^0-9]/g,""))||Math.floor(target*0.986);
+  if(from===target){el.textContent=target.toLocaleString();return;}
+  const t0=performance.now(),D=1500,ease=(t)=>1-Math.pow(1-t,3);
+  cancelAnimationFrame(el._tick||0);
+  const step=(t)=>{const k=Math.min(1,(t-t0)/D);el.textContent=Math.round(from+(target-from)*ease(k)).toLocaleString();if(k<1)el._tick=requestAnimationFrame(step);};
+  el._tick=requestAnimationFrame(step);
+}
+// winners leg of the funnel — only from the OUTCOME-labelled study (counts present); never faked from older data
+async function loadWinners(){
+  try{ const v=await fetch("/api/validation").then(r=>r.json());
+    const c=v&&v.cohort&&v.cohort.counts;
+    if(c&&(c.major!=null||c.runner!=null)){ const w=(c.major||0)+(c.runner||0);
+      if(w>0){ $("#fWin").textContent=w; $("#fWinWrap").hidden=false; $("#fWinArr").hidden=false; } }
+  }catch(e){}
+}
+// best shots by stage — the teaser; the full stage view is the board's lead tab
+async function loadShots(){
+  try{ const p=await fetch("/api/picks").then(r=>r.json());
+    if(!p||!p.brackets||!p.brackets.length) return;
+    const rc=(r)=>r<25?"var(--lime)":r<45?"var(--amber)":"var(--coral)";
+    $("#shots").innerHTML=p.brackets.map(br=>{const k=br.pick;return `<div class="shot">
+      <span class="stg">${esc(br.label)}</span>
+      <span class="sy"><a href="/token?address=${k.address}">$${esc(k.sym)}</a><span class="mc">${B0.mcT(k.mcapUsd)}</span></span>
+      <p class="why">${esc(k.why||"")}</p>
+      <span class="rk" style="color:${rc(k.risk??100)}">risk ${k.risk??"—"} · ${(k.holders||0).toLocaleString()} holders</span>
+    </div>`;}).join("");
+    $("#shotsec").hidden=false;
+  }catch(e){}
+}
+loadBoard();loadProof();loadWinners();loadShots();setInterval(loadBoard,30000);
 
 /* ============ the winner corridor — lateral profile ============ */
 (function(){

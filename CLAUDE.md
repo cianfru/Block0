@@ -89,6 +89,21 @@ dumping — places it against a study of past winners, and shows the wallet inte
   global `playwright`). Every page links favicon.svg + favicon.ico + apple-touch-icon; `server.mjs` MIME map now serves
   .png/.ico/.webp. Rejected variants: block-dot zero (reads as a record button), cut-ring zero (mush at 16px).
 
+- **⭐ HERO + FLOW + GATE MODEL (owner decisions, 2026-09-05).** (1) **Landing hero = the honest funnel storyline**:
+  "The path to millions starts at block zero" + a LIVE ticking counter (`tickTo`, launchTotal from /api/board — real,
+  from the launchpad's own total, never faked) → graduated → "N reached $1M — and held it" (the winners leg renders
+  ONLY when /api/validation carries the outcome-format `cohort.counts`; degrades honestly on older data). Fade % is
+  phrased "of studied launches" (the settled cohort), never "of all launches". (2) **Best shots by stage** — the picks
+  BRACKETS are the stages of the winners' path (labels: Block zero / First traction / The climb / Proving it / Made it,
+  each still carrying its $ range; keys unchanged). The board leads with the ◆ Best shots tab (default view, loads
+  immediately); the landing has a compact per-stage teaser strip (`#shotsec`) linking into the board. (3) **GATE MODEL
+  (owner: "not really charging — people need to have tokens to access; free lookup and it ends there")**: FREE forever =
+  landing + methodology + track record (the trust engine) + the single-token lookup (`index.html` mount({gated:false}));
+  TOKEN-GATED = board, best shots, alerts, leaderboard, wallet pages (mount({gated:true}) + overlay). The gate stays
+  OPEN until `GATE_TOKEN` is set on Railway (plus GATE_SYMBOL/THRESHOLD/DECIMALS/BUY_URL/CHAIN_RPC). ⚠ HONEST SCOPE:
+  enforcement is the client overlay + a server-side read-only balance check — a curtain, not a wall (APIs stay
+  fetchable by a technical visitor); signed-session server enforcement is the P2 if the token gets real value.
+
 ## Feature engines (all pure + unit-tested; `npm test`)
 - **PnL (`pnl.mjs`):** avg-cost realized (coins sold) + unrealized (coins held) per wallet, from the backtest's
   price series. Conservative — untracked-cost coins credit ZERO profit (understates, never invents). On

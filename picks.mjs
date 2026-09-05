@@ -14,12 +14,14 @@
 
 import { blueprintMatch } from "./intel.mjs";
 
+// Brackets are the STAGES of the winners' path (same stages the corridor gates on), named as such — each label
+// still carries its honest $ range so a stage name never obscures what it means.
 export const BRACKETS = [
-  { key: "fresh",       label: "Fresh · under $500k", min: 0,    max: 5e5 },
-  { key: "early",       label: "$500k – $1M",         min: 5e5,  max: 1e6 },
-  { key: "traction",    label: "$1M – $5M",           min: 1e6,  max: 5e6 },
-  { key: "established", label: "$5M – $10M",          min: 5e6,  max: 1e7 },
-  { key: "bluechip",    label: "$10M and up",         min: 1e7,  max: Infinity },
+  { key: "fresh",       label: "Block zero · under $500k",    min: 0,    max: 5e5 },
+  { key: "early",       label: "First traction · $500k–$1M",  min: 5e5,  max: 1e6 },
+  { key: "traction",    label: "The climb · $1M–$5M",         min: 1e6,  max: 5e6 },
+  { key: "established", label: "Proving it · $5M–$10M",       min: 5e6,  max: 1e7 },
+  { key: "bluechip",    label: "Made it · $10M+",             min: 1e7,  max: Infinity },
 ];
 export const bracketOf = (mcap) => BRACKETS.find((b) => mcap >= b.min && mcap < b.max) || BRACKETS[0];
 

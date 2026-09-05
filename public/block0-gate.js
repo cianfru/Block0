@@ -62,9 +62,10 @@ const B0GATE = (() => {
       overlay.innerHTML = `<div class="gate-card panel">
         <p class="micro eye">members access</p>
         <h2>Token-gated<span class="blink" style="color:var(--lime)">_</span></h2>
-        <p class="gate-sub">Block0 is gated by its token. Connect an EVM wallet — we read your balance, nothing else. No signing, no transactions, no custody. Hold <b style="color:var(--lime)">${label}</b> to unlock the full board, dossiers, bubble maps and the wallet leaderboard.</p>
+        <p class="gate-sub">Block0 runs on its token. The single-token verdict lookup is free for everyone, forever — the working product is for holders. Hold <b style="color:var(--lime)">${label}</b> to unlock the graded board, the best shots at every stage, live alerts and the smart-money leaderboard. Connect reads your balance, nothing else — no signing, no transactions, no custody.</p>
         <div class="gate-btns"><button class="btn-lime" id="gateConnect">Connect wallet</button>${cfg.buyUrl ? `<a class="btn-ghost" href="${cfg.buyUrl}" target="_blank" rel="noopener">Get the token</a>` : ""}</div>
         <p class="gate-note" id="gateNote">Read-only balance check on ${cfg.chain}. Your keys never leave your wallet.</p>
+        <a class="gate-peek" href="/token">Free token lookup →</a>
         <a class="gate-peek" href="/">← back to the landing</a>
       </div>`;
       document.body.appendChild(overlay);

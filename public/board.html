@@ -70,8 +70,8 @@
     </div>
     <input class="search" id="q" placeholder="Search name, symbol, or paste a contract address" autocomplete="off">
     <div class="filters" id="tabs">
-      <button class="on" data-f="cooking">About to graduate</button>
-      <button data-f="picks">◆ Most promising</button>
+      <button class="on" data-f="picks">◆ Best shots</button>
+      <button data-f="cooking">About to graduate</button>
       <button data-f="smart"><svg class="ic" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg> Smart money</button>
       <button data-f="blueprint">Blueprint fit</button>
       <button data-f="graduated">Graduated</button>
@@ -95,8 +95,8 @@
         <p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p>
       </div>
       <div class="ft-cols">
-        <div><p class="micro">Product</p><a href="/">Board</a><a href="/token">Token dossier</a></div>
-        <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Token dossier</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/track-record">Track record</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
       </div>
     </div>
     <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
@@ -109,7 +109,7 @@
 const $=(s)=>document.querySelector(s);
 function go(e){e.preventDefault();const v=$("#q").value.trim();if(/^0x[0-9a-fA-F]{40}$/.test(v))location.href="/token?address="+v;return false;}
 let SEARCH="";
-let LAST=null, FILTER="cooking";
+let LAST=null, FILTER="picks";
 function section(rows){return `<div class="grid">${rows.map((r,i)=>B0.tokenCard(r,i)).join("")}</div>`;}
 function render(){
   const b=LAST; if(!b||((!b.cooking||!b.cooking.length)&&(!b.graduated||!b.graduated.length))){
@@ -179,7 +179,7 @@ function pickBlock(br){
 }
 function renderPicks(p){
   if(!p||!p.brackets||!p.brackets.length) return '<div class="state">'+((p&&p.computing)?"Reading the board by bracket…":"No launches to rank yet — the first scan is still running.")+'</div>';
-  const intro=`<p class="caveat" style="margin:0 0 4px">The launch in each <b style="color:var(--tx)">market-cap bracket</b> whose on-chain fingerprint looks most like a real one — clean risk, a float that opens up, real adoption, proven wallets present. ${p.llmUsed?'Plain-language reason written by a model over our numbers — it never invents a token or a figure.':'Ranked by our transparent promise score.'} Signal, not proof — never a buy recommendation.</p>`;
+  const intro=`<p class="caveat" style="margin:0 0 4px">Your best shot at every <b style="color:var(--tx)">stage of the winners' path</b> — in each stage, the launch whose on-chain fingerprint looks most like the ones that made it: clean risk, a float that opens up, real adoption, proven wallets present. ${p.llmUsed?'Plain-language reason written by a model over our numbers — it never invents a token or a figure.':'Ranked by our transparent promise score.'} Signal, not proof — never a buy recommendation.</p>`;
   return intro+`<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${p.brackets.map(pickBlock).join("")}</div>`;
 }
 $("#q").addEventListener("input",(e)=>{const v=e.target.value.trim();SEARCH=/^0x[0-9a-fA-F]{0,40}$/.test(v)?"":v;$("#tabs").style.opacity=SEARCH?".4":"1";render();});
@@ -195,7 +195,7 @@ async function load(){try{
     `<span class="chip tnum">${s.activeTotal||nc} active</span><span class="chip tnum">${s.graduatedTotal||ng} graduated</span>`;
   render();
 }catch(e){$("#statchips").innerHTML='<span class="chip">board unavailable — retrying…</span>';}}
-load();setInterval(load,20000);
+load();loadPicks();setInterval(load,20000);
 
 // ── live alerts strip (polls the public feed; no third party) ──
 const KLAB={"insider-dump":"insiders selling","smart-convergence":"smart money","clean-launch":"clean launch"};
