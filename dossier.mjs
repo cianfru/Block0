@@ -6,6 +6,7 @@
 // Alchemy-preferred): the dossier always resolves fast from the incremental store, so the page shows the full
 // forensic read — snipers, bundles, concentration, who's buying/selling — even if the history chart is still loading.
 import { computeIntel, blueprintMatch, blueprintLabel } from "./intel.mjs";
+import { deployerReputation } from "./deployer.mjs";
 import { getCurrentSmartMoney } from "./smart-money.mjs";
 import { pathPosition, precedentValuation, liveTrajectory, corridorStatus } from "./model.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
