@@ -69,6 +69,22 @@ dumping — places it against a study of past winners, and shows the wallet inte
     the tokens the wallet actually touched, so the endpoint only backtests the intersection with the winner set (~a
     handful, not 100). Falls back to the full set if the lookup fails, so results never shrink; `tokensRequested` still
     reports the whole universe. This is what makes a COLD wallet report fast.
+- **⭐⭐ WINNER/PnL RECONSTRUCTION — WHY IT WAS SLOW + THE CONVERGENCE FIX (measured live 2026-09-05).** Per-token
+  backtest = a full `getLogs` walk of the token's history on the native RH RPC ≈ **30–60s each** (older/bigger winners
+  slowest). The leaderboard warms ~15 tokens per 12-min cycle. With `BT_TTL`=45m the early results EXPIRED before
+  coverage finished — a treadmill that never reached warm, so every page hit cold tokens ("cannot wait forever").
+  Measured: `partial:true, tokensScanned 15/34`. **Fixes:** (1) **`BT_TTL` 45m→6h** so results ACCUMULATE across
+  cycles — after ~3 cycles (~90 min from first deploy) every winner is warm and stays warm (Redis survives redeploys);
+  steady state = pure cache reads, leaderboard + wallet pages instant. (2) **`winnerTokens()` snapshots the last
+  COMPLETE board scan** — it was reading the board's partial mid-scan lists (31 tokens one minute, 8 the next) →
+  churning cache keys + a false "traded nothing". (3) **Pre-filter gated to `PROVIDER==="alchemy"`** — the native node
+  doesn't serve getAssetTransfers (junk → false negatives); an empty intersection now falls back to the full scan.
+  (4) **Wallet PnL 8s deadline** (`WALLET_PNL_DEADLINE_MS`): a cold scan returns a fast PARTIAL flagged `computing`
+  (page polls every 20s) instead of blocking ~48s; in-flight backtests keep running and warm the memo. (5) **Never
+  cache a partial-empty report.** ⚠ The one unavoidable cost is the FIRST warm-up after a cold cache (~90 min) — during
+  it pages show honest "reconstructing…" progress, not a hang. ⚠ Unrealised PnL can be up to 6h stale (pages say
+  "rough"). If ever needed: persisting per-token transfer events would make even first-ever computes incremental, but
+  ~2.5MB/token is too big for the free Redis tier — result-caching is the cost-correct choice.
 - **Trajectory honesty — SHAPE vs ADOPTION must agree (`model.mjs corridorStatus`, fixed 2026-09).** The trajectory
   SCORE (`liveTrajectory`) saturates on any clean young launch: `inflow = holders/ageH` explodes at low ages and pins
   the arrival-rate term at its cap, so a fresh clean token scores ~84 and plots ABOVE the winner cone (57–70) even
