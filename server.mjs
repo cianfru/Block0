@@ -82,7 +82,12 @@ function anchorToPons(r, ponsMcap) {
 // correct); the result is cached in KV keyed by token so that expensive pull happens once, not on every redeploy.
 // serve a cached backtest for 45 min — deliberately LONGER than the 30-min leaderboard refresh, so steady-state LB
 // rebuilds hit the cache (only the cold start pays the full 100-backtest cost, not every cycle).
-const BT_TTL = Number(process.env.BT_TTL_MS || 45 * 60 * 1000);
+// Backtest results live 6h (not 45m). Reconstructing one token's history is ~30-60s on the native RPC and the
+// leaderboard can only warm ~15 tokens per 12-min cycle — with a 45m TTL the early ones EXPIRED before coverage was
+// complete (a treadmill that never reached warm). At 6h the results accumulate across cycles: after ~3 cycles every
+// winner is warm and STAYS warm (Redis survives redeploys), so leaderboard + wallet reports become pure cache reads.
+// Honesty note: unrealised PnL is marked at compute time, so it can be up to 6h stale — the pages already say "rough".
+const BT_TTL = Number(process.env.BT_TTL_MS || 6 * 60 * 60 * 1000);
 const STORE_CAP = 25000;
 // In-process hot cache for backtests. The leaderboard warms every winner token through the SAME genericBt keys
 // every refresh, so a per-wallet PnL report (which reuses those keys) reads them straight from memory — no ~100
@@ -140,14 +145,18 @@ export function leaderboardHealth() { return _lbHealth; }
 // The chain's WINNER SET — graduated launchpad tokens + DEX-listed tokens, biggest first, deduped, capped.
 // One source of truth so the leaderboard and a single wallet's PnL report scan the exact same tokens (and thus
 // reconcile to the cent). Reads the live board cache; empty until the first board cycle lands.
+let _winnerSnap = [];   // last COMPLETE winner set — the board publishes partial lists mid-scan, never read those live
 function winnerTokens() {
   const b = getBoard();
   const seen = new Set();
-  return [...(b.graduated || []), ...(b.dex || [])]
+  const list = [...(b.graduated || []), ...(b.dex || [])]
     .filter((t) => t.address && !seen.has(t.address.toLowerCase()) && seen.add(t.address.toLowerCase()))
     .sort((x, y) => (y.mcapUsd || 0) - (x.mcapUsd || 0))
     .slice(0, LB_TOKENS)
     .map((t) => ({ address: t.address.toLowerCase(), sym: t.sym, mcapUsd: t.mcapUsd || 0, graduated: !!t.graduated }));
+  // adopt a new snapshot only from a FINISHED board scan; while a scan is in flight keep serving the last complete set
+  if (!b.scanning && list.length) _winnerSnap = list;
+  return _winnerSnap.length ? _winnerSnap : list;
 }
 // The generic (wallet-agnostic) backtest a wallet report reuses — same key the leaderboard warms, so it's a cache hit.
 const genericBt = (addr) => computeBacktest(addr, `${addr}:90:3000:false:${Number(process.env.BT_CAP || 100000)}`, { points: 90, ethUsd: 3000 });
@@ -475,9 +484,13 @@ createServer(async (req, res) => {
         // instead of reconstructing all ~100. A wallet trades a handful, so this collapses a cold report from ~100
         // backtests to a few. Falls back to the full set if the token-set lookup fails, so results can't shrink.
         let scanTokens = tokens;
-        try { const traded = await walletTokenSet(a); if (traded && traded.size) scanTokens = tokens.filter((t) => traded.has(t.address)); }
-        catch { /* keep the full set on any failure */ }
-        rep = await walletPnlReport(a, scanTokens, genericBt, { budgetMs });
+        if (PROVIDER === "alchemy") {   // getAssetTransfers is only real on Alchemy; the native RH node returns junk
+          try { const traded = await walletTokenSet(a);
+            const narrowed = traded && traded.size ? tokens.filter((t) => traded.has(t.address)) : [];
+            if (narrowed.length) scanTokens = narrowed;   // an EMPTY intersection must never mean "traded nothing"
+          } catch { /* keep the full set on any failure */ }
+        }
+        rep = await walletPnlReport(a, scanTokens, genericBt, { budgetMs, deadlineMs: Number(process.env.WALLET_PNL_DEADLINE_MS || 8000) });
         rep.tokensRequested = tokens.length;   // report against the whole winner universe, not just the scanned subset
         let contract = false; try { contract = await isContract(a); } catch { /* fail open */ }
         rep = { ...rep, contract };
@@ -485,7 +498,10 @@ createServer(async (req, res) => {
         const lb = _leaderboard || await getJSON("leaderboard").catch(() => null);
         const row = lb && (lb.rows || []).find((r) => r.a === a);
         if (row) rep.board = { rank: (lb.rows.findIndex((r) => r.a === a) + 1) || null, proven: !!row.proven, riding: !!row.riding, kind: row.kind };
-        setJSON(key, { at: Date.now(), data: rep }).catch(() => {});
+        // a scan that hit its budget before finishing is NOT a verdict: don't cache it as "traded nothing"; tell the
+        // page it's still reconstructing so it keeps polling while the backtests warm in the background
+        if (rep.partial && !rep.found) { rep.computing = true; }
+        else setJSON(key, { at: Date.now(), data: rep }).catch(() => {});
       }
       return res.end(JSON.stringify({ ...rep, links }));
     }

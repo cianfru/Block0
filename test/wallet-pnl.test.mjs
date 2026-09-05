@@ -54,3 +54,20 @@ test("a token that fails to backtest is skipped, not fatal", async () => {
   assert.equal(r.found, true);
   assert.equal(r.tokens.length, 2);
 });
+
+test("deadline: a slow backtest returns a fast PARTIAL report instead of blocking the caller", async () => {
+  const slow = () => new Promise((r) => setTimeout(() => r(BT["0xaa"]), 2000));   // slower than the deadline
+  const t0 = Date.now();
+  const r = await walletPnlReport("0xme", tokens, slow, { deadlineMs: 150 });
+  const took = Date.now() - t0;
+  assert.ok(took < 1000, `should return near the deadline, took ${took}ms`);
+  assert.equal(r.partial, true);        // flagged so the endpoint reports "computing", never "traded nothing"
+  assert.equal(r.found, false);         // nothing finished inside the deadline
+});
+
+test("deadline: fast backtests still complete fully (deadline never truncates a warm scan)", async () => {
+  const r = await walletPnlReport("0xme", tokens, computeBt, { deadlineMs: 5000 });
+  assert.equal(r.partial, false);
+  assert.equal(r.found, true);
+  assert.equal(r.tokens.length, 2);
+});

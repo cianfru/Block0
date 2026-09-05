@@ -15,6 +15,7 @@ export async function walletPnlReport(address, tokens, computeBt, opts = {}) {
   const minRealized = opts.minRealized ?? 100;         // a "win" = at least this much cash actually taken out
   const budgetMs = opts.budgetMs || 0;                 // 0 = scan all; else stop early (partial) so it can't run long
   const conc = Math.max(1, opts.concurrency || 20);    // fetch the per-token backtests in PARALLEL, not one-by-one
+  const deadlineMs = opts.deadlineMs || 0;             // hard wall-clock cap on how long the CALLER waits (0 = none)
   const start = Date.now();
   const rows = [];
   let scanned = 0, partial = false;
@@ -32,7 +33,15 @@ export async function walletPnlReport(address, tokens, computeBt, opts = {}) {
       try { bts[i] = await computeBt(tokens[i].address); } catch { /* a token that won't backtest is skipped, never fatal */ }
     }
   };
-  await Promise.all(Array.from({ length: Math.min(conc, tokens.length) }, worker));
+  // A cold backtest is ~30-60s on the native RPC and a worker can't be interrupted mid-await, so the budget alone
+  // still makes the caller wait for the first batch. The DEADLINE races the pool against a timer: when it fires we
+  // stop launching new tokens and return what has finished (partial). The in-flight backtests are NOT cancelled —
+  // they keep running and land in the server's memo/KV, so the page's next poll finds them warm. Never block a user.
+  const pool = Promise.all(Array.from({ length: Math.min(conc, tokens.length) }, worker));
+  if (deadlineMs) {
+    let t; const timer = new Promise((r) => { t = setTimeout(() => { stopped = true; partial = true; r(); }, deadlineMs); if (t.unref) t.unref(); });
+    await Promise.race([pool, timer]); clearTimeout(t);
+  } else await pool;
 
   // build rows in token order (then sort) so output is identical regardless of fetch interleaving
   for (let i = 0; i < tokens.length; i++) {
