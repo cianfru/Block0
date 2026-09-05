@@ -63,3 +63,24 @@ test("report: accruing below MIN_SHOW, then a real hit-rate with lift", () => {
   assert.ok(r.baseRate < r.promising.winRate);         // promising beats the base rate
   assert.ok(r.lift > 1);
 });
+
+
+test("report: rates come ONLY from the matured cohort — a young store can never read 100% wins", () => {
+  const s = { tokens: {} };
+  const now = 5_000_000_000_000;   // fixed 'now' so ageing is deterministic
+  // 12 promising calls made 5h ago (NOT matured); 6 of them run 6x within the hour → early winners
+  for (let i = 0; i < 12; i++) ingest(s, [{ address: "p" + i, ageH: 1, risk: 15, blueprint: 80, corridor: { status: "on-track" }, mcapUsd: 10000 }], now - 5 * H);
+  for (let i = 0; i < 6; i++) ingest(s, [{ address: "p" + i, ageH: 5, mcapUsd: 60000 }], now - 1 * H);
+  resolve(s, now);
+  const r = report(s, now);
+  assert.equal(r.wonEarly, 6);          // the early runs are visible…
+  assert.equal(r.resolved, 0);          // …but nothing is matured, so there is NO rate yet
+  assert.equal(r.ready, false);
+  assert.equal(r.baseRate, null);       // never a fake 100%
+  // 80h later everything has matured: losers resolved, rate is the honest 6/12
+  resolve(s, now + 80 * H);
+  const r2 = report(s, now + 80 * H);
+  assert.equal(r2.resolved, 12);
+  assert.equal(r2.baseRate, 0.5);
+  assert.equal(r2.wonEarly, 0);
+});

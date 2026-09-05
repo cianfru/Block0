@@ -61,9 +61,16 @@ export function resolve(store, now = Date.now()) {
 }
 
 // The live track record. Only tokens with a YOUNG frozen prediction count (a genuine forward call).
-export function report(store) {
+export function report(store, now = Date.now()) {
   const recs = Object.values((store && store.tokens) || {}).filter((r) => r.prediction && r.call);
-  const resolved = recs.filter((r) => r.resolved);
+  // HONESTY RAIL: a winner resolves the moment it runs, a loser only at MATURE_H. Counting every resolved token
+  // therefore over-represents winners at ANY snapshot — a freshly-started store read 100% wins (baseRate 1, lift 1,
+  // "avoid" 9/9 winners) purely because no token had aged enough to resolve as a loser yet. Rates are computed over
+  // the MATURED cohort only: tokens old enough that either outcome was possible (every one of them is resolved).
+  // Winners that ran early but aren't matured yet are reported separately as wonEarly, never folded into a rate.
+  const matured = recs.filter((r) => (now - r.firstSeen) / 3.6e6 >= MATURE_H);
+  const resolved = matured.filter((r) => r.resolved);
+  const wonEarly = recs.filter((r) => r.resolved && r.outcome === "winner" && (now - r.firstSeen) / 3.6e6 < MATURE_H).length;
   const byCall = {};
   for (const r of resolved) { const b = byCall[r.call] || (byCall[r.call] = { call: r.call, n: 0, winners: 0 }); b.n++; if (r.outcome === "winner") b.winners++; }
   const buckets = Object.values(byCall).map((b) => ({ ...b, winRate: b.n ? +(b.winners / b.n).toFixed(3) : null }))
@@ -72,11 +79,13 @@ export function report(store) {
   const prom = byCall.promising || { n: 0, winners: 0 };
   const base = N ? W / N : null;
   return {
-    updated: Date.now(),
-    ready: N >= MIN_SHOW,                    // enough resolved to show a rate honestly
+    updated: now,
+    ready: N >= MIN_SHOW,                    // enough MATURED calls to show a rate honestly
     minShow: MIN_SHOW,
     predicted: recs.length,                  // young forward calls made
-    pending: recs.length - N,                // called, not yet matured
+    matured: matured.length,                 // old enough that either outcome was possible — the only basis for a rate
+    pending: recs.length - matured.length,   // called, not yet matured (includes early winners still ageing in)
+    wonEarly,                                // ran the multiple before maturing — shown, but never counted in a rate
     resolved: N, winners: W,
     baseRate: base == null ? null : +base.toFixed(3),
     promising: { n: prom.n, winners: prom.winners, winRate: prom.n ? +(prom.winners / prom.n).toFixed(3) : null },
