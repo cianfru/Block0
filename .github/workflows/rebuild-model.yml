@@ -14,13 +14,19 @@ name: rebuild-model
 on:
   workflow_dispatch:
     inputs:
-      budgetMin:      { description: "Backtest wall-clock budget (minutes)", default: "120" }
+      budgetMin:      { description: "Backtest wall-clock budget (minutes)", default: "155" }
+      max:            { description: "Max backtests this run (queue is highest-value first)", default: "1500" }
       controls:       { description: "Max small/aged launches to profile as stalled/dead controls", default: "300" }
       dex:            { description: "Include direct DEX listings (non-Pons)", type: boolean, default: true }
       dexBlocks:      { description: "DEX scan depth (blocks)", default: "2500000" }
       dexCap:         { description: "DEX tokens to profile (chain-wide: v2/v3/v4)", default: "300" }
   schedule:
-    - cron: "17 6 * * 1,4"   # Mondays + Thursdays 06:17 UTC — twice a week so pending tokens settle into the cohort promptly
+    # DAILY 06:17 UTC. Until the whole universe is profiled + cached, consecutive daily runs clear the ~900-token
+    # queue in a couple of days (a single job is capped at 170 min ≈ ~600 tokens, so no one run finishes it). Once the
+    # committed cache is complete each daily run only re-backtests what's new or still undecided — minutes, ~2-3M CU —
+    # so daily is cheap AND keeps pending tokens settling into the cohort promptly. Was Mon+Thu; daily finishes the
+    # backfill and keeps the model current with no manual dispatch.
+    - cron: "17 6 * * *"
 
 concurrency:
   group: rebuild-model
@@ -47,7 +53,8 @@ jobs:
       - name: Profile the launch universe (incremental, budgeted, outcome-labelled)
         run: |
           node tools/build-cohort.mjs \
-            --budgetMin="${{ github.event.inputs.budgetMin || '120' }}" \
+            --budgetMin="${{ github.event.inputs.budgetMin || '155' }}" \
+            --max="${{ github.event.inputs.max || '1500' }}" \
             --controls="${{ github.event.inputs.controls || '300' }}" \
             ${{ (github.event.inputs.dex == 'false') && ' ' || '--dex' }} \
             --dexBlocks="${{ github.event.inputs.dexBlocks || '2500000' }}" \
