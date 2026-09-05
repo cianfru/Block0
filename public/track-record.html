@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<title>Block0 — forward track record</title>
+<meta name="description" content="Every forward call Block0 has made on the Robinhood Chain, listed with its outcome — winners and misses alike.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+<style>
+  .kpis{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-top:22px}
+  @media(max-width:760px){.kpis{grid-template-columns:1fr 1fr}}
+  .kpi{border:1px solid var(--line);border-radius:14px;padding:16px 18px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008))}
+  .kpi .n{font-family:var(--serif);font-size:2rem;line-height:1;color:var(--tx);font-variant-numeric:tabular-nums}
+  .kpi .n.g{color:var(--lime)} .kpi .n.m{color:var(--dim)}
+  .kpi .l{margin-top:8px;font-size:.8rem;color:var(--dim)}
+  .accrue{margin-top:22px;border:1px dashed var(--line-2);border-radius:14px;padding:16px 18px;color:var(--dim);font-size:.9rem;line-height:1.6}
+  .accrue b{color:var(--tx)}
+  table.tr{width:100%;border-collapse:collapse;margin-top:22px;font-size:.88rem}
+  table.tr th{text-align:left;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:10px 10px;border-bottom:1px solid var(--line)}
+  table.tr td{padding:11px 10px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--tx);vertical-align:middle;font-variant-numeric:tabular-nums}
+  table.tr td.d{color:var(--dim)}
+  .call{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid}
+  .call.promising{color:var(--lime);border-color:rgba(200,255,77,.4);background:rgba(200,255,77,.08)}
+  .call.watch{color:#ffd23d;border-color:rgba(255,210,61,.4);background:rgba(255,210,61,.08)}
+  .call.avoid{color:#ff3b5c;border-color:rgba(255,59,92,.4);background:rgba(255,59,92,.08)}
+  .out{font-weight:600}
+  .out.winner{color:var(--lime)} .out.loser{color:#ff3b5c} .out.pending{color:var(--dim);font-weight:400}
+  .out.early{color:#35e6e0}
+  .miss{color:#ff3b5c;font-size:.72rem;margin-left:6px}
+  .wrapx{overflow-x:auto}
+  .sec h2{margin-top:34px}
+</style>
+<script src="/blockclock.js" defer></script>
+<script src="/track.js" defer></script>
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav"><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Dossier</a><a href="/methodology">Methodology</a><a href="/track-record" class="on">Track record</a></nav>
+    <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span><span class="chip blockclock"></span><button class="btn-connect" id="connect">Connect</button></div>
+  </div>
+  <div class="gatebar" id="gatebar" hidden></div>
+</header>
+<main class="wrap">
+  <section class="sec">
+    <p class="micro eye">forward track record</p>
+    <h1>Every call we made. Every outcome.</h1>
+    <p class="sub" style="max-width:64ch;color:var(--dim);margin-top:10px">A call is frozen the first time we grade a launch while it's still young (≤8h), <b style="color:var(--tx)">before</b> the outcome exists. A <b style="color:var(--tx)">winner</b> graduated, reached $1M, or ran 4× its early market cap; a <b style="color:var(--tx)">miss</b> is anything that didn't within 72h. Rates are computed only over calls old enough that either outcome was possible — nothing is cherry-picked, misses are listed with everything else.</p>
+    <div class="kpis" id="kpis"></div>
+    <div class="accrue" id="accrue" hidden></div>
+    <h2>By call</h2>
+    <div class="wrapx"><table class="tr" id="buckets"><thead><tr><th>Our call</th><th>Matured calls</th><th>Winners</th><th>Win rate</th><th>vs base rate</th></tr></thead><tbody></tbody></table></div>
+    <h2>The full list <span class="micro" style="color:var(--dim);margin-left:8px" id="lcnt"></span></h2>
+    <div class="wrapx"><table class="tr" id="calls"><thead><tr><th>Token</th><th>Call</th><th>Called at</th><th>Age at call</th><th>Risk</th><th>Mcap at call</th><th>Peak ×</th><th>Outcome</th></tr></thead><tbody></tbody></table></div>
+    <p class="caveat">Signal, not proof — never a buy recommendation. Outcomes are reconstructed from public chain data (Pons market cap + on-chain history). A winner that ran before its 72h maturity is shown as <b>early winner</b> and is <b>not</b> counted in any rate until it matures, so a young record can never read 100%. Not financial advice.</p>
+  </section>
+</main>
+<footer class="ft"><div class="ft-in"><div class="ft-top"><div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p></div>
+  <div class="ft-cols"><div><p class="micro">Product</p><a href="/board">Board</a><a href="/token">Token dossier</a></div><div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/track-record">Track record</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div></div></div>
+  <p class="fine">Not financial advice. You are responsible for your own decisions.</p></div></footer>
+<script src="/block0-cards.js"></script>
+<script src="/block0-gate.js"></script>
+<script>
+const $=(s)=>document.querySelector(s);
+const pct=(x)=>x==null?"—":Math.round(x*100)+"%";
+const when=(t)=>{const d=new Date(t);return d.toISOString().slice(0,16).replace("T"," ")+" UTC";};
+const ageS=(h)=>h==null?"—":h<1?Math.round(h*60)+"m":Math.round(h*10)/10+"h";
+B0GATE.mount({gated:false});
+async function load(){try{
+  const r=await fetch("/api/track-record?calls=400").then(x=>x.json());
+  const base=r.baseRate, prom=r.promising||{};
+  $("#kpis").innerHTML=[
+    ["n",r.predicted.toLocaleString(),"forward calls made"],
+    ["n m",(r.matured||0).toLocaleString(),"matured (≥"+r.horizonH+"h) — the rate basis"],
+    ["n "+(r.ready?"g":"m"),r.ready?pct(prom.winRate):"—",r.ready?"of our PROMISING calls won":"promising win rate (accruing)"],
+    ["n "+(r.ready?"":"m"),r.ready&&r.lift!=null?r.lift+"×":"—",r.ready?"lift vs the base rate ("+pct(base)+")":"lift (accruing)"],
+  ].map(([c,v,l])=>`<div class="kpi"><div class="${c}">${v}</div><div class="l">${l}</div></div>`).join("");
+  const acc=$("#accrue");
+  if(!r.ready){ acc.hidden=false; acc.innerHTML=`<b>Rates are still accruing.</b> ${r.predicted.toLocaleString()} forward calls are on record, ${(r.pending||0).toLocaleString()} of them not yet old enough to judge (a call needs ${r.horizonH}h so a miss has had time to show). ${r.wonEarly?`<b>${r.wonEarly}</b> have already run the multiple but are not counted until they mature — `:""}we show a win rate only once at least ${r.minShow} calls have matured, so a young record can never read 100%.`; }
+  const tb=$("#buckets tbody");
+  tb.innerHTML=(r.buckets||[]).map(b=>`<tr><td><span class="call ${b.call}">${b.call}</span></td><td>${b.n}</td><td>${b.winners}</td><td class="out ${b.n?(b.winRate>=0.5?"winner":"loser"):"pending"}">${b.n?pct(b.winRate):"—"}</td><td class="d">${(b.n&&base)?(b.winRate/base).toFixed(2)+"×":"—"}</td></tr>`).join("")||'<tr><td colspan="5" class="d">No matured calls yet.</td></tr>';
+  const calls=r.calls||[]; $("#lcnt").textContent=calls.length?calls.length+" calls, newest first":"";
+  $("#calls tbody").innerHTML=calls.map(c=>{
+    const early=c.resolved&&c.outcome==="winner"&&!c.matured;
+    const oc=early?"early":c.outcome; const ol=early?"early winner":c.outcome==="loser"?"faded":c.outcome;
+    const miss=(c.matured&&c.resolved&&((c.call==="promising"&&c.outcome==="loser")||(c.call==="avoid"&&c.outcome==="winner")))?'<span class="miss">miss</span>':"";
+    return `<tr><td><a href="/token?address=${c.address}" style="font-weight:700;color:var(--tx)">$${B0.esc(c.sym||c.address.slice(0,6))}</a></td><td><span class="call ${c.call}">${c.call}</span></td><td class="d">${when(c.at)}</td><td class="d">${ageS(c.ageAtCallH)}</td><td>${c.risk??"—"}</td><td class="d">${B0.mcT(c.mcapAtCall)}</td><td>${c.peakMult!=null?c.peakMult+"×":"—"}</td><td><span class="out ${oc}">${ol}</span>${miss}</td></tr>`;
+  }).join("")||'<tr><td colspan="8" class="d">No forward calls recorded yet.</td></tr>';
+}catch(e){$("#kpis").innerHTML='<div class="kpi"><div class="n m">—</div><div class="l">track record unavailable — retrying…</div></div>';}}
+load();setInterval(load,60000);
+</script>
+</body>
+</html>

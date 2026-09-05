@@ -14,7 +14,7 @@ import { watchLogs, WS_ENABLED } from "./ws.mjs";
 import { refreshBoard, refreshDex, getBoard, ensureFresh, setSmartMoney } from "./board.mjs";
 import { smartMoneyFrom, convergence } from "./smart-money.mjs";
 import { coverageReport } from "./coverage.mjs";
-import { tick as trackTick, trackRecord } from "./track-record.mjs";
+import { tick as trackTick, trackRecord, trackCalls } from "./track-record.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON, sendTelegram, PUBLIC_URL } from "./alerts.mjs";
@@ -233,7 +233,7 @@ async function refreshPicks() {
   if (_picksRunning) return; _picksRunning = true;
   try {
     const tokens = boardTokens();
-    if (!tokens.length) return;
+    if (!tokens.length) { setTimeout(() => refreshPicks().catch(() => {}), 60000); return; }   // board still filling → retry soon, don't wait a full cycle
     const p = await buildPicks(tokens, llmHasKey() ? llmChat : null);   // no key → deterministic ranking
     _picks = p; setJSON("picks", p).catch(() => {});
   } catch { /* keep last good picks */ }
@@ -287,6 +287,7 @@ async function serveStatic(res, urlPath) {
     : (urlPath === "/leaderboard" || urlPath === "/leaderboard.html") ? "leaderboard.html"
     : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
     : (urlPath === "/wallet" || urlPath === "/wallet.html") ? "wallet.html"
+    : (urlPath === "/track-record" || urlPath === "/track-record.html") ? "track-record.html"
     : (urlPath === "/methodology" || urlPath === "/methodology.html") ? "methodology.html"
     : (urlPath === "/control" || urlPath === "/control.html") ? "control.html"
     : (urlPath === "/desk" || urlPath === "/desk.html") ? "desk.html"
@@ -433,7 +434,9 @@ createServer(async (req, res) => {
 
     if (u.pathname === "/api/track-record") { // forward, out-of-sample hit-rate — accrues live as launches mature
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-      return res.end(JSON.stringify(await trackRecord()));
+      const rec = await trackRecord();
+      if (u.searchParams.get("calls")) rec.calls = await trackCalls(Math.min(500, Number(u.searchParams.get("calls")) || 300));   // every call, misses included
+      return res.end(JSON.stringify(rec));
     }
 
     if (u.pathname === "/api/alerts/feed") { // public: recent event alerts (insiders selling / smart money / clean launch)

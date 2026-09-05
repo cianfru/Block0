@@ -100,3 +100,14 @@ let _store = null;
 async function load() { if (_store) return _store; try { _store = await getJSON("track-record"); } catch { /* no store */ } if (!_store) _store = { tokens: {} }; return _store; }
 export async function tick(tokens) { const s = await load(); ingest(s, tokens); resolve(s); setJSON("track-record", s).catch(() => {}); return s; }
 export async function trackRecord() { return report(await load()); }
+// Every forward call we ever made, newest first — the radically transparent list (misses included). Pure over the store.
+export function callsList(store, n = 300, now = Date.now()) {
+  return Object.values((store && store.tokens) || {}).filter((r) => r.prediction && r.call)
+    .sort((a, b) => b.prediction.ts - a.prediction.ts).slice(0, n)
+    .map((r) => ({ address: r.address, sym: r.sym, call: r.call, at: r.prediction.ts, ageAtCallH: r.prediction.ageH,
+      risk: r.prediction.risk, blueprint: r.prediction.blueprint, mcapAtCall: r.prediction.mcap || null,
+      peakMult: r.prediction.mcap ? +(r.peakMcap / r.prediction.mcap).toFixed(2) : null, peakMcap: r.peakMcap || null,
+      matured: (now - r.firstSeen) / 3.6e6 >= MATURE_H, resolved: !!r.resolved,
+      outcome: r.resolved ? r.outcome : "pending" }));
+}
+export async function trackCalls(n = 300) { return callsList(await load(), n); }
