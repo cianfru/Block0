@@ -111,7 +111,15 @@
   .mkt-stats .st b.g{color:var(--lime)} .mkt-stats .st b.c{color:var(--coral)}
   .mkt-stats .st i{font-style:normal;font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
   .mkt-src{font-size:.72rem;color:var(--mute)} .mkt-src a{color:var(--dim)}
-  #cvmkt{height:300px}
+  /* the market chart lives on its own richer surface — a soft radial lime glow over deep black */
+  #mktwrap{position:relative;background:
+     radial-gradient(120% 90% at 84% -20%, rgba(200,255,77,.10), transparent 55%),
+     radial-gradient(90% 120% at 8% 120%, rgba(53,230,224,.06), transparent 55%),
+     linear-gradient(180deg,#0c0e0b,#080809 70%)}
+  #mktwrap .ch-h,#mktwrap .mkt-stats,#mktwrap .mkt-src{position:relative;z-index:2}
+  #cvmkt{height:320px}
+  .mkt-lastpill{position:absolute;right:0;transform:translateY(-50%);font-family:var(--mono);font-size:.68rem;font-weight:700;
+    padding:2px 7px;border-radius:5px;pointer-events:none;white-space:nowrap;z-index:3}
   .tip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;font-size:.74rem;z-index:5;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
   .tip .d{color:var(--mute);margin-bottom:4px} .tip b{font-variant-numeric:tabular-nums}
   .chnote{padding:34px 16px;color:var(--mute);font-size:.86rem;text-align:center}
@@ -396,7 +404,7 @@ function render(r){
         </div>
       </div>
       <div class="mkt-stats" id="mktstats"></div>
-      <div style="position:relative"><canvas id="cvmkt"></canvas><div class="tip" id="tipmkt"></div></div>
+      <div style="position:relative"><canvas id="cvmkt"></canvas><div class="mkt-lastpill" id="mktlast" hidden></div><div class="tip" id="tipmkt"></div></div>
       <div class="chnote" id="mktnote" hidden></div>
       <div class="mkt-src" id="mktsrc" hidden></div>
     </div>
@@ -876,7 +884,7 @@ async function fetchMarket(){
   try{
     const m=await fetch(`/api/chart?address=${MADDR}&tf=${MTF}`).then(x=>x.json()); MKT=m;
     if(!m.hasMarket||!m.candles||!m.candles.length){
-      cv.style.display="none"; stats.innerHTML=""; src.hidden=true;
+      cv.style.display="none"; stats.innerHTML=""; src.hidden=true; { const pill=$("#mktlast"); if(pill) pill.hidden=true; }
       note.hidden=false; note.textContent=m.note||"No live market for this token yet.";
       return;
     }
@@ -890,7 +898,7 @@ async function fetchMarket(){
       `<div class="st"><b>${fmtVol(mk.vol24)}</b><i>24h volume</i></div>`,
       (mk.buys24!=null?`<div class="st"><b><span style="color:${UP}">${mk.buys24}</span> / <span style="color:${DOWN}">${mk.sells24}</span></b><i>24h buys / sells</i></div>`:""),
     ].join("");
-    src.hidden=false;
+    src.hidden=false; { const pill=$("#mktlast"); if(pill) pill.hidden=false; }
     src.innerHTML=`Candles via GeckoTerminal · liquidity &amp; volume via DexScreener${mk.url?` · <a href="${mk.url}" target="_blank" rel="noopener">open on DexScreener ↗</a>`:""}. Price is market data, shown next to the analysis — not part of the verdict.`;
     drawCandles();
   }catch(e){ note.hidden=false; note.textContent="Couldn't load the price chart — retry in a moment."; }
@@ -901,25 +909,62 @@ function drawCandles(hoverIdx=-1){
   const g=cv.getContext("2d"), dpr=Math.min(2,devicePixelRatio||1);
   const W=cv.clientWidth, H=cv.clientHeight; cv.width=W*dpr; cv.height=H*dpr; g.setTransform(dpr,0,0,dpr,0,0);
   g.clearRect(0,0,W,H);
-  const C=MKT.candles, PL=8,PR=64,PT=10,PB=22, pw=W-PL-PR, ph=H-PT-PB;
-  let lo=Infinity,hi=-Infinity; for(const k of C){ if(k.l<lo)lo=k.l; if(k.h>hi)hi=k.h; }
+  const C=MKT.candles, PL=10,PR=66,PT=14,PB=20;
+  const VOLH=Math.round((H-PT-PB)*0.16), ph=H-PT-PB-VOLH-6, pw=W-PL-PR;   // price panel + a slim volume strip beneath
+  const yTop=PT, yBot=PT+ph, volTop=yBot+6, volBot=H-PB;
+  let lo=Infinity,hi=-Infinity,vhi=0; for(const k of C){ if(k.l<lo)lo=k.l; if(k.h>hi)hi=k.h; if(k.v>vhi)vhi=k.v; }
   if(!(hi>lo)){ hi=lo*1.001+1e-9; lo=lo*0.999; }
-  const pad=(hi-lo)*0.08; lo-=pad; hi+=pad;
-  const X=(i)=>PL+(C.length<=1?pw/2:i/(C.length-1)*pw), Y=(v)=>PT+(1-(v-lo)/(hi-lo))*ph;
-  // grid + price axis (log-free; these are short windows so linear reads fine)
-  g.strokeStyle="rgba(255,255,255,.05)"; g.fillStyle="#7f7f88"; g.font="11px ui-monospace,Menlo,monospace"; g.textAlign="left";
-  for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4, y=Y(v); g.beginPath();g.moveTo(PL,y);g.lineTo(PL+pw,y);g.stroke(); g.fillText(pxFmt(v).replace("$",""),PL+pw+6,y+3); }
-  const cw=Math.max(1.5,Math.min(14,pw/C.length*0.66));
-  C.forEach((k,i)=>{ const x=X(i), up=k.c>=k.o, col=up?UP:DOWN;
-    g.strokeStyle=col; g.fillStyle=col; g.lineWidth=1;
-    g.beginPath(); g.moveTo(x,Y(k.h)); g.lineTo(x,Y(k.l)); g.stroke();     // wick
-    const yo=Y(k.o),yc=Y(k.c),top=Math.min(yo,yc),bh=Math.max(1,Math.abs(yc-yo));
-    if(up){ g.globalAlpha=.9; g.fillRect(x-cw/2,top,cw,bh); g.globalAlpha=1; } else g.fillRect(x-cw/2,top,cw,bh);
-    if(i===hoverIdx){ g.strokeStyle="rgba(255,255,255,.5)"; g.strokeRect(x-cw/2-1,Y(k.h)-1,cw+2,Y(k.l)-Y(k.h)+2); }
+  const pad=(hi-lo)*0.10; lo-=pad; hi+=pad;
+  const X=(i)=>PL+(C.length<=1?pw/2:i/(C.length-1)*pw), Y=(v)=>yTop+(1-(v-lo)/(hi-lo))*ph;
+  const up0=C[0].c, upN=C[C.length-1].c, rising=upN>=up0, ACC=rising?UP:DOWN;
+
+  // faint horizontal grid + right-edge price ladder (mono, muted)
+  g.font="11px ui-monospace,Menlo,monospace"; g.textAlign="left"; g.textBaseline="middle";
+  for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4, y=Y(v);
+    g.strokeStyle="rgba(255,255,255,.045)"; g.lineWidth=1; g.beginPath();g.moveTo(PL,y);g.lineTo(PL+pw,y);g.stroke();
+    g.fillStyle="#6d6d77"; g.fillText(pxFmt(v).replace("$",""),PL+pw+8,y); }
+
+  // area sheen under the close-path — the "sleek" depth cue, tinted to the trend, behind the candles
+  const clineY=(i)=>Y(C[i].c);
+  g.beginPath(); g.moveTo(X(0),clineY(0));
+  for(let i=1;i<C.length;i++) g.lineTo(X(i),clineY(i));
+  g.lineTo(X(C.length-1),yBot); g.lineTo(X(0),yBot); g.closePath();
+  const grad=g.createLinearGradient(0,yTop,0,yBot);
+  grad.addColorStop(0, rising?"rgba(200,255,77,.16)":"rgba(255,59,92,.15)");
+  grad.addColorStop(1, "rgba(200,255,77,0)");
+  g.fillStyle=grad; g.fill();
+  // the close line itself, soft-glowing
+  g.beginPath(); for(let i=0;i<C.length;i++){ const x=X(i),y=clineY(i); i?g.lineTo(x,y):g.moveTo(x,y); }
+  g.strokeStyle=rising?"rgba(200,255,77,.35)":"rgba(255,59,92,.32)"; g.lineWidth=1.25;
+  g.save(); g.shadowColor=g.strokeStyle; g.shadowBlur=8; g.stroke(); g.restore();
+
+  // volume strip (thin bars tinted by candle direction)
+  C.forEach((k,i)=>{ const x=X(i), vh=vhi>0?Math.max(1,(k.v/vhi)*(volBot-volTop)):1, up=k.c>=k.o;
+    g.fillStyle=up?"rgba(200,255,77,.28)":"rgba(255,59,92,.26)";
+    g.fillRect(x-Math.max(1,Math.min(10,pw/C.length*0.5))/2, volBot-vh, Math.max(1,Math.min(10,pw/C.length*0.5)), vh); });
+
+  // candles — rounded bodies, crisp wicks, a glow on the most recent
+  const cw=Math.max(2,Math.min(13,pw/C.length*0.64));
+  const rr=(x,y,w,h,r)=>{ r=Math.min(r,w/2,h/2); g.beginPath(); if(g.roundRect){g.roundRect(x,y,w,h,r);} else {g.rect(x,y,w,h);} };
+  C.forEach((k,i)=>{ const x=X(i), up=k.c>=k.o, col=up?UP:DOWN, live=(i===C.length-1);
+    g.strokeStyle=col; g.lineWidth=1.4; g.globalAlpha=up?1:.92;
+    g.beginPath(); g.moveTo(x,Y(k.h)); g.lineTo(x,Y(k.l)); g.stroke();                 // wick
+    const yo=Y(k.o),yc=Y(k.c),top=Math.min(yo,yc),bh=Math.max(1.5,Math.abs(yc-yo));
+    g.fillStyle=col;
+    if(live){ g.save(); g.shadowColor=col; g.shadowBlur=12; }
+    rr(x-cw/2,top,cw,bh,2.2); g.fill();
+    if(live) g.restore();
+    g.globalAlpha=1;
+    if(i===hoverIdx){ g.strokeStyle="rgba(255,255,255,.55)"; g.lineWidth=1; rr(x-cw/2-1.5,Y(k.h)-1.5,cw+3,Y(k.l)-Y(k.h)+3,3); g.stroke(); }
   });
-  // last price line
-  const last=C[C.length-1]; g.strokeStyle="rgba(255,255,255,.25)"; g.setLineDash([3,3]);
-  g.beginPath();g.moveTo(PL,Y(last.c));g.lineTo(PL+pw,Y(last.c));g.stroke(); g.setLineDash([]);
+
+  // last-price marker: a dashed guide + a floating coloured pill on the right axis
+  const last=C[C.length-1], ly=Y(last.c), lc=last.c>=last.o?UP:DOWN;
+  g.strokeStyle=lc==UP?"rgba(200,255,77,.4)":"rgba(255,59,92,.4)"; g.setLineDash([2,4]); g.lineWidth=1;
+  g.beginPath();g.moveTo(PL,ly);g.lineTo(PL+pw,ly);g.stroke(); g.setLineDash([]);
+  const pill=$("#mktlast");
+  if(pill){ pill.textContent=pxFmt(last.c).replace("$",""); pill.style.top=ly+"px";
+    pill.style.background=lc; pill.style.color="#0a0a0e"; pill.style.boxShadow="0 0 12px "+(lc==UP?"rgba(200,255,77,.5)":"rgba(255,59,92,.45)"); }
   cv._geom={X,Y,PL,pw,C,cw};
 }
 (function wireCandleHover(){
