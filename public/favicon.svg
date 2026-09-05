@@ -1,18 +1,1 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64" role="img" aria-label="Block0">
-  <rect width="64" height="64" rx="14" fill="#08080b"/>
-  <rect x="0.75" y="0.75" width="62.5" height="62.5" rx="13.25" fill="none" stroke="#ffffff" stroke-opacity="0.10"/>
-  <!-- b — slanted serif, white (unchanged) -->
-  <text x="7" y="47" font-family="'Instrument Serif', Georgia, 'Times New Roman', serif" font-style="italic" font-weight="400" font-size="46" fill="#ffffff">b</text>
-  <!-- 0 — VGA / pixel-font zero, green. Solid pixels forming a bitmap glyph with stair-stepped rounded corners
-       (8×11 cell, 3px pixels), upright to match the SPX6900/Rainbow VGA logo. -->
-  <g fill="#c8ff4d" shape-rendering="crispEdges">
-    <rect x="39" y="15" width="12" height="3"/>              <!-- top cap -->
-    <rect x="36" y="18" width="6" height="3"/><rect x="48" y="18" width="6" height="3"/>  <!-- upper corners -->
-    <rect x="33" y="21" width="6" height="21"/>              <!-- left wall -->
-    <rect x="51" y="21" width="6" height="21"/>              <!-- right wall -->
-    <rect x="36" y="42" width="6" height="3"/><rect x="48" y="42" width="6" height="3"/>  <!-- lower corners -->
-    <rect x="39" y="45" width="12" height="3"/>              <!-- bottom cap -->
-    <!-- slashed-zero strike ("/"), pixel staircase wall-to-wall so it reads 0 not O -->
-    <rect x="39" y="36" width="3" height="3"/><rect x="42" y="33" width="3" height="3"/><rect x="45" y="30" width="3" height="3"/><rect x="48" y="27" width="3" height="3"/>
-  </g>
-</svg>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200" role="img" aria-label="Block0"><rect width="200" height="200" rx="40" fill="#08080b"/><g transform="translate(100 100) scale(0.86) translate(-100 -100)"><g transform="translate(-18.50 9.00)"><line x1="46" y1="22" x2="46" y2="160" stroke="#ffffff" stroke-width="17"/><circle cx="75" cy="122.5" r="29" fill="none" stroke="#ffffff" stroke-width="17"/><circle cx="162" cy="122.5" r="29" fill="none" stroke="#c8ff4d" stroke-width="17"/><clipPath id="z162"><circle cx="162" cy="122.5" r="37.5"/></clipPath><line clip-path="url(#z162)" x1="135.9" y1="148.6" x2="188.1" y2="96.4" stroke="#c8ff4d" stroke-width="13.600000000000001" stroke-linecap="round"/></g></g></svg>

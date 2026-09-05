@@ -247,7 +247,7 @@ if (Number(process.env.PICKS_ON ?? 1) > 0) {
 const __dir = fileURLToPath(new URL(".", import.meta.url));
 const PORT = process.env.PORT || 8080;
 const POLL_MS = Number(process.env.POLL_MS || 6000);
-const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml" };
+const MIME = { ".html": "text/html", ".js": "text/javascript", ".css": "text/css", ".json": "application/json", ".svg": "image/svg+xml", ".png": "image/png", ".ico": "image/x-icon", ".webp": "image/webp", ".txt": "text/plain" };
 
 // ---- live tail: one subscription (ws) or poller (fallback) per watched token, fanned to its SSE clients ----
 const watch = new Map(); // address -> { clients:Set<res>, lastBlock, pool, decimals, unsub }

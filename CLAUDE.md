@@ -80,6 +80,15 @@ dumping — places it against a study of past winners, and shows the wallet inte
     `engine.mjs` treat a zero timestamp as ABSENT, and `store.mjs` `fillTimestamps()` derives missing times from the
     block calibration for the live intel path. **RULE: never trust a log's blockTimestamp without `> 0`.**
 
+- **Logo / favicon (owner brief 2026-09-05: "b0" mark, white b, fluo green 0):** a CONSTRUCTED geometric mark, no font
+  dependency (the old favicon typeset Instrument Serif in `<text>`, which fell back to Georgia in favicon contexts and
+  thinned out at 16px). Concept: the **0 is the atom** (monoline ring, slashed wall-to-wall so it reads as a zero, not an O),
+  the **b is the same ring plus a stem** — everything starts from block zero. Lime `#c8ff4d` on `#08080b`; a light variant
+  swaps the b to `#0b0b0e`. Generator = `tools/logo/gen.mjs` (geometry) + `tools/logo/export.mjs` (writes favicon.svg/.ico,
+  apple-touch-icon, icon-192/512, b0-avatar(.png/-light.png) 1024 for X/Telegram, b0-logo(.svg/-on-light.svg); needs a
+  global `playwright`). Every page links favicon.svg + favicon.ico + apple-touch-icon; `server.mjs` MIME map now serves
+  .png/.ico/.webp. Rejected variants: block-dot zero (reads as a record button), cut-ring zero (mush at 16px).
+
 ## Feature engines (all pure + unit-tested; `npm test`)
 - **PnL (`pnl.mjs`):** avg-cost realized (coins sold) + unrealized (coins held) per wallet, from the backtest's
   price series. Conservative — untracked-cost coins credit ZERO profit (understates, never invents). On
