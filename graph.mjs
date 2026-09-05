@@ -125,10 +125,13 @@ export function buildGraph(transfers, opts = {}) {
     const net = m.reduce((s, n) => s + n.net, 0);
     const hasBundle = edges.some((e) => e.kind === "bundle" && memberSet.has(e.a) && memberSet.has(e.b));
     const hasFunder = edges.some((e) => e.kind === "funder" && memberSet.has(e.a) && memberSet.has(e.b));
+    // hand-to-hand token moves between members — the "careful operator" signal: wallets that DIDN'T buy in the same
+    // block but shuffle the token between themselves. Same-block bundle detection can't see this; the transfer web can.
+    const hasTransfer = edges.some((e) => e.kind === "transfer" && memberSet.has(e.a) && memberSet.has(e.b));
     const hasSniper = m.some((n) => n.role === "sniper" || n.role === "bundle");
     return { id: `c${i}`, size: m.length, wallets, bal: +bal.toFixed(2), pct: +(bal / held * 100).toFixed(2),
       net: +net.toFixed(2), flow: flowOf(net, bal), // the group's green/red verdict
-      hasBundle, hasFunder, hasSniper, flag: hasBundle || hasFunder || (m.length >= 3 && bal / held > 0.05) };
+      hasBundle, hasFunder, hasTransfer, hasSniper, flag: hasBundle || hasFunder || (m.length >= 3 && bal / held > 0.05) };
   }).sort((x, y) => y.pct - x.pct);
 
   const clusterOf = new Map();
@@ -144,5 +147,26 @@ export function buildGraph(transfers, opts = {}) {
       biggestClusterPct: clusters.length ? clusters[0].pct : 0,
       firstPoolBlock,
     },
+  };
+}
+
+// ADVERSARIAL COORDINATION SIGNAL — reduces the bubble-map graph to the few numbers the RISK score needs, so the same
+// clustering that draws the picture also feeds the verdict. Pure + free (the token's own transfers, no extra RPC), and
+// computed IDENTICALLY on the live board and in the historical backtest, so it can never bias the model (train == live).
+//   coordPct     — biggest coordinated cluster's share of held supply (any link: same-block, hand-to-hand, or funder)
+//   hiddenPct    — biggest cluster linked by a HAND-TO-HAND transfer web: the operator that avoided same-block buying
+//   coordSellPct — biggest coordinated cluster that is DISTRIBUTING right now (the combined "insiders + selling" flag)
+export function coordinationSignal(transfers, { pool = "", venues = [], window = 1800, topN = 150 } = {}) {
+  const z = { coordPct: 0, hiddenPct: 0, coordSellPct: 0, nClusters: 0 };
+  if (!transfers || transfers.length < 4) return z;
+  let g; try { g = buildGraph(transfers, { pool, extraInfra: venues, window, topN }); } catch { return z; }
+  const cl = g.clusters || [];
+  if (!cl.length) return z;
+  const maxPct = (arr) => arr.length ? Math.max(...arr.map((c) => c.pct)) : 0;
+  return {
+    coordPct: cl[0].pct,                                                     // sorted desc by pct
+    hiddenPct: maxPct(cl.filter((c) => c.hasTransfer)),                      // beyond same-block bundles
+    coordSellPct: maxPct(cl.filter((c) => c.flag && c.flow === "sell")),     // coordinated AND selling now
+    nClusters: cl.length,
   };
 }

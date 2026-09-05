@@ -276,7 +276,8 @@ function meter(k,v,detail){const c=sev(v);return `<div class="fac"><div class="f
   <div class="ftrack"><div class="ffill" style="width:${Math.max(3,Math.min(100,v))}%;background:${c}"></div></div><div class="fd">${detail}</div></div>`;}
 
 const DRV={concentration:"top-heavy — a few wallets hold the float",dumping:"insiders are selling into the market now",
-  bundles:"coordinated same-block buying at launch",snipers:"heavy block-0 sniping",deployer:"the deployer still holds a big bag"};
+  bundles:"coordinated same-block buying at launch",snipers:"heavy block-0 sniping",deployer:"the deployer still holds a big bag",
+  coordination:"linked wallets moving as one — a hidden cluster, not a same-block bundle"};
 
 // how much to trust the read — uncertainty made visible (never a silent neutral). high=lime, limited=amber, low=coral.
 function confStamp(cf){
@@ -375,6 +376,7 @@ function render(r){
   const facs=[
     meter("Snipers",p.snipers||0,f.snipers?`${f.snipers} wallet${f.snipers>1?'s':''} · hold ${f.sniperHeldPct}%`:"none at launch"),
     meter("Bundles",p.bundles||0,f.bundles?`${f.bundles} group${f.bundles>1?'s':''} · ${f.bundleWallets} wallets · ${f.bundleHeldPct}%`:"none detected"),
+    meter("Coordination",p.coordination||0,(f.hiddenCoordPct>0||f.coordSellingPct>0)?`linked cluster holds ${Math.max(f.hiddenCoordPct||0,f.coordPct||0)}%${f.coordSellingPct>0?` · <b style="color:var(--coral)">selling now</b>`:""}`:"no hidden cluster"),
     meter("Concentration",p.concentration||0,`top 10 hold ${f.top10Pct}%`),
     meter("Dumping now",p.dumping||0,f.insiderSellersNow?`${f.insiderSellersNow} insider${f.insiderSellersNow>1?'s':''} · ${f.insiderDumpNowPct}%`:"none selling"),
     meter("Deployer",p.deployer||0,f.creatorPct>0?`holds ${f.creatorPct}%`:"empty / distributed"),

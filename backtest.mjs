@@ -8,6 +8,7 @@
 // Alchemy-only (uses the enhanced getAssetTransfers to keep tx hashes for the receipt lookups).
 import { detectPool, ROUTERS } from "./engine.mjs";
 import { computeRisk, blueprintMatch } from "./intel.mjs";
+import { coordinationSignal } from "./graph.mjs";
 import { rpc, hx, toNum, PROVIDER, getTransferLogs, latestBlock, findDeployBlock } from "./rpc.mjs";
 import { estimateBlockAt, chainCalibration, parseTs } from "./store.mjs";
 import { liveTrajectory, corridorBins } from "./model.mjs";
@@ -124,7 +125,14 @@ export async function backtest(addr, opts = {}) {
   const recent = []; let rs0 = 0; // rolling 30-min send window for live-dumping, front-trimmed by pointer
   const series = [];
   const buyers = new Set(); let volAccum = 0; // cumulative UNIQUE buyer wallets + per-bucket buy volume (tokens)
+  // adversarial coordination, computed IDENTICALLY to the live path: the transfer prefix up to each snapshot fed to
+  // the same coordinationSignal(). prefix holds transfers already processed (all ts ≤ T at snap time). A soft cap keeps
+  // a rare 40k+-transfer token from re-graphing every slice; those late slices reuse the last read (coordination drifts slowly).
+  const coordVenues = [...venues];
+  const prefix = []; let lastCoord = { hiddenPct: 0, coordSellPct: 0 };
   const snap = (T) => {
+    const cs = prefix.length <= 40000 ? coordinationSignal(prefix, { pool: opts.pool || detected, venues: coordVenues, window: 1800 }) : lastCoord;
+    lastCoord = cs;
     while (rs0 < recent.length && recent[rs0].ts < T - 1800) rs0++;
     let held = 0, sniperHeld = 0, bundleHeld = 0, creatorBal = 0; const bags = [];
     for (const [a, v] of bal) { if (v > 1e-9 && !isInfra(a)) { held += v; bags.push(v); if (snipers.has(a)) sniperHeld += v; if (bundleWallets.has(a)) bundleHeld += v; if (a === creator) creatorBal = v; } }
@@ -133,7 +141,8 @@ export async function backtest(addr, opts = {}) {
     let dump = 0; const sellers = new Set();
     for (let i = rs0; i < recent.length; i++) { const r = recent[i]; if (r.ts <= T && insiderSet.has(r.w)) { dump += r.amt; sellers.add(r.w); } }
     const pct = (x) => +(x / held * 100).toFixed(2);
-    const r = computeRisk({ f_snipe: pct(sniperHeld), f_bundle: pct(bundleHeld), f_top10: pct(top10), f_creator: pct(creatorBal), f_dumpNow: +(dump / held * 100).toFixed(2), nBundles, nSnipers: snipers.size, nSellers: sellers.size, grad });
+    const r = computeRisk({ f_snipe: pct(sniperHeld), f_bundle: pct(bundleHeld), f_top10: pct(top10), f_creator: pct(creatorBal), f_dumpNow: +(dump / held * 100).toFixed(2),
+      f_coord: cs.hiddenPct, coordSellPct: cs.coordSellPct, nBundles, nSnipers: snipers.size, nSellers: sellers.size, grad });
     // winner-corridor placement at this historical moment: the same blueprint + trajectory the live board uses,
     // so the token's path can be drawn THROUGH the study's healthy cone (is it tracking the winner band by age?).
     const ageH = Math.max(0, (T - t0) / 3600);
@@ -148,6 +157,7 @@ export async function backtest(addr, opts = {}) {
     if (!isInfra(e.from)) { bal.set(e.from, (bal.get(e.from) || 0) - e.amt); recent.push({ ts: e.ts, w: e.from, amt: e.amt }); }
     if (!isInfra(e.to)) bal.set(e.to, (bal.get(e.to) || 0) + e.amt);
     if (isBuy(e) && !isInfra(e.to)) { buyers.add(e.to); volAccum += e.amt; } // a real buy from the pool → unique wallet + volume
+    if (prefix.length <= 40000) prefix.push(e); // grows with the replay; each snap sees only transfers with ts ≤ T
   }
   while (bi < bounds.length) snap(bounds[bi++]);
 

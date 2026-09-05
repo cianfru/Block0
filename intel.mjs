@@ -4,6 +4,7 @@ import { rpc } from "./rpc.mjs";
 import { detectPool, ROUTERS } from "./engine.mjs";
 import { getTransfers } from "./store.mjs";
 import { smartHolders } from "./smart-money.mjs";
+import { coordinationSignal } from "./graph.mjs";
 
 const ZERO = "0x0000000000000000000000000000000000000000", DEAD = "0x000000000000000000000000000000000000dead";
 const TRANSFER = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11628f55a4df523b3ef";
@@ -29,29 +30,37 @@ export async function deployerOf(addr) {
 export async function isTokenizedStock(addr) { return STOCK_ISSUERS.has(await deployerOf(addr)); }
 
 // The risk model, extracted so the live board AND the historical backtest score identically. Inputs are held
-// SUPPLY shares (of the real distributed float) + counts; graduation flips the weights. Two disqualifying floors
-// (near-total concentration, or insiders selling now) sit on top of the weighted mean. Returns {parts,risk,label,topFactor}.
-export function computeRisk({ f_snipe = 0, f_bundle = 0, f_top10 = 0, f_creator = 0, f_dumpNow = 0, nBundles = 0, nSnipers = 0, nSellers = 0, grad = false }) {
+// SUPPLY shares (of the real distributed float) + counts; graduation flips the weights. THREE disqualifying floors
+// (near-total concentration, insiders selling now, or a coordinated cluster distributing now) sit on top of the
+// weighted mean. `f_coord`/`coordSellPct` come from coordinationSignal() — the hand-to-hand + funder cluster web that
+// catches operators who split into wallets that AVOID the same-block bundle. Returns {parts,risk,label,topFactor}.
+export function computeRisk({ f_snipe = 0, f_bundle = 0, f_top10 = 0, f_creator = 0, f_dumpNow = 0, f_coord = 0, coordSellPct = 0, nBundles = 0, nSnipers = 0, nSellers = 0, grad = false }) {
   const clamp = (x) => Math.max(0, Math.min(100, x));
   const parts = {
     bundles: Math.round(clamp(f_bundle * 3 + nBundles * 12)),
     snipers: Math.round(clamp(f_snipe * 0.9 + Math.max(0, nSnipers - 3) * 8)),
     concentration: Math.round(clamp((f_top10 - (grad ? 15 : 25)) * 1.5)),
     dumping: Math.round(clamp(f_dumpNow * 4 + nSellers * 10)),
+    // hidden coordination: a hand-to-hand cluster holding 15% of the float scores ~55; 30% ~100. Bundles it already
+    // caught are penalised by the bundles part — this is the EXTRA operator the same-block rule misses.
+    coordination: Math.round(clamp(f_coord * 3.6)),
     deployer: Math.round(clamp(f_creator * 3)),
   };
   const w = grad
-    ? { concentration: 0.42, dumping: 0.28, bundles: 0.10, snipers: 0.12, deployer: 0.08 }
-    : { concentration: 0.30, bundles: 0.24, dumping: 0.22, snipers: 0.16, deployer: 0.08 };
-  const weighted = parts.bundles * w.bundles + parts.snipers * w.snipers + parts.concentration * w.concentration
-    + parts.dumping * w.dumping + parts.deployer * w.deployer;
+    ? { concentration: 0.38, dumping: 0.26, coordination: 0.12, bundles: 0.08, snipers: 0.08, deployer: 0.08 }
+    : { concentration: 0.26, bundles: 0.20, dumping: 0.20, coordination: 0.14, snipers: 0.12, deployer: 0.08 };
+  const weighted = Object.keys(parts).reduce((s, k) => s + parts[k] * (w[k] || 0), 0);
   const concFloor = f_top10 >= 92 ? 72 : f_top10 >= 82 ? 55 : f_top10 >= 72 ? 40 : 0;
   const dumpFloor = nSellers >= 2 ? 58 : f_dumpNow >= 20 ? 50 : 0;
-  const floor = Math.max(concFloor, dumpFloor);
+  // COMBINED VETO (ChatGPT #2/#7): a coordinated cohort that OWNS a real slice AND is distributing right now is the
+  // single most dangerous pattern — it must not be offset by good sub-scores elsewhere. Floors independent of the mean.
+  const coordSellFloor = coordSellPct >= 20 ? 72 : coordSellPct >= 12 ? 58 : coordSellPct >= 6 ? 45 : 0;
+  const floors = { concentration: concFloor, dumping: dumpFloor, coordination: coordSellFloor };
+  const floor = Math.max(concFloor, dumpFloor, coordSellFloor);
   const risk = Math.round(clamp(Math.max(weighted, floor)));
   const label = risk >= 66 ? "HIGH RISK" : risk >= 45 ? "CAUTION" : risk >= 25 ? "MIXED" : "LOOKS CLEANER";
-  const contrib = Object.fromEntries(Object.keys(parts).map((k) => [k, parts[k] * w[k]]));
-  if (floor > weighted) contrib[concFloor >= dumpFloor ? "concentration" : "dumping"] = floor;
+  const contrib = Object.fromEntries(Object.keys(parts).map((k) => [k, parts[k] * (w[k] || 0)]));
+  if (floor > weighted) { const fk = Object.entries(floors).sort((a, b) => b[1] - a[1])[0][0]; contrib[fk] = floor; }
   const driver = Object.entries(contrib).sort((a, b) => b[1] - a[1])[0];
   return { parts, risk, label, topFactor: driver && driver[1] > 3 ? driver[0] : null };
 }
@@ -149,9 +158,13 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const pct = (x) => +(x / held * 100).toFixed(1);
   const f_snipe = pct(sniperHeld), f_bundle = pct(bundleHeld), f_top10 = pct(top10), f_creator = pct(creatorBal);
   const f_dumpNow = +(insiderDumpNow / held * 100).toFixed(2);
-  // Risk = five interpretable sub-scores + two disqualifying floors — see computeRisk (shared with the backtest).
+  // Adversarial coordination — the hand-to-hand / funder cluster web (from the SAME transfers, no extra RPC). Catches
+  // the operator who split into wallets that avoid the same-block bundle but still shuffle the token between themselves.
+  const coord = coordinationSignal(ev, { pool, venues: [...venues], window: 1800 });
+  // Risk = six interpretable sub-scores + three disqualifying floors — see computeRisk (shared with the backtest).
   const grad = !!opts.graduated;
   const { parts, risk, label, topFactor } = computeRisk({ f_snipe, f_bundle, f_top10, f_creator, f_dumpNow,
+    f_coord: coord.hiddenPct, coordSellPct: coord.coordSellPct,
     nBundles: bundles.length, nSnipers: sniperW.length, nSellers: insiderSellers, grad });
   // momentum: recent buy vs sell + holder base + freshness (for ranking "what's heating up")
   const spanH = +((tsMax - tsMin) / 3600).toFixed(1);
@@ -162,6 +175,7 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
     risk, label, momentum, parts, topFactor, graduated: grad,
     flags: { snipers: sniperW.length, sniperHeldPct: f_snipe, bundles: bundles.length, bundleWallets: bundleSet.size, bundleHeldPct: f_bundle,
       top10Pct: f_top10, holders: holders.length, wallets: [...W.values()].filter((w) => w.bought > 0).length, creatorPct: f_creator, insiderDumpNowPct: f_dumpNow, insiderSellersNow: insiderSellers,
+      coordPct: coord.coordPct, hiddenCoordPct: coord.hiddenPct, coordSellingPct: coord.coordSellPct, coordClusters: coord.nClusters,
       buysRecent: buys, sellsRecent: sells } };
   if (opts.mcapUsd != null) { out.mcapUsd = Math.round(opts.mcapUsd); out.bucket = bucketOf(opts.mcapUsd); } // from Pons API — accurate, no receipts
   else if (opts.mcap !== false) { const m = await computeMcap(addr); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
