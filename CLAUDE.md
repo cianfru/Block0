@@ -113,6 +113,29 @@ dumping — places it against a study of past winners, and shows the wallet inte
   picks. `/api/picks` (memory + KV cached, background refresh every `PICKS_REFRESH_MS`=15m, ONE call/bracket ≤5).
   Board tab **◆ Most promising**. LLM does LANGUAGE ONLY over facts we computed — never invents a token or number.
   ⚠ COST: free models only; if the free key is unset the feature still works (deterministic). Keep it 1 call/bracket.
+- **⭐ PRODUCTION HARDENING + TRADER FEATURES (owner: "build both, make it ready, deviate as per your analysis" — 2026-09-05).**
+  - **Abuse guards (`ratelimit.mjs`, pure+tested; wired in server before routing):** per-IP token buckets — HEAVY endpoints
+    (backtest/scan/graph/wallet/wallet-pnl/wallet-trades/token, each triggers RPC work) ~20/min, LIGHT (cached reads) ~120/min
+    → 429 + Retry-After; a global cap of 6 concurrent heavy handlers → fast 503 "busy" (never pile onto the free RPC);
+    identical concurrent backtests + dossier builds COALESCE into one compute. Knobs: `RL_HEAVY_BURST/PER_SEC`, `RL_LIGHT_*`,
+    `RL_HEAVY_CONCURRENCY`. Static files untouched. **This was the one blocker for a public link.**
+  - **Alerts as THE product (`alert-events.mjs`, pure+tested):** detects TRANSITIONS over the board's own verdicts each
+    cycle (zero extra RPC): insiders START selling (0→≥1) · smart money REACHES ≥2 · a fresh launch clears the clean bar.
+    Per-token/per-kind 6h cooldown; cold start SEEDS full state (incl. clean) so it can never blast a backlog. State +
+    feed persisted in KV; `/api/alerts/feed` public; Telegram push when the bot is set; board "⚡ Live alerts" strip polls
+    it (new-count, `TELEGRAM_PUBLIC_LINK` CTA). `alerts.mjs` exports `sendTelegram`/`PUBLIC_URL`.
+  - **Public forward track record (`/track-record`):** every forward call listed newest-first with outcome — misses
+    flagged openly (promising→faded, avoid→won). Rates ONLY over the matured cohort (`track-record.mjs report()`
+    maturity fix); early winners shown in cyan but never counted; "accruing" state until ≥MIN_SHOW matured. Endpoint
+    `/api/track-record?calls=N` (`callsList/trackCalls`). Linked from landing caveat + methodology nav + footer.
+  - **Serial-operator signal (`deployer.mjs`, pure+tested, shared by board card + dossier):** `deployerReputation(all,
+    meta)` from the launchpad's own `deployer` field (NO RPC — note `deployerOf` in intel.mjs needs Alchemy and is
+    unused here): launched / graduated / **faded** (prior launch not graduated & mcap < $5k) / reputation
+    (proven|serial|repeat|first). Board attaches `r.deployerRep` (compact) from `ALL_META` (the full launchpad list
+    captured each refresh); card shows a `.serialflag` — red when priors faded with none graduated, lime when a prior
+    graduated. Dossier's existing `deployerCard` now reads the same function.
+  - **Picks:** retries in 60s when the board is still empty at refresh (was a full 15-min wait).
+  - ⚠ STILL OWNER-SIDE: `EXPLORER_URL` (click-through addresses), `RPC_WS` (true push tail), `TELEGRAM_PUBLIC_LINK`.
 - **KV (`store/kv.mjs`):** 3 backends auto-selected (Upstash REST > native `redis://` TCP `store/redis-tcp.mjs` > file).
   `kvPing()` reports backend/connected honestly. Redis is live in prod.
 

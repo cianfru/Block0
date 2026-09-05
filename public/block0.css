@@ -244,6 +244,12 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .bundleflag{display:flex;align-items:center;gap:8px;margin:12px 0 2px;padding:9px 12px;border-radius:11px;background:rgba(255,59,92,.13);border:1px solid rgba(255,59,92,.4);color:#ff8093;font-size:.8rem;line-height:1.35}
 .bundleflag .ic{font-size:16px;flex:0 0 auto;color:var(--coral)}
 .bundleflag b{color:#ff3b5c;font-weight:700}
+/* serial-operator flag (deployer's other launches) — neutral by default, red when priors faded, lime when a prior graduated */
+.serialflag{display:flex;align-items:center;gap:8px;margin:10px 0 2px;padding:8px 12px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--line-2);color:var(--dim);font-size:.78rem;line-height:1.35}
+.serialflag .ic{font-size:15px;flex:0 0 auto;color:var(--dim)}
+.serialflag b{color:var(--tx);font-weight:600}
+.serialflag.bad{background:rgba(255,59,92,.10);border-color:rgba(255,59,92,.35);color:#ff8093}.serialflag.bad b{color:#ff3b5c}.serialflag.bad .ic{color:var(--coral)}
+.serialflag.good{background:rgba(200,255,77,.08);border-color:rgba(200,255,77,.3);color:#b9e35a}.serialflag.good b{color:var(--lime)}.serialflag.good .ic{color:var(--lime)}
 
 /* ---- token-gated access overlay ---- */
 .gate-overlay{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,8,11,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}

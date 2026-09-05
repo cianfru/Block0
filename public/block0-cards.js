@@ -79,6 +79,11 @@ const B0 = (() => {
       : f.insiderSellersNow ? `<p class="alert" style="color:#ff3b5c">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
         : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#c8ff4d">✓ no snipers · no bundles</p>` : "";
     // BUNDLES are the loudest red flag on a launch — one actor wearing many wallets. Flag it hard, up top.
+    // SERIAL OPERATOR — what else has this deployer launched, and what happened to it (launchpad data, no RPC)
+    const dr = r.deployerRep;
+    const serialFlag = dr && dr.launched >= 2 ? (dr.graduated >= 1
+      ? `<div class="serialflag good">${ico("check")}<span><b>Deployer has ${dr.graduated} prior graduation${dr.graduated > 1 ? "s" : ""}</b> — ${dr.launched} launches from this wallet</span></div>`
+      : `<div class="serialflag${dr.faded >= 1 ? " bad" : ""}">${ico("warn")}<span><b>Deployer's launch #${dr.launched}</b> — ${dr.faded ? `${dr.faded} prior faded to dust` : "no prior graduation"}${dr.faded && dr.launched - 1 > dr.faded ? `, ${dr.launched - 1 - dr.faded} still live` : ""}</span></div>`) : "";
     const bundleFlag = f.bundles ? `<div class="bundleflag">${ico("warn")}<span><b>${f.bundles} bundle${f.bundles > 1 ? "s" : ""} detected</b>${f.bundleHeldPct ? ` — ${f.bundleHeldPct}% of supply bought as one` : " — coordinated same-block buys"}</span></div>` : "";
     const liveDanger = (r.alert && r.alert.tone === "bad") || f.insiderSellersNow;   // actively being dumped → the card buzzes
     const sm = r.smart && r.smart.count ? r.smart : null;
@@ -93,7 +98,7 @@ const B0 = (() => {
           </div>
           <div class="rscore"><span class="n" style="color:${c};text-shadow:0 0 26px ${c}66">${r.risk}</span><span class="l" style="color:${c}">${tooEarly ? "Too early" : r.label}</span></div>
         </div>
-        ${bundleFlag}
+        ${bundleFlag}${serialFlag}
         <div class="meters">${meters}</div>
         <div class="chiprow">${venue}${bpChips}${curve}</div>
         ${smartRow}${prec}${al}

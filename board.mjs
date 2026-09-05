@@ -35,6 +35,7 @@ async function verdict(meta) {
   const r = await computeIntel(meta.address, meta.sym, { pool: meta.pool, mcapUsd: meta.mcapUsd, graduated: meta.graduated, launchedAt: meta.launchedAt, whales: false, smartSet: SMART.set, smartMeta: SMART.meta });
   r.name = meta.name; r.logo = meta.logo; r.progress = meta.progress; r.graduated = meta.graduated;
   r.launchedAt = meta.launchedAt; r.mcapUsd = Math.round(meta.mcapUsd || r.mcapUsd || 0);
+  r.deployerRep = compactRep(deployerReputation(ALL_META, meta));   // serial-operator signal (launchpad data, no RPC)
   r.ape = apeScore(r);
   r.blueprint = blueprintMatch({ bundles: r.flags.bundles, top10Pct: r.flags.top10Pct, holders: r.flags.holders, risk: r.risk });
   r.blueprintLabel = blueprintLabel(r.blueprint);
@@ -57,6 +58,7 @@ export async function refreshBoard() {
   CACHE = { ...CACHE, scanning: true };
   try {
     const [active, grad] = await Promise.all([fetchActive({ sort: "marketCap", pageSize: N_ACTIVE * 2 }), fetchGraduated()]);
+    ALL_META = [...(active.items || []), ...(grad.items || [])];
     const activePick = active.items.filter((t) => t.address && t.mcapUsd > 0).slice(0, N_ACTIVE);
     const gradPick = grad.items.filter((t) => t.address).sort((a, b) => b.mcapUsd - a.mcapUsd).slice(0, N_GRAD);
     const cooking = [], graduated = [];
