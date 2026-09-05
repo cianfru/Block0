@@ -9,6 +9,25 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/block0.css">
+<style>
+  /* live alerts strip — the product a trader keeps open */
+  .alertsbar{margin:14px 0 4px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008));overflow:hidden}
+  .alertsbar .ah{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:.78rem;color:var(--dim)}
+  .alertsbar .ah b{color:var(--tx);font-weight:600;letter-spacing:.02em}
+  .alertsbar .ah .cnt{margin-left:auto;font-variant-numeric:tabular-nums}
+  .alertsbar .ah a.tg{color:var(--lime);font-weight:600}
+  .alertsbar .al{display:grid;gap:0}
+  .alertsbar .ev{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.85rem;color:var(--tx)}
+  .alertsbar .ev:last-child{border-bottom:none}
+  .alertsbar .k{flex:0 0 auto;font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid}
+  .alertsbar .k.bad{color:#ff3b5c;border-color:rgba(255,59,92,.4);background:rgba(255,59,92,.08)}
+  .alertsbar .k.good{color:var(--lime);border-color:rgba(200,255,77,.4);background:rgba(200,255,77,.08)}
+  .alertsbar .ev a.sym{font-weight:700;color:var(--tx)}
+  .alertsbar .ev .hl{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+  .alertsbar .ev .ago{margin-left:auto;flex:0 0 auto;font-size:.72rem;color:var(--dim);font-variant-numeric:tabular-nums}
+  .alertsbar .empty{padding:12px 14px;font-size:.8rem;color:var(--dim)}
+  @media(max-width:560px){.alertsbar .ev .hl{display:none}}
+</style>
 <script src="/blockclock.js" defer></script>
 <script src="/track.js" defer></script>
 </head>
@@ -42,6 +61,10 @@
       <div class="statchips" id="statchips"><span class="chip">scanning…</span></div>
     </div>
 
+    <div class="alertsbar" id="alertsbar">
+      <div class="ah"><b>⚡ Live alerts</b><span>insiders selling · smart money converging · clean launches — from the board's own verdicts</span><span class="cnt" id="acnt"></span><a class="tg" id="atg" hidden target="_blank" rel="noopener">Get them on Telegram →</a></div>
+      <div class="al" id="alist"><div class="empty">Watching the board…</div></div>
+    </div>
     <input class="search" id="q" placeholder="Search name, symbol, or paste a contract address" autocomplete="off">
     <div class="filters" id="tabs">
       <button class="on" data-f="cooking">About to graduate</button>
@@ -170,6 +193,21 @@ async function load(){try{
   render();
 }catch(e){$("#statchips").innerHTML='<span class="chip">board unavailable — retrying…</span>';}}
 load();setInterval(load,20000);
+
+// ── live alerts strip (polls the public feed; no third party) ──
+const KLAB={"insider-dump":"insiders selling","smart-convergence":"smart money","clean-launch":"clean launch"};
+const ago=(t)=>{const s=Math.max(0,(Date.now()-t)/1000);return s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":s<86400?Math.round(s/3600)+"h":Math.round(s/86400)+"d";};
+async function loadAlerts(){try{
+  const d=await fetch("/api/alerts/feed?n=8").then(r=>r.json());
+  const ev=d.events||[];
+  if(d.telegram){const a=$("#atg");a.href=d.telegram;a.hidden=false;}
+  let seen=0;try{seen=Number(localStorage.getItem("b0_alerts_seen")||0);}catch{}
+  const fresh=ev.filter(e=>e.at>seen).length;
+  $("#acnt").textContent=ev.length?(fresh?fresh+" new · ":"")+ev.length+" recent":"";
+  $("#alist").innerHTML=ev.length?ev.map(e=>`<div class="ev"><span class="k ${e.sev}">${KLAB[e.kind]||e.kind}</span><a class="sym" href="/token?address=${e.address}">${B0.esc(e.sym)}</a><span class="hl">${B0.esc(e.headline||"")}</span><span class="ago">${ago(e.at)} ago</span></div>`).join(""):'<div class="empty">No alerts yet — they fire the moment insiders start selling, proven wallets converge, or a clean launch clears the bar.</div>';
+  try{ if(ev.length) localStorage.setItem("b0_alerts_seen",String(ev[0].at)); }catch{}
+}catch{}}
+loadAlerts();setInterval(loadAlerts,30000);
 </script>
 </body>
 </html>

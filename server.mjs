@@ -17,8 +17,9 @@ import { coverageReport } from "./coverage.mjs";
 import { tick as trackTick, trackRecord } from "./track-record.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
-import { startAlerts, runAlertScan, getCalls, ALERTS_ON } from "./alerts.mjs";
-import { KV_BACKEND, getJSON, setJSON, kvPing } from "./store/kv.mjs";
+import { startAlerts, runAlertScan, getCalls, ALERTS_ON, sendTelegram, PUBLIC_URL } from "./alerts.mjs";
+import { detectEvents, formatEvent } from "./alert-events.mjs";
+import { KV_BACKEND, getJSON, setJSON, kvPing, lPush, lRange } from "./store/kv.mjs";
 import { getTransfers } from "./store.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { PROVIDER } from "./rpc.mjs";
@@ -135,6 +136,29 @@ const BOARD_REFRESH_MS = Number(process.env.BOARD_REFRESH_MS || 180000);
 async function boardCycle() {
   await refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {});
   try { const b = getBoard(); await trackTick([...(b.cooking || []), ...(b.dex || []), ...(b.graduated || [])]); } catch { /* tracker never blocks the board */ }
+  try { await alertTick(); } catch { /* alerts never block the board */ }
+}
+
+// ── EVENT ALERTS — insiders start selling / smart money converges / clean launch — over the board's own verdicts ──
+// Zero extra RPC. State (previous snapshot + last-fired cooldowns) persists in KV so a redeploy can't re-fire the
+// backlog; the feed is public JSON; Telegram push only when the bot is configured. The board strip polls the feed.
+const ALERT_STATE_KEY = "alerts:state", ALERT_FEED_KEY = "alerts:feed";
+let _alertState = null, _alertFeed = null;
+const TELEGRAM_PUBLIC_LINK = (process.env.TELEGRAM_PUBLIC_LINK || "").trim() || null;
+async function alertTick() {
+  if (_alertState === null) { _alertState = (await getJSON(ALERT_STATE_KEY).catch(() => null)) || { prev: {}, lastFired: {} }; }
+  const b = getBoard(); if (b.scanning && !Object.keys(_alertState.prev).length) return;   // wait for a complete first board
+  const tokens = [...(b.cooking || []), ...(b.graduated || []), ...(b.dex || [])];
+  if (!tokens.length) return;
+  const { events, next, lastFired } = detectEvents(_alertState.prev, tokens, { lastFired: _alertState.lastFired });
+  _alertState = { prev: next, lastFired };
+  setJSON(ALERT_STATE_KEY, _alertState).catch(() => {});
+  for (const ev of events) {
+    lPush(ALERT_FEED_KEY, ev, 200).catch(() => {});
+    if (_alertFeed) _alertFeed.unshift(ev), (_alertFeed.length > 200 && _alertFeed.pop());
+    if (ALERTS_ON) sendTelegram(formatEvent(ev, PUBLIC_URL)).catch((e) => console.error("[alerts] telegram", e.message));
+  }
+  if (events.length) console.log(`[alerts] ${events.length} event(s): ${events.map((e) => e.kind + " " + e.sym).join(", ")}`);
 }
 boardCycle();
 setInterval(boardCycle, BOARD_REFRESH_MS);
@@ -410,6 +434,13 @@ createServer(async (req, res) => {
     if (u.pathname === "/api/track-record") { // forward, out-of-sample hit-rate — accrues live as launches mature
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(await trackRecord()));
+    }
+
+    if (u.pathname === "/api/alerts/feed") { // public: recent event alerts (insiders selling / smart money / clean launch)
+      const n = Math.min(200, Math.max(1, Number(u.searchParams.get("n") || 50)));
+      if (_alertFeed === null) { _alertFeed = (await lRange(ALERT_FEED_KEY, 200).catch(() => [])) || []; }
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify({ updated: Date.now(), telegram: TELEGRAM_PUBLIC_LINK, push: ALERTS_ON, events: _alertFeed.slice(0, n) }));
     }
 
     if (u.pathname === "/api/alerts/calls") { // the durable track record of past alerts

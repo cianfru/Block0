@@ -15,7 +15,7 @@ import { sAdd, sHas, sMembers, lPush, lRange, KV_BACKEND } from "./store/kv.mjs"
 const TOKEN = (process.env.TELEGRAM_BOT_TOKEN || "").trim();
 const CHAT = (process.env.TELEGRAM_CHAT_ID || "").trim();
 export const ALERTS_ON = !!(TOKEN && CHAT);
-const PUBLIC_URL = (process.env.PUBLIC_URL || "https://block0-production.up.railway.app").replace(/\/$/, "");
+export const PUBLIC_URL = (process.env.PUBLIC_URL || "https://block0-production.up.railway.app").replace(/\/$/, "");
 
 // tunable bar (env-overridable) — defaults chosen from the separation study
 const CFG = {
@@ -78,7 +78,7 @@ function format(r) {
   return lines.join("\n");
 }
 
-async function sendTelegram(text) {
+export async function sendTelegram(text) {
   if (!ALERTS_ON) return { skipped: true };
   const r = await fetch(`https://api.telegram.org/bot${TOKEN}/sendMessage`, {
     method: "POST", headers: { "content-type": "application/json" },
