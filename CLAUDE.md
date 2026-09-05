@@ -104,6 +104,20 @@ dumping — places it against a study of past winners, and shows the wallet inte
   enforcement is the client overlay + a server-side read-only balance check — a curtain, not a wall (APIs stay
   fetchable by a technical visitor); signed-session server enforcement is the P2 if the token gets real value.
 
+- **⭐ LIVE PRICE CHART — our own candles, sourced OHLCV (owner, 2026-09-05: "modify background and candles").** `market.mjs`
+  proxies + caches two KEYLESS feeds and we render them OURSELVES in the Block0 palette (never an iframe): **GeckoTerminal**
+  `/networks/robinhood/pools/<pool>/ohlcv/<tf>` → real [t,o,h,l,c,v] candles (VERIFIED the RH chain is indexed), **DexScreener**
+  `/latest/dex/tokens/<addr>` → the deepest pair (pool addr) + liquidity/24h-volume/buys-sells/priceChange snapshot. `/api/chart?
+  address=&tf=` returns `{hasMarket,market,candles,note}`, `btCoalesce`-deduped + TTL-cached (MARKET_TTL_MS 150s), soft-fails to
+  hasMarket:false (degrades to "no market yet", NEVER faked). Dossier (`index.html`) draws a canvas candlestick — **lime up /
+  coral down, #08080b ground, mono price axis** (the DexScreener embed can't be recolored — only dark/light — so we render our
+  own; that was the whole point) + a market stats row + timeframe toggles (15m/1h/4h/1d) + "open on DexScreener ↗". **STRICTLY
+  SEPARATE from the forensic engine**: price is market data shown NEXT TO the analysis, labelled "not part of the verdict" +
+  "via GeckoTerminal/DexScreener" — the moat stays our own reproduction; this is just context. A <24h token's 24h% is shown as
+  "new" (the 24h-ago price is ~0 → absurd %). Pure helpers (pickPair/marketSnapshot/normalizeOhlc/tokenMarket) unit-tested
+  (`test/market.test.mjs`, injectable fetch). 🔲 NEXT (offered, not built): batch-enrich board CARDS with liq/24h-vol via one
+  DexScreener multi-address call (up to 30 addrs/call), labelled sourced.
+
 ## Feature engines (all pure + unit-tested; `npm test`)
 - **PnL (`pnl.mjs`):** avg-cost realized (coins sold) + unrealized (coins held) per wallet, from the backtest's
   price series. Conservative — untracked-cost coins credit ZERO profit (understates, never invents). On

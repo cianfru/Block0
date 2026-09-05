@@ -17,6 +17,7 @@ import { coverageReport } from "./coverage.mjs";
 import { tick as trackTick, trackRecord, trackCalls } from "./track-record.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
+import { tokenMarket } from "./market.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON, sendTelegram, PUBLIC_URL } from "./alerts.mjs";
 import { detectEvents, formatEvent } from "./alert-events.mjs";
 import { KV_BACKEND, getJSON, setJSON, kvPing, lPush, lRange } from "./store/kv.mjs";
@@ -616,6 +617,20 @@ createServer(async (req, res) => {
       const r = await btCoalesce.run("dossier:" + address, () => tokenDossier(address));   // stampede on one token = one dossier build
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(r));
+    }
+
+    if (u.pathname === "/api/chart") {   // LIVE price candles + market snapshot (sourced, cached) — separate from the forensic engine
+      const address = (u.searchParams.get("address") || "").toLowerCase();
+      if (!/^0x[0-9a-f]{40}$/.test(address)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?address=0x…"}'); }
+      const tf = ["5m", "15m", "1h", "4h", "1d"].includes(u.searchParams.get("tf")) ? u.searchParams.get("tf") : "1h";
+      try {
+        const m = await btCoalesce.run(`chart:${address}:${tf}`, () => tokenMarket(address, tf));
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "public, max-age=60" });
+        return res.end(JSON.stringify(m));
+      } catch (e) {
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+        return res.end(JSON.stringify({ address, tf, hasMarket: false, market: null, candles: [], note: "Market feed unavailable right now." }));
+      }
     }
 
     if (u.pathname === "/api/board") {
