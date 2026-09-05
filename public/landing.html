@@ -172,11 +172,11 @@
         <div class="funnel" id="funnel" aria-label="the launch funnel, live">
           <span class="fs"><b class="fn" id="fTotal">—</b><i>launched</i></span>
           <span class="farr">→</span>
-          <span class="fs"><b class="fn dimn" id="fGrad">—</b><i>graduated</i></span>
+          <span class="fs"><b class="fn dimn" id="fGrad">—</b><i>reached the market</i></span>
           <span class="farr" id="fWinArr" hidden>→</span>
-          <span class="fs" id="fWinWrap" hidden><b class="fn limen" id="fWin">—</b><i>reached $1M — and held it</i></span>
+          <span class="fs" id="fWinWrap" hidden><b class="fn limen" id="fWin">—</b><i>made it past $1M</i></span>
         </div>
-        <p class="sub">Almost every launch dies within hours. We reconstructed the full on-chain history of every one that mattered — the few that reached a real valuation and held it, and the many that got there and collapsed — and mapped the path the winners took, wallet by wallet, stage by stage. Every new launch is scored against that path, live.</p>
+        <p class="sub">Most new coins are traps. Paste any one — Block0 checks the wallets behind it and tells you, free, if it's <b style="color:var(--lime)">clean</b> or a <b style="color:var(--coral)">trap</b>. Then it shows you the one launch actually worth watching right now.</p>
         <form class="scan" onsubmit="return scan(event)">
           <input id="addr" placeholder="Paste any token address — the verdict is free" autocomplete="off">
           <button class="go" type="submit">Scan</button>
@@ -198,19 +198,19 @@
 
   <!-- THE WINNER CORRIDOR — lateral profile, price threading the gates -->
   <section class="sec">
-    <div class="stitle"><p class="micro eye">the winner corridor</p><h2>Most fall out in the first hour. We track the ones that don't.</h2><p class="sub">Every launch starts in the same place. The model draws the lane past winners travelled — and watches, gate by gate, whether this one is still inside it. Clear every gate and it's carrying the fingerprint.</p></div>
+    <div class="stitle"><p class="micro eye">winners vs traps</p><h2>Most coins die in the first hour. A few keep climbing.</h2><p class="sub">The winners all move the same way — real people buy and hold, so the coin keeps rising. Traps fall apart fast. Block0 watches every new launch and flags the ones still moving like the winners did.</p></div>
     <div class="wincorridor">
       <canvas id="corr" aria-label="A price line threading the winner corridor's stage gates while weaker launches fall out"></canvas>
       <div class="corr-legend">
-        <span class="k"><span class="ln" style="background:#c8ff4d"></span> stayed in the lane → winner</span>
-        <span class="k"><span class="ln" style="background:#ff3b5c"></span> fell out early → faded</span>
+        <span class="k"><span class="ln" style="background:#c8ff4d"></span> kept climbing → made it</span>
+        <span class="k"><span class="ln" style="background:#ff3b5c"></span> fell apart → died</span>
       </div>
     </div>
   </section>
 
   <!-- PROOF: the winners the model caught (free, retrospective) — the LIVE best shot is gated below -->
   <section class="sec" id="shotsec" hidden>
-    <div class="stitle"><p class="micro eye">proof · the winners it caught</p><h2>A best shot is one that grows into this</h2><p class="sub" id="proofSub">Every launch on the chain, profiled and graded by what it became — clean fingerprint early, then it <i>held</i> a real cap for weeks. Not a spike. This is the whole set the model is fitted on.</p></div>
+    <div class="stitle"><p class="micro eye">proof · it works</p><h2>The coins that made it — and Block0 saw them early</h2><p class="sub" id="proofSub">These are the launches that grew past $1M and stayed there. Block0 flagged every one as clean while it was still small.</p></div>
     <div class="wins" id="wins"></div>
     <p class="sub" style="margin-top:14px;font-size:.82rem">A clean read is the green light to <b style="color:var(--tx)">look closer</b> — not a promise. A dirty launch almost never wins; some clean ones still fade. That honest limit is <a href="/methodology">measured, not hidden</a>.</p>
     <a class="shotlock" href="/board" id="shotlock">
@@ -458,14 +458,15 @@ async function loadWins(){
     if(!roll.length) return;
     const c=v.cohort||{}, p=v.progress||{}, ts=v.timeSplit||{};
     const done=p.cached??p.backtested, nWin=(c.winners!=null?c.winners:roll.length);
-    let sub=`${done?done.toLocaleString()+" launches profiled":"Every launch on the chain, profiled"} · ${nWin} held a real cap for weeks — not a spike.`;
-    if(ts&&ts.ready&&ts.testWinners) sub+=` On the ${ts.testWinners} winners it had never seen, it flagged ${ts.catch>=1?"every one":Math.round(ts.catch*100)+"%"} clean early.`;
+    let sub=`We checked ${done?done.toLocaleString():"every"} launch${done?"es":""}. ${nWin} grew past $1M and stayed there.`;
+    if(ts&&ts.ready&&ts.testWinners&&ts.catch>=1) sub+=` Block0 spotted every one while it was still small.`;
+    else if(ts&&ts.ready&&ts.testWinners) sub+=` Block0 flagged them clean early.`;
     $("#proofSub").textContent=sub;
     $("#wins").innerHTML=roll.map(w=>{ const keep=w.peakHolders?Math.round((w.holders/w.peakHolders)*100):null;
-      const bits=[]; if(w.sustainedH) bits.push(Math.round(w.sustainedH/24)+"d above $1M"); if(keep!=null) bits.push(keep+"% holders kept");
+      const bits=[]; if(w.sustainedH) bits.push("held for "+Math.round(w.sustainedH/24)+" days"); if(keep!=null) bits.push(keep+"% still holding");
       return `<div class="win"><span class="win-top"><span class="win-sym">${esc(w.sym||"?")}</span><span class="win-tier ${w.tier}">${esc(w.tier||"")}</span></span>
-        <span class="win-cap">${B0.mcT(w.heldPeak)}</span><span class="win-cl">held-peak</span>
-        <span class="win-meta">${bits.join(" · ")||"held its valuation"}</span></div>`;}).join("");
+        <span class="win-cap">${B0.mcT(w.heldPeak)}</span><span class="win-cl">reached</span>
+        <span class="win-meta">${bits.join(" · ")||"still holding its value"}</span></div>`;}).join("");
     $("#shotsec").hidden=false;
   }catch(e){}
 }
