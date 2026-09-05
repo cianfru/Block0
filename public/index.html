@@ -50,6 +50,9 @@
   .verdict .n{font-family:var(--serif);font-size:3.6rem;line-height:.85}
   .verdict .l{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
   .verdict .drv{font-size:.72rem;color:var(--mute);margin-top:7px;max-width:20ch;margin-left:auto}
+  .verdict .conf{display:inline-flex;align-items:center;gap:6px;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:10px}
+  .verdict .cdot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
+  .verdict .confwhy{font-size:.68rem;color:var(--mute);margin-top:3px;max-width:24ch;margin-left:auto;line-height:1.35}
   .prog{margin-top:14px;grid-column:1/-1}
   .prog .lab{display:flex;justify-content:space-between;font-size:.72rem;color:var(--mute);margin-bottom:5px}
   .prog .lab b{color:var(--lime)}
@@ -275,6 +278,16 @@ function meter(k,v,detail){const c=sev(v);return `<div class="fac"><div class="f
 const DRV={concentration:"top-heavy — a few wallets hold the float",dumping:"insiders are selling into the market now",
   bundles:"coordinated same-block buying at launch",snipers:"heavy block-0 sniping",deployer:"the deployer still holds a big bag"};
 
+// how much to trust the read — uncertainty made visible (never a silent neutral). high=lime, limited=amber, low=coral.
+function confStamp(cf){
+  if(!cf||!cf.level) return "";
+  const col={high:"var(--lime)",limited:"var(--amber)",low:"var(--coral)"}[cf.level]||"var(--mute)";
+  const why=(cf.reasons&&cf.reasons[0])?String(cf.reasons[0]).replace(/[<>&]/g,""):"";
+  return `<div class="conf" style="color:${col}" title="${(cf.reasons||[]).join(' · ').replace(/"/g,'')}">
+    <span class="cdot" style="background:${col}"></span>${cf.level} confidence</div>
+    <div class="confwhy">${why}</div>`;
+}
+
 function deployerCard(r){
   const d=r.deployer; if(!d) return "";
   const REP={proven:["PROVEN BUILDER","var(--lime)","has graduated a token before"],
@@ -384,7 +397,8 @@ function render(r){
         </div>
       </div></div>
       <div class="verdict"><div class="n" style="color:${c}">${r.risk}</div><div class="l" style="color:${c}">${r.label}</div>
-        <div class="drv">${r.topFactor?DRV[r.topFactor]:"no single dominant risk driver"}</div></div>
+        <div class="drv">${r.topFactor?DRV[r.topFactor]:"no single dominant risk driver"}</div>
+        ${confStamp(r.confidence)}</div>
       ${prog}
     </div>
 

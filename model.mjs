@@ -63,3 +63,27 @@ export function pathPosition(wallets, mcap) {
 export const corridorBins = () => CORRIDOR;
 export const ladderRungs = () => LADDER;
 export const hasModel = () => LADDER.length > 0;
+
+// how much to TRUST this read — uncertainty as a first-class output, never a silent neutral. A very new token, a thin
+// holder base, sparse transfer coverage, or a stage with few comparable winners all LOWER confidence — the read is
+// still shown, but stamped so "unknown" can't masquerade as "clean". Pure + unit-tested; every reason is a plain fact.
+//   level: "high" | "limited" | "low"   reasons: short human strings   nWinners: comparable winners at this age
+export function readConfidence({ ageH = 0, holders = 0, events = null, priceReconstructed = true } = {}) {
+  const reasons = [];
+  // comparable winners at this age (the corridor bin's target count) — the resemblance read leans on this many examples
+  const bin = CORRIDOR.find((x) => ageH >= x.lo && ageH < x.hi) || CORRIDOR[CORRIDOR.length - 1];
+  const nWinners = bin ? (bin.n_tgt ?? bin.nW ?? null) : null;
+  const RANK = { high: 0, limited: 1, low: 2 }, NAME = ["high", "limited", "low"];
+  let sev = 0;
+  const drop = (to) => { sev = Math.max(sev, RANK[to]); };
+  if (ageH < 1)        { reasons.push(`only ${Math.max(1, Math.round(ageH * 60))} min old — the earliest reads barely separate winners from traps`); drop("low"); }
+  else if (ageH < 6)   { reasons.push(`${Math.round(ageH)}h old — still early, the read firms up over the first day`); drop("limited"); }
+  if (holders > 0 && holders < 30)       { reasons.push(`just ${holders} holders — too thin to read distribution reliably`); drop("low"); }
+  else if (holders > 0 && holders < 100) { reasons.push(`${holders} holders — a small sample`); drop("limited"); }
+  if (events != null && events < 40)     { reasons.push(`sparse on-chain history (${events} transfers) — coverage is partial`); drop("limited"); }
+  if (!priceReconstructed)               { reasons.push("price is reconstructed from swaps — treat exact figures as estimates"); drop("limited"); }
+  // NOTE: the small comparable-winner count (nWinners) is a limit of the RESEMBLANCE read, not the data/trap read —
+  // it's reported here and surfaced beside the resemblance verdict, but it never caps confidence in the structure check.
+  if (!reasons.length) reasons.push("enough history, holders and comparable winners for a confident read");
+  return { level: NAME[sev], reasons, nWinners };
+}

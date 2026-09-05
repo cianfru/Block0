@@ -8,7 +8,7 @@
 import { computeIntel, blueprintMatch, blueprintLabel } from "./intel.mjs";
 import { deployerReputation } from "./deployer.mjs";
 import { getCurrentSmartMoney } from "./smart-money.mjs";
-import { pathPosition, precedentValuation, liveTrajectory, corridorStatus } from "./model.mjs";
+import { pathPosition, precedentValuation, liveTrajectory, corridorStatus, readConfidence } from "./model.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 
 let _metaCache = { at: 0, items: [] };
@@ -48,6 +48,8 @@ export async function tokenDossier(address) {
   r.ageH = +ageH.toFixed(1);
   r.trajectory = liveTrajectory({ blueprint: r.blueprint, holders: r.flags.holders, ageH });
   r.corridor = corridorStatus(ageH, r.trajectory, { wallets: r.flags.wallets ?? r.flags.holders, mcap: r.mcapUsd });
+  // how much to trust this read — never a silent neutral. Surfaced on the verdict; also gates the resemblance read.
+  r.confidence = readConfidence({ ageH, holders: r.flags.holders, events: r.eventsCount ?? r.transfers ?? null, priceReconstructed: true });
 
   // split the holder table into who's adding vs shedding right now (net flow over the live 30-min window),
   // and surface the biggest bags so a graduated token with no recent flow still shows its distribution.
