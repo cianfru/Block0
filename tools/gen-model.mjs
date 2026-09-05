@@ -11,16 +11,25 @@
 // corridor, so a model refresh can never silently drop them (the bug that prompted committing this).
 //
 // Run:  node tools/gen-model.mjs        (from the scanner root; reads study/, writes model.json)
-import { readFileSync, writeFileSync } from "node:fs";
+import { readFileSync, writeFileSync, existsSync } from "node:fs";
+import { join } from "node:path";
+import { STUDY_DIR, loadIndex } from "./cohort-lib.mjs";
 
-const ROOT = new URL("..", import.meta.url);
-const rd = (f) => JSON.parse(readFileSync(new URL(f, ROOT), "utf8"));
+const arg = Object.fromEntries(process.argv.slice(2).map((a) => { const [k, v] = a.replace(/^--/, "").split("="); return [k, v ?? true]; }));
+const MIN_WINNERS = Number(arg.minWinners || 10);   // below this the study can't state a corridor — keep the previous model rather than degrade it
+const OUT = arg.out || "model.json";
+const rd = (f) => JSON.parse(readFileSync(join(STUDY_DIR, f), "utf8"));
 const med = (a) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const pctl = (a, p) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); const i = (s.length - 1) * p, lo = Math.floor(i), hi = Math.ceil(i); return s[lo] + (s[hi] - s[lo]) * (i - lo); };
 const MIN_N = 4; // a bin needs ≥ this many winner samples before we state a target — otherwise it stays null (never fabricated)
 
-const proj = rd("study/projection_data.json"); // { ladder, winners:[{path:[{w,m,a}]}], losers }
-const corr = rd("study/corridor_data.json");   // { bins:[{lo,hi,q1,med,q3,...}], winners, losers }
+const proj = rd("projection_data.json"); // { ladder, winners:[{path:[{w,m,a}]}], losers }
+const corr = rd("corridor_data.json");   // { bins:[{lo,hi,q1,med,q3,...}], winners, losers }
+const idx = loadIndex();                 // outcome labels + rule definitions (published with the model so text and code can't drift)
+if (proj.winners.length < MIN_WINNERS && !arg.force) {
+  console.log(`only ${proj.winners.length} winners in the study (< ${MIN_WINNERS}) — refusing to overwrite ${OUT}; pass --force to override`);
+  process.exit(existsSync(OUT) ? 0 : 1);
+}
 
 // ladder: winner market cap by unique-wallet stage (drop the working `n` count)
 const ladder = proj.ladder.map((l) => ({ wallets: l.wallets, p25: l.p25, med: l.med, p75: l.p75, vol: l.vol ?? null }));
@@ -70,13 +79,16 @@ for (const c of corridor) {
 
 const model = {
   generatedAt: new Date().toISOString().slice(0, 10),
-  source: "winner-study: top graduated cohort backtests (corridor.mjs + projection.mjs)",
+  source: "winner-study: outcome-labelled cohort backtests (build-cohort → corridor.mjs + projection.mjs); winners = runner + major, graduation is not a criterion",
+  // the cohort the model was fitted on — published so the page, the API and the code all state the same basis
+  cohort: idx ? { generatedAt: idx.generatedAt, winners: proj.winners.length, controls: corr.losers.length, counts: idx.counts, rules: idx.rules, definitions: idx.definitions,
+    winnerList: proj.winners.map((w) => ({ sym: w.sym, addr: w.addr, label: w.label, heldPeak: w.heldPeak })) } : null,
   ladder, corridor,
 };
-writeFileSync(new URL("model.json", ROOT), JSON.stringify(model));
+writeFileSync(OUT, JSON.stringify(model));
 
 // summary
 const $ = (x) => x == null ? "—" : x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1e3 ? "$" + Math.round(x / 1e3) + "k" : "$" + Math.round(x);
-console.log(`model.json written · ${ladder.length} ladder rungs · ${corridor.length} corridor bins`);
+console.log(`${OUT} written · ${proj.winners.length} winners · ${ladder.length} ladder rungs · ${corridor.length} corridor bins`);
 console.log("age bin     traj q1–q3   target wallets   target mcap   (n)");
 for (const c of corridor) console.log(`  ${(c.lo + "–" + c.hi + "h").padEnd(10)} ${String(c.q1).padStart(3)}–${String(c.q3).padStart(3)}      ${String(c.tw ?? "—").padStart(8)}       ${$(c.tm).padStart(7)}    (${c.n_tgt})`);

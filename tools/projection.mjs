@@ -1,21 +1,18 @@
 // Build the PROJECTION model: from the winners' reconstructed (unique-wallets → market-cap) curves, a valuation
 // LADDER — at each wallet stage, what were the winners worth — plus each winner's path and the losers' actual
 // endpoints (survivorship reality). A token at W wallets reads its winner-precedent valuation + forward path.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+import { writeFileSync } from "node:fs";
+import { loadCohort, STUDY_DIR } from "./cohort-lib.mjs";
 const pctile = (arr, p) => { const s = arr.slice().sort((a, b) => a - b); if (!s.length) return 0; const i = (s.length - 1) * p; const l = Math.floor(i), h = Math.ceil(i); return l === h ? s[l] : s[l] + (s[h] - s[l]) * (i - l); };
 
-// current market caps (today) from the Pons universe snapshots we saved
-const currentMc = {};
-try { const b = JSON.parse(readFileSync("board.json", "utf8")); for (const r of [...(b.cooking || []), ...(b.graduated || [])]) currentMc[(r.sym || "").toUpperCase()] = r.mcapUsd; } catch {}
-
+// cohort = study/cohort.json outcome labels: winners are runner+major (held a real valuation), live caps from the index
+const cohort = loadCohort();
 const winners = [];
-for (const f of readdirSync("winners_full").filter((f) => f.endsWith(".json"))) {
-  const r = JSON.parse(readFileSync("winners_full/" + f, "utf8"));
-  if (r.error || !r.series?.length) { console.log("skip", f, r.error); continue; }
+for (const r of cohort.winners) {
   // clean, monotonic-ish points: unique wallets vs market cap (drop nulls / zero)
   const pts = r.series.filter((p) => p.mcap > 0 && p.wallets > 0).map((p) => ({ w: p.wallets, m: p.mcap, a: +((p.t - r.t0) / 3600).toFixed(2), v: p.volUsd || 0 }));
-  if (pts.length < 6) continue;
-  winners.push({ sym: r.sym, supply: r.supply, curMc: currentMc[r.sym.toUpperCase()] || null, wEnd: pts[pts.length - 1].w, mEnd: pts[pts.length - 1].m, path: pts });
+  if (pts.length < 6) { console.log("skip", r.sym, "too few priced points"); continue; }
+  winners.push({ sym: r.sym, addr: r.addr, label: r.meta.label, supply: r.supply, curMc: r.meta.curMcap || null, heldPeak: r.meta.heldPeak, wEnd: pts[pts.length - 1].w, mEnd: pts[pts.length - 1].m, path: pts });
 }
 
 // valuation ladder: at each wallet stage, the winners' market-cap distribution
@@ -31,24 +28,15 @@ for (const W of STAGES) {
   if (mc.length >= 3) ladder.push({ wallets: W, n: mc.length, p25: Math.round(pctile(mc, 0.25)), med: Math.round(pctile(mc, 0.5)), p75: Math.round(pctile(mc, 0.75)), vol: vol.length ? Math.round(pctile(vol, 0.5)) : null });
 }
 
-// losers' actual outcomes: (peak wallets/holders, current mcap) — where the field really ended up
-const losers = [];
-try {
-  const meta = JSON.parse(readFileSync("losers.json", "utf8"));
-  const curL = {}; for (const t of [...(meta.dead || []), ...(meta.faded || [])]) curL[t.sym.replace(/\s+/g, "_")] = { mc: t.mcapUsd, kind: t.kind };
-  for (const f of readdirSync("losers").filter((f) => f.endsWith(".json"))) {
-    const r = JSON.parse(readFileSync("losers/" + f, "utf8")); if (r.error || !r.series?.length) continue;
-    const peakH = Math.max(...r.series.map((p) => p.holders));
-    const c = curL[r.sym]; if (!c || !peakH) continue;
-    losers.push({ sym: r.sym, w: peakH, m: c.mc, kind: c.kind });
-  }
-} catch {}
+// controls' actual outcomes: (peak holders, current mcap, kind) — where the field really ended up
+const losers = cohort.controls.map((r) => ({ sym: r.sym, addr: r.addr, w: r.meta.peakHolders || Math.max(...r.series.map((p) => p.holders || 0)), m: r.meta.curMcap || 0, peak: r.meta.heldPeak || 0, kind: r.kind })).filter((l) => l.w > 0);
 
 // downsample winner paths for the chart
 const thin = (p) => { const s = Math.max(1, Math.floor(p.length / 40)); return p.filter((_, i) => i % s === 0 || i === p.length - 1); };
-writeFileSync("study/projection_data.json", JSON.stringify({
+writeFileSync(`${STUDY_DIR}/projection_data.json`, JSON.stringify({
+  generatedAt: new Date().toISOString().slice(0, 10), cohort: { winners: winners.length, controls: losers.length },
   ladder, losers,
-  winners: winners.map((t) => ({ sym: t.sym, curMc: t.curMc, wEnd: t.wEnd, mEnd: t.mEnd, path: thin(t.path) })),
+  winners: winners.map((t) => ({ sym: t.sym, addr: t.addr, label: t.label, curMc: t.curMc, heldPeak: t.heldPeak, wEnd: t.wEnd, mEnd: t.mEnd, path: thin(t.path) })),
 }, null, 0));
 
 const $ = (x) => x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1e3 ? "$" + Math.round(x / 1e3) + "k" : "$" + Math.round(x || 0);

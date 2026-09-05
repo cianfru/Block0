@@ -1,7 +1,9 @@
 // Build the LAUNCH CORRIDOR: for each profiled token, a per-age Trajectory Score = distribution HEALTH
 // (blueprint) blended with real DEMAND (wallet inflow + adoption depth). Then the winner ENVELOPE by age bin
 // (the healthy zone), and every token's path through it. Winners thread the green corridor; losers fall out.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+// Cohort = study/cohort.json (outcome labels): winners are runner+major, controls are faded/stalled/dead.
+import { writeFileSync } from "node:fs";
+import { loadCohort, STUDY_DIR } from "./cohort-lib.mjs";
 const clamp = (x, lo = 0, hi = 100) => Math.max(lo, Math.min(hi, x));
 const pctile = (arr, p) => { const s = arr.slice().sort((a, b) => a - b); if (!s.length) return 0; const i = (s.length - 1) * p; const l = Math.floor(i), h = Math.ceil(i); return l === h ? s[l] : s[l] + (s[h] - s[l]) * (i - l); };
 
@@ -16,34 +18,29 @@ const bpMatch = ({ bundles, top10, holders, risk }) => {
 // demand: adoption depth (log holders) + recent wallet-inflow rate
 const demandScore = (holders, inflowPerHr) => clamp(Math.min(55, 18 * Math.log10(holders + 1)) + Math.min(45, inflowPerHr * 1.3));
 
-function loadDir(dir, cls) {
-  const out = [];
-  for (const f of readdirSync(dir).filter((f) => f.endsWith(".json"))) {
-    const r = JSON.parse(readFileSync(dir + "/" + f, "utf8"));
-    if (r.error || !r.series?.length) continue;
-    const s = r.series, t0 = r.t0, bundles = r.bundles;
-    const pts = [];
-    for (let i = 0; i < s.length; i++) {
-      const p = s[i], ageH = Math.max(0.02, (p.t - t0) / 3600);
-      // inflow rate over a short trailing window (~3 buckets)
-      const j = Math.max(0, i - 3), dt = Math.max(0.05, (s[i].t - s[j].t) / 3600), dH = s[i].holders - s[j].holders;
-      const inflow = dH / dt;
-      const health = bpMatch({ bundles, top10: p.top10, holders: p.holders, risk: p.risk });
-      const demand = demandScore(p.holders, Math.max(0, inflow));
-      const traj = Math.round(0.5 * health + 0.5 * demand);
-      pts.push({ ageH: +ageH.toFixed(3), traj, health, demand: Math.round(demand), holders: p.holders, top10: p.top10, risk: p.risk, inflow: +Math.max(0, inflow).toFixed(1) });
-    }
-    // smooth the trajectory (the score has discrete bands, so raw it flickers) — centred moving average, w=5
-    const raw = pts.map((p) => p.traj);
-    pts.forEach((p, i) => { let s = 0, n = 0; for (let k = Math.max(0, i - 2); k <= Math.min(pts.length - 1, i + 2); k++) { s += raw[k]; n++; } p.traj = Math.round(s / n); });
-    out.push({ sym: r.sym, cls, mcapUsd: r.mcapUsd || 0, bundles, hours: +((r.t1 - r.t0) / 3600).toFixed(1), pts });
+function profileToken(r, cls) {
+  const s = r.series, t0 = r.t0, bundles = r.bundles;
+  const pts = [];
+  for (let i = 0; i < s.length; i++) {
+    const p = s[i], ageH = Math.max(0.02, (p.t - t0) / 3600);
+    // inflow rate over a short trailing window (~3 buckets)
+    const j = Math.max(0, i - 3), dt = Math.max(0.05, (s[i].t - s[j].t) / 3600), dH = s[i].holders - s[j].holders;
+    const inflow = dH / dt;
+    const health = bpMatch({ bundles, top10: p.top10, holders: p.holders, risk: p.risk });
+    const demand = demandScore(p.holders, Math.max(0, inflow));
+    const traj = Math.round(0.5 * health + 0.5 * demand);
+    pts.push({ ageH: +ageH.toFixed(3), traj, health, demand: Math.round(demand), holders: p.holders, top10: p.top10, risk: p.risk, inflow: +Math.max(0, inflow).toFixed(1) });
   }
-  return out;
+  // smooth the trajectory (the score has discrete bands, so raw it flickers) — centred moving average, w=5
+  const raw = pts.map((p) => p.traj);
+  pts.forEach((p, i) => { let s = 0, n = 0; for (let k = Math.max(0, i - 2); k <= Math.min(pts.length - 1, i + 2); k++) { s += raw[k]; n++; } p.traj = Math.round(s / n); });
+  return { sym: r.sym, addr: r.addr, cls, mcapUsd: r.meta.curMcap || 0, heldPeak: r.meta.heldPeak || 0, launchedAt: r.meta.launchedAt, t0, bundles, hours: +((r.t1 - r.t0) / 3600).toFixed(1), pts };
 }
 
-const winners = loadDir("profiles", "winner");
-let losers = loadDir("losers", "dead");
-try { const L = JSON.parse(readFileSync("losers.json", "utf8")); const km = {}; for (const t of [...L.dead, ...L.faded]) km[t.sym.replace(/\s+/g, "_")] = t.kind; losers = losers.map((w) => ({ ...w, cls: km[w.sym] || "dead" })); } catch {}
+const cohort = loadCohort();
+const winners = cohort.winners.map((r) => profileToken(r, r.meta.label));
+const losers = cohort.controls.map((r) => profileToken(r, r.kind));
+console.log(`cohort: ${winners.length} winners (${cohort.index.counts.major} major · ${cohort.index.counts.runner} runner) · ${losers.length} controls (${cohort.index.counts.faded} faded · ${cohort.index.counts.stalled} stalled · ${cohort.index.counts.dead} dead) · ${cohort.undecided.length} undecided excluded`);
 
 // age bins (hours), log-spaced-ish
 const EDGES = [0, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256, 600];
@@ -58,9 +55,9 @@ for (let b = 0; b < EDGES.length - 1; b++) {
 }
 // downsample each token path to ~40 pts for the chart
 const thin = (pts) => { const step = Math.max(1, Math.floor(pts.length / 40)); return pts.filter((_, i) => i % step === 0 || i === pts.length - 1); };
-const outTok = (arr) => arr.map((w) => ({ sym: w.sym, cls: w.cls, mcapUsd: w.mcapUsd, hours: w.hours, path: thin(w.pts).map((p) => ({ a: p.ageH, t: p.traj, h: p.holders, c: p.top10 })) }));
+const outTok = (arr) => arr.map((w) => ({ sym: w.sym, addr: w.addr, cls: w.cls, mcapUsd: w.mcapUsd, heldPeak: w.heldPeak, launchedAt: w.launchedAt, t0: w.t0, hours: w.hours, path: thin(w.pts).map((p) => ({ a: p.ageH, t: p.traj, h: p.holders, c: p.top10 })) }));
 
-writeFileSync("study/corridor_data.json", JSON.stringify({ bins, winners: outTok(winners), losers: outTok(losers) }, null, 0));
+writeFileSync(`${STUDY_DIR}/corridor_data.json`, JSON.stringify({ generatedAt: new Date().toISOString().slice(0, 10), cohort: { winners: winners.length, controls: losers.length, counts: cohort.index.counts }, bins, winners: outTok(winners), losers: outTok(losers) }, null, 0));
 
 // debug
 console.log("age bin        winners: p10  q1  med  q3  p90   (n)");

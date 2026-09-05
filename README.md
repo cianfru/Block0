@@ -258,7 +258,8 @@ Heavy endpoints (`/api/backtest`, `scan`, `graph`, `wallet`, `wallet-pnl`, `wall
 Dependency-light Node (`node server.mjs`, deploys to Railway). The forensic engine is EVM-generic and
 launchpad-agnostic — it verdicts any token from its transfer history. Pons API = launchpad discovery; on-chain
 Uniswap-v4 `Initialize` events = DEX discovery; Alchemy for heavy transfer pulls, the native RH RPC for wide log
-scans. The winner model (`model.json`) is rebuilt from a study of past winners incl. DEX winners; its accuracy is
+scans. The winner model (`model.json`) is rebuilt from an outcome-labelled study of every launch (winners = tokens that held
+a $1M+ valuation for a week or more, graduation is not a criterion; incl. direct DEX listings); its accuracy is
 re-measured each rebuild and published on the methodology page. See `.env.example` for configuration.
 
 Not financial advice. You are responsible for your own decisions.

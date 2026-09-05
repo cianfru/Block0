@@ -32,7 +32,7 @@ export function decode(logs, decimals) {
     ev.push({
       from: addrOf(l.topics[1]), to: addrOf(l.topics[2]),
       amt: Number(BigInt(l.data || "0x0")) / d,
-      ts: l.blockTimestamp ? toNum(l.blockTimestamp) : null,
+      ts: (l.blockTimestamp && toNum(l.blockTimestamp) > 0) ? toNum(l.blockTimestamp) : null, // RH node sends "0x0" → unknown, resolved from the block downstream
       block: toNum(l.blockNumber), li: toNum(l.logIndex || "0x0"),
     });
   }

@@ -22,7 +22,7 @@ const big = (h) => BigInt(h && h !== "0x" ? h : "0x0"); // guard empty "0x" data
 // transfer history from launch WITH tx hashes (needed for receipt-based price). Provider-aware:
 //  • Alchemy → the enhanced getAssetTransfers (range-uncapped, paged, carries hash + blockTimestamp).
 //  • any other RPC (incl. the native RH node) → eth_getLogs from the launch block, keeping transactionHash;
-//    the RH node's logs carry no blockTimestamp, so each transfer's time is derived from its block via a
+//    the RH node's logs carry no usable blockTimestamp (absent, or "0x0"), so each transfer's time is derived from its block via a
 //    one-time linear chain calibration. `launchedAt` (Pons) bounds the pull to since-launch so it's not a
 //    genesis-deep scan. `cap` bounds the Alchemy paging for fast cohort profiling.
 async function pullWithHash(addr, cap = 400000, opts = {}) {
@@ -57,7 +57,7 @@ async function pullWithHash(addr, cap = 400000, opts = {}) {
     ev.push({
       from: "0x" + l.topics[1].slice(26).toLowerCase(), to: "0x" + l.topics[2].slice(26).toLowerCase(),
       amt: Number(big(l.data || "0x0")) / 1e18,
-      ts: l.blockTimestamp ? toNum(l.blockTimestamp) : tsAt(block),
+      ts: (l.blockTimestamp && toNum(l.blockTimestamp) > 0) ? toNum(l.blockTimestamp) : tsAt(block), // the RH node returns "0x0" here — treat as absent
       block, hash: l.transactionHash,
     });
   }

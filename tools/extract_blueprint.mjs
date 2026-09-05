@@ -1,12 +1,12 @@
-// Read the cohort profiles, extract each winner's launch-window signature, aggregate into a blueprint.
-import { readdirSync, readFileSync, writeFileSync } from "node:fs";
+// Read the winner profiles (study/cohort.json: runner+major), extract each winner's launch-window signature,
+// aggregate into a blueprint.
+import { writeFileSync } from "node:fs";
+import { loadCohort, STUDY_DIR } from "./cohort-lib.mjs";
 const median = (a) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.floor(s.length / 2)] : 0; };
 const q = (a, p) => { const s = a.slice().sort((x, y) => x - y); return s.length ? s[Math.min(s.length - 1, Math.floor(p * s.length))] : 0; };
 
 const winners = [];
-for (const f of readdirSync("profiles").filter((f) => f.endsWith(".json"))) {
-  const r = JSON.parse(readFileSync("profiles/" + f, "utf8"));
-  if (r.error || !r.series?.length) { console.log("skip", f, r.error || "no series"); continue; }
+for (const r of loadCohort().winners) {
   const s = r.series;
   const t10 = s.map((p) => p.top10), risk = s.map((p) => p.risk), snip = s.map((p) => p.sniperHeld), hold = s.map((p) => p.holders);
   // downsample the trajectory to ~28 points for the sparkline
@@ -17,7 +17,7 @@ for (const f of readdirSync("profiles").filter((f) => f.endsWith(".json"))) {
   const late = s.slice(Math.floor(s.length * 0.45));
   const lateT10 = late.map((p) => p.top10), lateRisk = late.map((p) => p.risk);
   winners.push({
-    sym: r.sym, mcapUsd: r.mcapUsd, transfers: r.transfers, hours: +((r.t1 - r.t0) / 3600).toFixed(1),
+    sym: r.sym, addr: r.addr, label: r.meta.label, mcapUsd: r.meta.curMcap || 0, heldPeak: r.meta.heldPeak, transfers: r.transfers, hours: +((r.t1 - r.t0) / 3600).toFixed(1),
     bundles: r.bundles, launchSnipers: r.snipers,
     t10Launch: t10[0], t10End: t10[t10.length - 1], t10Min: Math.min(...t10),
     t10Settled: median(lateT10), riskSettled: median(lateRisk), riskLateMax: Math.max(...lateRisk),
@@ -42,10 +42,10 @@ const sig = {
   cleanFrac: winners.filter((w) => w.riskSettled < 25).length / n,
   holdersEndMed: median(winners.map((w) => w.holdersEnd)),
 };
-writeFileSync("study/blueprint_data.json", JSON.stringify({ winners, sig }, null, 0));
+writeFileSync(`${STUDY_DIR}/blueprint_data.json`, JSON.stringify({ generatedAt: new Date().toISOString().slice(0, 10), winners, sig }, null, 0));
 console.log(`\ncohort: ${n} winners`);
 console.log("sym        mc     t10 launch→settled  distr  snipMax  riskSettled(max)  bundles  holders");
-for (const w of winners) console.log(`  ${w.sym.padEnd(10)} $${(w.mcapUsd/1e6).toFixed(0).padStart(3)}M  ${String(w.t10Launch).padStart(5)}→${String(w.t10Settled).padStart(5)}%  ${w.distributed?"yes":"no "}  ${String(w.sniperHeldMax).padStart(5)}%  ${String(w.riskSettled).padStart(3)} (${w.riskMax})   ${w.bundles}       ${w.holders0}→${w.holdersEnd}`);
+for (const w of winners) console.log(`  ${w.sym.padEnd(10)} $${(w.heldPeak/1e6).toFixed(1).padStart(4)}M  ${String(w.t10Launch).padStart(5)}→${String(w.t10Settled).padStart(5)}%  ${w.distributed?"yes":"no "}  ${String(w.sniperHeldMax).padStart(5)}%  ${String(w.riskSettled).padStart(3)} (${w.riskMax})   ${w.bundles}       ${w.holders0}→${w.holdersEnd}`);
 console.log("\n── SIGNATURE (settled) ──");
 console.log(`top-10 settled: median ${sig.t10SettledMed}% (90th ${sig.t10SettledHi}%)`);
 console.log(`float distributed/moderate in ${(sig.distributedFrac*100).toFixed(0)}% of winners`);

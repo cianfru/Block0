@@ -26,6 +26,10 @@ export async function rpc(method, params, tries = 6) {
   for (let t = 0; t < tries; t++) {
     try {
       const r = await fetch(RPCS[t % RPCS.length], { method: "POST", headers: UA, body });
+      if (r.status === 429) { // rate-limited: honour Retry-After, else back off much harder than a transient error
+        const ra = Number(r.headers.get("retry-after")) || 0;
+        err = new Error("http 429"); await new Promise((s) => setTimeout(s, ra ? ra * 1000 : 1500 * (t + 1))); continue;
+      }
       if (!r.ok) throw new Error("http " + r.status);
       const j = await r.json();
       if (j.error) throw new Error(j.error.message || "rpc error");
@@ -74,12 +78,13 @@ export async function getTransferLogs(address, from, to) {
   const GAP = Number(process.env.LOGS_GAP_MS || 120);
   const MAXR = LOGS_RANGE;
   const out = [];
-  const pull = async (lo, hi) => {
+  const pull = async (lo, hi, again = 0) => {
     try {
       const part = await rpc("eth_getLogs", [{ address, topics: [TRANSFER_TOPIC], fromBlock: hx(lo), toBlock: hx(hi) }], 3);
       for (const l of part || []) out.push(l);
     } catch (e) {
       const m = String(e.message || e).toLowerCase();
+      if (m.includes("429") && again < 4) { await new Promise((s) => setTimeout(s, 4000 * (again + 1))); return pull(lo, hi, again + 1); } // throttled: wait it out, same chunk
       if (hi > lo && (m.includes("limit") || m.includes("exceed") || m.includes("timed out") || m.includes("too many") || m.includes("range"))) {
         const mid = (lo + hi) >> 1;
         await pull(lo, mid); await new Promise((s) => setTimeout(s, GAP)); await pull(mid + 1, hi);

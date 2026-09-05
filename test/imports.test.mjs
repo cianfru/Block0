@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 // Every server-side module must import cleanly (top-level evaluation). Catches broken import graphs/cycles.
 const MODULES = ["../alert-events.mjs","../alerts.mjs","../backtest.mjs","../board.mjs","../cards.mjs","../deployer.mjs","../dossier.mjs",
   "../graph.mjs","../intel.mjs","../leaderboard.mjs","../llm.mjs","../model.mjs","../picks.mjs","../pnl.mjs","../ratelimit.mjs",
-  "../smart-money.mjs","../social.mjs","../track-record.mjs","../wallet.mjs","../wallet-pnl.mjs"];
+  "../smart-money.mjs","../social.mjs","../track-record.mjs","../wallet.mjs","../wallet-pnl.mjs","../outcome.mjs","../tools/cohort-lib.mjs"];
 for (const m of MODULES) test("module imports: " + m.replace("../", ""), async () => { const mod = await import(m); assert.ok(mod); });
 
 // Static guard for the exact bug that emptied the board: an identifier used in a module must be imported or declared

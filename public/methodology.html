@@ -87,24 +87,26 @@
   <p>It deliberately does <i>not</i> reward low sniper activity — the winner cohort showed heavy early snipers were survivable, while bundles were what killed. A strong fit is worth watching; it is a pattern, not a promise (see the measured limits below).</p>
 
   <h2>The winner corridor &amp; valuation ladder</h2>
-  <p>These come from a <b>study of the top graduated cohort</b>: each winner's whole history is replayed and reduced to a trajectory (distribution health blended with real wallet inflow) and a wallets→market-cap curve.</p>
+  <p>These come from a <b>study of every launch on the chain, labelled by what it actually became</b> — Pons launches and direct DEX listings under one rule. <b>Graduation is not a criterion.</b> A winner is a token that reached a real valuation and <i>held</i> it: a sustainable path to multi-million, not a spike. Each winner's whole history is replayed and reduced to a trajectory (distribution health blended with real wallet inflow) and a wallets→market-cap curve.</p>
+  <div id="tierbox"><p class="muted">loading cohort definitions…</p></div>
+  <p class="muted">"Held-peak" is the highest market cap the token stayed at for a full day (reconstructed caps wick on single swaps). <b>Pending</b> and <b>mid</b> tokens are excluded from both sides — a three-day-old token above $1M can't have held it a week yet, so it is never counted as a loser (right-censoring). The launchpad's own token and quote assets are excluded.</p>
   <ul>
     <li><b>The corridor</b> is the winners' healthy trajectory zone (25th–75th percentile) at each age. A live token's own trajectory is drawn through it — inside the band is tracking the winners, below is drifting.</li>
     <li><b>Stage targets</b> — each corridor box also shows the median unique-wallet count and market cap the winners actually carried by that age, so you see whether a token is hitting the real adoption and valuation a main player needs at each stage.</li>
     <li><b>The valuation ladder</b> places a token's current wallet count against what winners were worth at the same count.</li>
   </ul>
-  <p class="muted">The model is a committed, reproducible pipeline — the cohort backtests build the study data, which is assembled into the live model. It refreshes as more tokens graduate.</p>
+  <p class="muted">The model is a committed, reproducible pipeline — every backtest is cached and re-labelled with live market caps, so the cohort compounds run after run and the model refreshes as pending tokens settle into winners or fades.</p>
 
   <h2>Does it actually work?</h2>
-  <p>The honest question. Below is a <b>separation test</b> on the study cohort — at each age, how well the trajectory tells eventual winners apart from tokens that faded or died. <code>AUC</code> is the probability a random winner scores above a random loser: <b>0.50 is a coin flip, 1.00 is perfect.</b></p>
+  <p>The honest question. Below is a <b>separation test</b> on the study cohort — at each age, how well the trajectory tells eventual winners apart from the rest. Two controls are graded: <b>all</b> (faded + stalled + dead) and <b>faded only</b> — tokens that reached the same stages as the winners and then collapsed, which is the test that actually matters for a scanner. <code>AUC</code> is the probability a random winner scores above a random control: <b>0.50 is a coin flip, 1.00 is perfect.</b></p>
   <div id="valbox"><p class="muted">loading measurement…</p></div>
-  <div class="callout warn"><b>Read this honestly.</b> This is <b>in-sample separation on a small cohort</b> (the launchpad is young), not out-of-sample proof. It shows the signal is nearly a coin-flip in the first ~30 minutes — everything looks alike that early — and separates well only once a token is an hour or more old. Treat a very fresh launch's read as low-confidence by design, and the whole model as evidence that compounds as more tokens graduate, not a guarantee.</p></div>
+  <div class="callout warn"><b>Read this honestly.</b> The per-age table is <b>in-sample separation on a small cohort</b> (the chain is young). Winners are graded leave-one-out and the controls never shaped the band, and the <b>time split</b> below fits the band on earlier launches and grades only the later ones — the closest thing to out-of-sample a two-month-old chain allows. The signal is weakest in the first ~30 minutes — everything looks alike that early — and separates only once a token is an hour or more old. Treat a very fresh launch's read as low-confidence by design, and the whole model as evidence that compounds as more launches settle, not a guarantee.</div>
 
   <h2>Limits — what this can't tell you</h2>
   <ul>
     <li><b>Prices are reconstructed.</b> There's no oracle; price is implied from swap receipts and smoothed. Treat exact figures as estimates, not quotes.</li>
     <li><b>On-chain can't see intent.</b> A clean distribution can still be a slow rug; a messy one can still run. This reads structure, not the future.</li>
-    <li><b>The cohort is small and survivorship-shaped.</b> Winners are defined by having already graduated. The signal is suggestive, not deterministic.</li>
+    <li><b>The cohort is small and survivorship-shaped.</b> Winners are defined by having already got there and held it. More tokens tighten the corridor; they don't turn a pattern into a forecast.</li>
     <li><b>Fresh is uncertain.</b> As measured above, the first half hour barely discriminates. Earliest is riskiest — that's inherent, not a bug.</li>
   </ul>
 
@@ -124,21 +126,31 @@ const barCol=(a)=>a==null?"var(--mute)":a>=0.75?"var(--lime)":a>=0.6?"var(--cyan
 (async()=>{
   try{
     const v=await fetch("/api/validation").then(r=>r.json());
-    if(v.error){ $("#valbox").innerHTML='<p class="muted">Validation data not available on this deployment.</p>'; return; }
+    if(v.error){ $("#valbox").innerHTML='<p class="muted">Validation data not available on this deployment.</p>'; $("#tierbox").innerHTML=""; return; }
+    const c=v.cohort||{}, counts=c.counts||{}, defs=c.definitions||[];
+    const roleCol={winner:"var(--lime)",control:"var(--coral)",excluded:"var(--mute)"};
+    if(defs.length){
+      $("#tierbox").innerHTML=`<table><thead><tr><th>Tier</th><th>Rule</th><th>Role</th><th class="n">Tokens</th></tr></thead><tbody>${defs.map(d=>`<tr><td><b style="color:${roleCol[d.role]}">${d.tier}</b></td><td>${d.rule}</td><td class="muted">${d.role}</td><td class="n">${counts[d.tier]??"—"}</td></tr>`).join("")}</tbody></table>
+        <p class="muted">Cohort measured ${c.generatedAt||v.generatedAt}: <b style="color:var(--tx)">${c.winners} winners</b> (major + runner) vs <b style="color:var(--tx)">${c.losers} controls</b> (${c.faded??"—"} faded) · ${c.undecided??"—"} undecided excluded.</p>`;
+    } else $("#tierbox").innerHTML=`<p class="muted">Cohort: ${c.winners} winners vs ${c.losers} controls.</p>`;
     const rows=v.perBin.map(r=>{
       const w=r.auc==null?0:Math.round(r.auc*100);
       return `<tr><td>${r.age}</td>
         <td class="n">${r.medW??"—"} / <span class="muted">${r.medL??"—"}</span></td>
         <td class="n">${pc(r.onW)} / <span class="muted">${pc(r.onL)}</span></td>
         <td class="n"><span class="barw"><i style="width:${w}%;background:${barCol(r.auc)}"></i></span>${r.auc==null?"—":r.auc.toFixed(2)}</td>
-        <td class="${aucCls(r.auc)}">${aucRead(r.auc)}</td></tr>`;}).join("");
-    const late=v.lateLife||{}, bt=late.bestThreshold||{};
+        <td class="n">${r.aucFaded==null?"—":r.aucFaded.toFixed(2)}</td>
+        <td class="${aucCls(r.aucFaded??r.auc)}">${aucRead(r.aucFaded??r.auc)}</td></tr>`;}).join("");
+    const late=v.lateLife||{}, bt=late.bestThreshold||{}, ts=v.timeSplit||{};
     $("#valbox").innerHTML=`
-      <table><thead><tr><th>Token age</th><th class="n">median traj<br><span class="muted" style="font-weight:400">winner / loser</span></th>
-        <th class="n">on-band<br><span class="muted" style="font-weight:400">winner / loser</span></th><th class="n">AUC</th><th>separation</th></tr></thead>
+      <table><thead><tr><th>Token age</th><th class="n">median traj<br><span class="muted" style="font-weight:400">winner / control</span></th>
+        <th class="n">on-band<br><span class="muted" style="font-weight:400">winner / control</span></th><th class="n">AUC<br><span class="muted" style="font-weight:400">all controls</span></th><th class="n">AUC<br><span class="muted" style="font-weight:400">faded only</span></th><th>separation</th></tr></thead>
         <tbody>${rows}</tbody></table>
-      <p class="muted">Cohort: <b style="color:var(--tx)">${v.cohort.winners} winners</b> vs <b style="color:var(--tx)">${v.cohort.losers} losers</b>.
-      Late-life "did it sustain the path" AUC <b style="color:var(--tx)">${late.aucWinnerVsLoser??"—"}</b> — at trajectory ≥ ${bt.thr??"—"} that caught ${pc(bt.tpr)} of winners with a ${pc(bt.fpr)} false-positive rate on losers. Measured ${v.generatedAt}.</p>`;
+      <p class="muted">Held-out headline: the band catches <b style="color:var(--tx)">${pc(v.headline?.catch)}</b> of winners (leave-one-out) at <b style="color:var(--tx)">${pc(v.headline?.falsePos)}</b> false alarms on all controls, <b style="color:var(--tx)">${pc(v.headline?.falsePosFaded)}</b> on faded tokens.
+      Late-life "did it sustain the path" AUC <b style="color:var(--tx)">${late.aucWinnerVsLoser??"—"}</b> vs all controls, <b style="color:var(--tx)">${late.aucWinnerVsFaded??"—"}</b> vs faded — at trajectory ≥ ${bt.thr??"—"} that caught ${pc(bt.tpr)} of winners with a ${pc(bt.fpr)} false-positive rate. Measured ${v.generatedAt}.</p>
+      <div class="callout"><b>Time split (out-of-sample by launch date).</b> ${ts.ready
+        ? `Band fitted on the <b>${ts.trainWinners}</b> winners launched before <b>${ts.cutoff}</b>, graded only on the <b>${ts.testWinners}</b> winners and <b>${ts.testControls}</b> controls launched after it: catches <b style="color:var(--tx)">${pc(ts.catch)}</b> of the later winners at <b style="color:var(--tx)">${pc(ts.falsePos)}</b> false alarms (${pc(ts.falsePosFaded)} on faded) · late-life AUC <b style="color:var(--tx)">${ts.lateAuc??"—"}</b>.`
+        : `Not yet measurable — ${ts.reason||"the later slice is too small"}. It becomes available as more launches settle; nothing is fabricated in the meantime.`}</div>`;
   }catch(e){ $("#valbox").innerHTML='<p class="muted">Couldn\'t load the measurement — reload in a moment.</p>'; }
 })();
 </script>

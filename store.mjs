@@ -51,6 +51,15 @@ export async function estimateBlockAt(tsSec, latest, marginBlocks = 10000) {
 // the native RH node carry no blockTimestamp, so we derive each transfer's time from its block linearly.
 export async function chainCalibration(latest) { return calibrate(latest); }
 export { parseTs };
+// Logs from the native node carry no usable blockTimestamp (absent or "0x0"), so a generic-RPC pull arrives with
+// ts=null. Derive each missing time from its block via the calibration, so the live 30-min windows (dumping now,
+// momentum, recent flow) mean the same thing on every provider instead of silently treating all history as "now".
+async function fillTimestamps(ev, latest) {
+  if (!ev.some((e) => e.ts == null)) return ev;
+  const c = await calibrate(latest);
+  for (const e of ev) if (e.ts == null && e.block != null) e.ts = Math.round(c.headTs - (c.headBlock - e.block) * c.spb);
+  return ev;
+}
 
 // Return the token's full transfer history, pulling only what's new since last call.
 // opts.pool (from Pons) seeds the market so we never guess it; opts.decimals defaults to 18.
@@ -71,7 +80,7 @@ export async function getTransfers(addr, decimals = 18, opts = {}) {
       const ts = parseTs(opts.launchedAt);
       deployBlock = ts != null ? await estimateBlockAt(ts, latest) : await findDeployBlock(addr, latest);
     }
-    const ev = await pullTransfers(addr, deployBlock, latest, decimals);
+    const ev = await fillTimestamps(await pullTransfers(addr, deployBlock, latest, decimals), latest);
     s = { ev, lastBlock: latest, deployBlock, pool: ((opts.pool || "").toLowerCase() || detectPool(ev) || ""), newN: ev.length };
     S.set(addr, s);
     return { ev: s.ev, pool: s.pool, deployBlock, latest, fresh: true, newN: ev.length };
@@ -79,7 +88,7 @@ export async function getTransfers(addr, decimals = 18, opts = {}) {
 
   if (opts.pool && !s.pool) s.pool = opts.pool.toLowerCase();
   if (latest > s.lastBlock) {
-    const delta = await pullTransfers(addr, s.lastBlock + 1, latest, decimals);
+    const delta = await fillTimestamps(await pullTransfers(addr, s.lastBlock + 1, latest, decimals), latest);
     if (delta.length) s.ev = s.ev.concat(delta); // [deploy..lastBlock] + [lastBlock+1..latest], no overlap
     s.lastBlock = latest; s.newN = delta.length;
     return { ev: s.ev, pool: s.pool, deployBlock: s.deployBlock, latest, fresh: delta.length > 0, newN: delta.length };

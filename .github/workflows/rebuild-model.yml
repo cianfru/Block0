@@ -1,21 +1,26 @@
-# Rebuild the winner-study model — INCLUDING DEX winners — and commit the result.
+# Rebuild the winner-study model and commit the result.
 # This is the offline batch (RPC-heavy) that can't run in the app. Runs here where Alchemy + the native RH RPC are
-# reachable, then commits the refreshed model.json + study/*.json so the live site picks them up.
+# reachable, then commits the refreshed cohort (study/profiles cache + study/cohort.json), study/*.json and model.json
+# so the live site picks them up.
 #
-# Trigger it by hand from the Actions tab (Run workflow), or let the weekly schedule keep the model fresh as more
-# tokens graduate. Requires one repo secret: ALCHEMY_RPC_URL (your Alchemy HTTPS endpoint).
+# The cohort is INCREMENTAL: every backtest is cached under study/profiles/ and re-labelled for free on later runs,
+# so each run only backtests what's new or still undecided, inside a wall-clock budget. A first full build takes a
+# few runs to converge (the queue is ordered highest-value first); after that a weekly run is minutes.
+#
+# Trigger it by hand from the Actions tab (Run workflow), or let the schedule keep the model fresh.
+# Requires one repo secret: ALCHEMY_RPC_URL (your Alchemy HTTPS endpoint).
 name: rebuild-model
 
 on:
   workflow_dispatch:
     inputs:
-      dex:            { description: "Include DEX winners", type: boolean, default: true }
-      winners:        { description: "Pons winners (top graduated)", default: "24" }
-      losers:         { description: "Pons losers (aged/faded)", default: "120" }
+      budgetMin:      { description: "Backtest wall-clock budget (minutes)", default: "120" }
+      controls:       { description: "Max small/aged launches to profile as stalled/dead controls", default: "300" }
+      dex:            { description: "Include direct DEX listings (non-Pons)", type: boolean, default: true }
       dexBlocks:      { description: "DEX scan depth (blocks)", default: "2500000" }
-      dexCap:         { description: "DEX tokens to profile (now chain-wide: v2/v3/v4)", default: "400" }
+      dexCap:         { description: "DEX tokens to profile (chain-wide: v2/v3/v4)", default: "300" }
   schedule:
-    - cron: "17 6 * * 1"   # Mondays 06:17 UTC — keep the model fresh weekly
+    - cron: "17 6 * * 1,4"   # Mondays + Thursdays 06:17 UTC — twice a week so pending tokens settle into the cohort promptly
 
 concurrency:
   group: rebuild-model
@@ -24,7 +29,7 @@ concurrency:
 jobs:
   rebuild:
     runs-on: ubuntu-latest
-    timeout-minutes: 150   # bigger chain-wide cohort (v2/v3/v4) = more backtests; give it room
+    timeout-minutes: 170   # budget (default 120) + universe fetch + study build + commit
     permissions:
       contents: write
     env:
@@ -37,30 +42,31 @@ jobs:
       - name: Guard — RPC secret present
         run: |
           if [ -z "$RPC_URL" ]; then echo "::error::No Alchemy endpoint found. Add a GitHub REPO SECRET (not a Railway var) named ALCHEMY_RPC_URL (or RPC_URL) = your Alchemy HTTPS URL, under the repo's Settings → Secrets and variables → Actions → New repository secret."; exit 1; fi
-      - name: Backtest the cohort (Pons + DEX winners)
+      - name: Profile the launch universe (incremental, budgeted, outcome-labelled)
         run: |
           node tools/build-cohort.mjs \
-            --winners="${{ github.event.inputs.winners || '16' }}" \
-            --losers="${{ github.event.inputs.losers || '40' }}" \
+            --budgetMin="${{ github.event.inputs.budgetMin || '120' }}" \
+            --controls="${{ github.event.inputs.controls || '300' }}" \
             ${{ (github.event.inputs.dex == 'false') && ' ' || '--dex' }} \
-            --dexBlocks="${{ github.event.inputs.dexBlocks || '2000000' }}" \
-            --dexCap="${{ github.event.inputs.dexCap || '150' }}"
+            --dexBlocks="${{ github.event.inputs.dexBlocks || '2500000' }}" \
+            --dexCap="${{ github.event.inputs.dexCap || '300' }}"
       - name: Build the study data + assemble the model + validate
         run: |
           node tools/corridor.mjs
           node tools/projection.mjs
           node tools/extract_blueprint.mjs || echo "blueprint step skipped"
-          node tools/gen-model.mjs
+          node tools/gen-model.mjs          # refuses to overwrite model.json below 10 winners (keeps the last good model)
           node tools/validate.mjs
-      - name: Commit refreshed model
+          node --test test/model.test.mjs test/outcome.test.mjs
+      - name: Commit refreshed cohort + model
         run: |
           git config user.name "block0-bot"
           git config user.email "bot@users.noreply.github.com"
           git add model.json study
           if git diff --cached --quiet; then echo "no model changes"; exit 0; fi
-          git commit -m "Rebuild model (Pons + DEX winners) [skip ci]"
-          # The rebuild runs ~20 min; main may have advanced meanwhile. Rebase our single model commit onto the
-          # latest main and retry the push, so a concurrent code push can't waste the whole (RPC-heavy) run.
+          git commit -m "Rebuild model (outcome-labelled cohort, incremental) [skip ci]"
+          # The rebuild runs up to ~2h; main may have advanced meanwhile. Rebase our single commit onto the latest
+          # main and retry the push, so a concurrent code push can't waste the whole (RPC-heavy) run.
           for i in 1 2 3 4 5; do
             if git push; then echo "pushed"; exit 0; fi
             echo "push rejected — rebasing onto latest main (attempt $i)"

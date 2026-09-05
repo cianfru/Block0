@@ -44,7 +44,41 @@ dumping — places it against a study of past winners, and shows the wallet inte
   representative swap per bucket, ~45 receipt calls, cached). Also per-wallet **PnL** (see below).
 - **Winner model (`model.json` + `study/*.json`):** built offline by `tools/build-cohort.mjs` → corridor →
   projection → gen-model → validate. RPC-heavy, so it runs in the **`rebuild-model.yml` GitHub Action** (needs the
-  `ALCHEMY_RPC_URL` **repo secret** — separate from Railway env), NOT in the app. Includes DEX winners via `--dex`.
+  `ALCHEMY_RPC_URL` **repo secret** — separate from Railway env), NOT in the app. Includes direct DEX listings via `--dex`.
+  - **⭐ OUTCOME-LABELLED COHORT (owner call 2026-09-05: "graduation shouldn't be the only condition but a sustainable path
+    to multi-million valuations").** `outcome.mjs` `classifyOutcome(series, {now, t0, curMcap, curHolders})` labels EVERY
+    token (Pons or DEX) under ONE rule — graduation is NOT a criterion: **major** (held-peak ≥$5M, ≥$1M for 14d) · **runner**
+    (held-peak ≥$1M, ≥$1M for 7 consecutive days) — both need holders ≥70% of peak and still ≥25% of the held-peak (a week-long
+    pump that then went to zero is `faded`, flagged `wasRunner`) · **pending** (too young to have held/failed — right-censored,
+    excluded) · **mid** (reached $300k, alive, undecided — excluded) · **faded** (reached $300k, now <25% of held-peak — the
+    PRIMARY control) · **stalled** / **dead**. "Held-peak" = highest cap held a full day (reconstructed caps wick on single
+    swaps; `heldPeakH`). Knobs = `RULES`; `definitions()` publishes the text so page + code can't drift. PONS/USDC/USDG
+    excluded (`EXCLUDE_TOKENS`). Unit-tested (`test/outcome.test.mjs`).
+  - **⭐ INCREMENTAL + BUDGETED cohort (`tools/build-cohort.mjs` + `tools/cohort-lib.mjs`).** Every backtest is cached as a
+    SLIM profile at `study/profiles/<addr>.json` (COMMITTED); `study/cohort.json` = the index (every profiled token + label
+    + per-tier counts + rules). A cached token is re-labelled with the launchpad's LIVE mcap for $0; re-backtested only when
+    pending/mid (12h), printing new highs, or a young winner whose corridor path is still growing (<30d old, 48h). Queue is
+    highest-value first (live ≥$300k → graduated ≥$50k → open labels → controls ≤300 → DEX), `--budgetMin` (default 120)
+    stops cleanly and the NEXT run continues — so the first full build converges over a few runs, then a run is minutes.
+    Stops on 8 consecutive failures (RPC down); `study/skips.json` remembers failures for 7d. `--dry` prints the queue.
+    Downstream (`corridor`/`projection`/`extract_blueprint`/`validate`) read ONLY `loadCohort()` — winners = runner+major,
+    controls = faded/stalled/dead. **`gen-model.mjs` refuses to overwrite `model.json` below 10 winners** (`--force`), so a
+    thin early cohort can't degrade the live model; `model.json.cohort` states the basis (counts/rules/definitions/winners).
+  - **Validation (`validate.mjs` → `study/validation.json`):** per-bin AUC vs ALL controls AND vs FADED only (the hard test),
+    leave-one-out winner catch, `falsePosFaded`, plus a **TIME SPLIT** (band fitted on winners launched before a cutoff that
+    leaves the latest 30% as test; graded on later winners + controls only; `ready:false` + reason when the slice <5).
+    `cohort.winners/losers` kept for the landing + cards readers. Methodology page renders the tier table + counts + split.
+  - **The sandbox CAN run backtests on the native RH node** (verified 2026-09-05: 3 young tokens in 7.5 min; heavy fresh
+    tokens carry 150k–490k transfers, ~1–2.5 min each; use `LOGS_GAP_MS=300` — bursts draw 429s, now backed off in
+    `rpc.mjs`/`getTransferLogs`). The scheduled build runs in the Action (Mon+Thu 06:17 UTC, or dispatch) on Alchemy.
+    Pipeline is regression-tested on a SYNTHETIC cohort (`test/pipeline.test.mjs`) end-to-end; `--only=0x…` profiles
+    specific tokens; `STUDY_DIR=` redirects everything (smoke into a scratch dir, never the committed study).
+    The old `profiles/ winners_full/ losers/` dirs are gone.
+  - **⚠⚠ BUG FOUND BY THE SMOKE (2026-09-05): the native node returns `blockTimestamp: "0x0"` on eth_getLogs.** Both log
+    readers treated a truthy "0x0" as a real timestamp → ts=0 → the generic backtest dropped EVERY transfer ("too few
+    timestamped transfers") and the live engine's 30-min windows were meaningless on that provider. Fixed: `backtest.mjs` +
+    `engine.mjs` treat a zero timestamp as ABSENT, and `store.mjs` `fillTimestamps()` derives missing times from the
+    block calibration for the live intel path. **RULE: never trust a log's blockTimestamp without `> 0`.**
 
 ## Feature engines (all pure + unit-tested; `npm test`)
 - **PnL (`pnl.mjs`):** avg-cost realized (coins sold) + unrealized (coins held) per wallet, from the backtest's
