@@ -23,10 +23,11 @@
   table.tr th{text-align:left;font-size:.68rem;letter-spacing:.08em;text-transform:uppercase;color:var(--dim);padding:10px 10px;border-bottom:1px solid var(--line)}
   table.tr td{padding:11px 10px;border-bottom:1px solid rgba(255,255,255,.05);color:var(--tx);vertical-align:middle;font-variant-numeric:tabular-nums}
   table.tr td.d{color:var(--dim)}
-  .call{font-size:.68rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:3px 8px;border-radius:999px;border:1px solid}
-  .call.promising{color:var(--lime);border-color:rgba(200,255,77,.4);background:rgba(200,255,77,.08)}
-  .call.watch{color:#ffd23d;border-color:rgba(255,210,61,.4);background:rgba(255,210,61,.08)}
-  .call.avoid{color:#ff3b5c;border-color:rgba(255,59,92,.4);background:rgba(255,59,92,.08)}
+  /* call tag — square-cornered mono label with a left accent bar (terminal style, not a pill) */
+  .call{font-family:var(--mono);font-size:.64rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px 3px 9px;border-radius:3px;border-left:3px solid;background:rgba(255,255,255,.04)}
+  .call.promising{color:var(--lime);border-left-color:var(--lime);background:rgba(200,255,77,.09)}
+  .call.watch{color:#ffd23d;border-left-color:#ffd23d;background:rgba(255,210,61,.09)}
+  .call.avoid{color:#ff3b5c;border-left-color:#ff3b5c;background:rgba(255,59,92,.09)}
   .out{font-weight:600}
   .out.winner{color:var(--lime)} .out.loser{color:#ff3b5c} .out.pending{color:var(--dim);font-weight:400}
   .out.early{color:#35e6e0}
