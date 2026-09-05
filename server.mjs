@@ -34,6 +34,17 @@ import { rpc, isContract } from "./rpc.mjs";
 import { track, readIntel } from "./analytics.mjs";
 import { buildPicks } from "./picks.mjs";
 import { chat as llmChat, hasKey as llmHasKey } from "./llm.mjs";
+import { makeLimiter, makeCoalescer, makeSemaphore, clientIp } from "./ratelimit.mjs";
+
+// ── ABUSE GUARDS for the public API (the free native RPC is the resource being protected) ──────────────────────
+// HEAVY endpoints trigger real RPC work per request; LIGHT ones are cached reads. Per-IP token buckets on both, a
+// global concurrency cap on heavy handlers (beyond it: a fast "busy" instead of piling onto the RPC), and identical
+// concurrent backtests coalesce into one compute. All knobs env-tunable; defaults are generous for humans, hostile to loops.
+const HEAVY_API = new Set(["/api/backtest", "/api/scan", "/api/graph", "/api/wallet", "/api/wallet-pnl", "/api/wallet-trades", "/api/token"]);
+const heavyLimiter = makeLimiter({ capacity: Number(process.env.RL_HEAVY_BURST || 20), perSec: Number(process.env.RL_HEAVY_PER_SEC || 0.33) });   // ~20/min sustained
+const lightLimiter = makeLimiter({ capacity: Number(process.env.RL_LIGHT_BURST || 120), perSec: Number(process.env.RL_LIGHT_PER_SEC || 2) });     // ~120/min sustained
+const heavySem = makeSemaphore(Number(process.env.RL_HEAVY_CONCURRENCY || 6));
+const btCoalesce = makeCoalescer();
 
 const readBody = (req, cap = 8192) => new Promise((resolve) => { let d = ""; req.on("data", (c) => { d += c; if (d.length > cap) req.destroy(); }); req.on("end", () => { try { resolve(JSON.parse(d || "{}")); } catch { resolve({}); } }); req.on("error", () => resolve({})); });
 const CONTROL_PW = process.env.CONTROL_PASSWORD || "";
@@ -102,6 +113,9 @@ async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym, 
   if (mem) return mem;                           // instant: served from this process's memory
   const cached = await getJSON(kvKey).catch(() => null);
   if (cached && cached.data && Date.now() - cached.at < BT_TTL) { _btMemSet(kvKey, cached.data); return cached.data; }
+  // cache miss → the expensive path. Coalesce it: N concurrent requests for the same key share ONE reconstruction.
+  return btCoalesce.run(kvKey, async () => {
+  const again = _btMemGet(kvKey); if (again) return again;   // a sibling finished while we queued
   const meta = await ponsMeta(token);
   const st = await getTransfers(token, 18, { pool: meta?.pool, launchedAt: meta?.launchedAt }).catch(() => ({ ev: null }));
   const complete = st.ev && st.ev.length > 0 && st.ev.length < STORE_CAP - 1000; // store holds the whole history
@@ -112,6 +126,7 @@ async function computeBacktest(token, key, { points, ethUsd, noPrice, cap, sym, 
   _btMemSet(kvKey, r);
   setJSON(kvKey, { at: Date.now(), data: r }).catch(() => {});
   return r;
+  });
 }
 
 // background discover-board: scan every live launch, verdict + market-cap-bucket, keep a ranked cache
@@ -270,6 +285,23 @@ createServer(async (req, res) => {
   res.setHeader("access-control-allow-headers", "content-type");
   res.setHeader("access-control-max-age", "86400");
   if (req.method === "OPTIONS") { res.writeHead(204); return res.end(); }
+  // ── rate limit + concurrency cap (public /api only; static files untouched) ──
+  if (u.pathname.startsWith("/api/")) {
+    const ip = clientIp(req), heavy = HEAVY_API.has(u.pathname);
+    const lim = (heavy ? heavyLimiter : lightLimiter).take(ip);
+    if (!lim.ok) {
+      res.writeHead(429, { "content-type": "application/json", "retry-after": String(lim.retryAfterSec), "cache-control": "no-store" });
+      return res.end(JSON.stringify({ error: "rate limited — slow down", retryAfterSec: lim.retryAfterSec }));
+    }
+    if (heavy) {
+      const release = heavySem.tryAcquire();
+      if (!release) {
+        res.writeHead(503, { "content-type": "application/json", "retry-after": "3", "cache-control": "no-store" });
+        return res.end(JSON.stringify({ error: "busy — reconstructing for others, try again in a moment", retryAfterSec: 3 }));
+      }
+      res.once("finish", release); res.once("close", release);   // idempotent release either way
+    }
+  }
   try {
     if (u.pathname === "/healthz") { res.writeHead(200); return res.end("ok"); }
 
@@ -547,7 +579,7 @@ createServer(async (req, res) => {
     if (u.pathname === "/api/token") {
       const address = (u.searchParams.get("address") || "").toLowerCase();
       if (!/^0x[0-9a-f]{40}$/.test(address)) { res.writeHead(400, { "content-type": "application/json" }); return res.end('{"error":"pass ?address=0x…"}'); }
-      const r = await tokenDossier(address);
+      const r = await btCoalesce.run("dossier:" + address, () => tokenDossier(address));   // stampede on one token = one dossier build
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
       return res.end(JSON.stringify(r));
     }
