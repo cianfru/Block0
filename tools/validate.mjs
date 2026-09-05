@@ -112,14 +112,16 @@ if (bt) { const thr = bt.thr;
 const reached = (arr, age) => arr.filter((t) => (t.path || []).some((p) => p.a >= age)).length;
 const survivalSignal = [4, 16, 48, 128].map((age) => ({ age: age + "h", winners: r2(reached(W, age) / (W.length || 1)), losers: r2(reached(L, age) / (L.length || 1)), faded: r2(reached(LF, age) / (LF.length || 1)) }));
 
-// TIME SPLIT — fit on the earlier launches, grade the later ones. Cutoff = the launch date that leaves the latest 30%
-// of winners as the test slice; controls launched after the cutoff are the test negatives.
+// TIME SPLIT — fit on the earlier launches, grade the later ones. Cutoff = the launch date that leaves the latest ~30%
+// of winners as the test slice, but never fewer than MIN_TEST (so a small cohort still yields a usable forward test).
+// The split point only guarantees the minimum TEST SIZE the metric needs — it never peeks at features/thresholds; the
+// band is still fitted only on the train slice. Controls launched after the cutoff are the test negatives.
 const MIN_TEST = 5;
 const t0Of = (t) => t.t0 || (t.launchedAt ? Date.parse(t.launchedAt) / 1000 : null);
 const Wd = W.filter((t) => t0Of(t)).sort((a, b) => t0Of(a) - t0Of(b));
 let timeSplit = { ready: false, reason: "not enough dated winners" };
 if (Wd.length >= MIN_TEST * 2) {
-  const cutIdx = Math.floor(Wd.length * 0.7), cutoff = t0Of(Wd[cutIdx]);
+  const cutIdx = Math.min(Math.floor(Wd.length * 0.7), Wd.length - MIN_TEST), cutoff = t0Of(Wd[cutIdx]);
   const train = Wd.slice(0, cutIdx), test = Wd.slice(cutIdx), testL = L.filter((t) => t0Of(t) && t0Of(t) >= cutoff), testF = testL.filter((t) => t.cls === "faded");
   if (test.length >= MIN_TEST && testL.length >= MIN_TEST) {
     let hit = 0, tot = 0, lhit = 0, ltot = 0, fhit = 0, ftot = 0; const rows = [];
