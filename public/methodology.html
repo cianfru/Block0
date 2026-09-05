@@ -143,12 +143,12 @@ const barCol=(a)=>a==null?"var(--mute)":a>=0.75?"var(--lime)":a>=0.6?"var(--cyan
     const usd=(x)=>x==null?"—":x>=1e6?"$"+(x/1e6).toFixed(2)+"M":x>=1e3?"$"+Math.round(x/1e3)+"k":"$"+Math.round(x);
     const pg=v.progress, roll=v.winnerRoll||[];
     let rb="";
-    if(pg){ const done=pg.cached??pg.backtested, left=pg.queuedLeft??0, tot=done+left, frac=tot?Math.round(done/tot*100):100;
+    if(pg){ const done=pg.cached??pg.backtested, left=pg.queuedLeft??0, tot=done+left, frac=tot?Math.round(done/tot*100):100; const complete=left<=0;
       rb+=`<div class="callout" style="display:flex;flex-direction:column;gap:8px">
         <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
-          <b>Study build — in progress</b><span class="muted">${done} launches profiled${left?` · ~${left} still queued`:" · complete"}</span></div>
+          <b>${complete?`Study build — complete <span style="color:var(--lime)">✓</span>`:"Study build — in progress"}</b><span class="muted">${done.toLocaleString()} launches profiled${left?` · ~${left} still queued`:""}</span></div>
         <span class="barw" style="height:8px"><i style="width:${frac}%;background:var(--lime)"></i></span>
-        <span class="muted" style="font-size:.82rem">The offline engine backtests the chain's launch history a batch at a time (cached, so it compounds daily). ${left?`About ${frac}% of the known universe is profiled — the rest settles in over the next daily runs.`:"The whole known universe is profiled; daily runs now only re-check what's new or still undecided."} Last built ${pg.generatedAt||v.generatedAt}.</span>
+        <span class="muted" style="font-size:.82rem">The offline engine backtests every launch on the chain (cached, so it compounds daily). ${complete?"The whole known launch history is now profiled; daily runs only re-check what's new or still undecided, and pending launches keep settling into winners or fades.":`About ${frac}% of the known universe is profiled — the rest settles in over the next daily runs.`} Last built ${pg.generatedAt||v.generatedAt}.</span>
       </div>`;
     }
     if(roll.length){
