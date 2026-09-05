@@ -77,6 +77,37 @@ function bestPoint(pos, neg) {
 }
 const lateLife = { aucWinnerVsLoser: r2(auc(wl, ll)), aucWinnerVsFaded: r2(auc(wl, fl)), bestThreshold: bestPoint(wl, ll), bestThresholdFaded: bestPoint(wl, fl) };
 
+// PRECISION + BASE RATE — the honest counterweight to recall (ChatGPT #5). Winners are RARE, so even a low false-
+// positive rate leaves most "on-path" tokens fading. Precision = of everything the band flags, how many were winners;
+// lift = precision ÷ base rate (how much better than the prior). AUC/recall alone hide this; on a 6%-base-rate problem
+// they must be read WITH precision or they flatter.
+const baseRate = (W.length + L.length) ? W.length / (W.length + L.length) : null;
+const precisionAt = (thr) => { const tp = wl.filter((x) => x >= thr).length, fp = ll.filter((x) => x >= thr).length;
+  const prec = (tp + fp) ? tp / (tp + fp) : null; return { thr, tp, fp, precision: r2(prec), lift: (prec != null && baseRate) ? r2(prec / baseRate) : null }; };
+const bt = lateLife.bestThreshold;
+const precision = { baseRate: r2(baseRate), winners: W.length, controls: L.length,
+  atBestPoint: bt ? precisionAt(bt.thr) : null,
+  note: baseRate != null ? `winners are ${Math.round(baseRate * 100)}% of the graded cohort — a rare event. Precision is TP/(TP+FP) at the operating point; lift is precision ÷ base rate (1.0 = no better than the prior).` : "no base rate yet" };
+
+// CALIBRATION — does a higher trajectory actually mean a higher observed win-rate? Bucket the late-life score and
+// report the fraction of winners among {winners ∪ controls} in each band. Monotone-rising = the score means something.
+const calibBands = [[0, 60], [60, 70], [70, 80], [80, 90], [90, 101]];
+const wlTok = W.map((t) => ({ v: lateTraj(t), win: 1 })).concat(L.map((t) => ({ v: lateTraj(t), win: 0 }))).filter((x) => x.v != null);
+const calibration = calibBands.map(([lo, hi]) => { const inb = wlTok.filter((x) => x.v >= lo && x.v < hi); const w = inb.filter((x) => x.win).length;
+  return { band: `${lo}–${hi > 100 ? "100" : hi}`, n: inb.length, winRate: inb.length ? r2(w / inb.length) : null }; });
+
+// MISSES — name them. At the late-life operating point: winners the band DROPPED (false negatives) and controls it
+// FLAGGED (false positives). The honest ledger — every model has these; hiding them is the dishonesty. Sorted worst-first.
+let misses = null;
+if (bt) { const thr = bt.thr;
+  const fn = W.map((t) => ({ sym: t.sym, cls: t.cls, heldPeak: t.heldPeak, v: lateTraj(t) })).filter((x) => x.v != null && x.v < thr).sort((a, b) => a.v - b.v);
+  const fp = L.map((t) => ({ sym: t.sym, cls: t.cls, heldPeak: t.heldPeak, v: lateTraj(t) })).filter((x) => x.v != null && x.v >= thr).sort((a, b) => b.v - a.v);
+  misses = { thr,
+    falseNeg: { n: fn.length, of: wl.length, tokens: fn.slice(0, 12).map((x) => ({ sym: x.sym, traj: Math.round(x.v), heldPeak: x.heldPeak })) },
+    falsePos: { n: fp.length, of: ll.length, tokens: fp.slice(0, 12).map((x) => ({ sym: x.sym, cls: x.cls, traj: Math.round(x.v), heldPeak: x.heldPeak })) },
+    note: "false negatives = winners scoring below the operating point (the band would have passed on them); false positives = faded/dead tokens scoring above it (the band would have called them on-path). This is the cost of the operating point above." };
+}
+
 // survival alone: does the token live past a given age?
 const reached = (arr, age) => arr.filter((t) => (t.path || []).some((p) => p.a >= age)).length;
 const survivalSignal = [4, 16, 48, 128].map((age) => ({ age: age + "h", winners: r2(reached(W, age) / (W.length || 1)), losers: r2(reached(L, age) / (L.length || 1)), faded: r2(reached(LF, age) / (LF.length || 1)) }));
@@ -111,7 +142,7 @@ const out = {
   cohort: { winners: W.length, losers: L.length, faded: LF.length, counts, undecided: (counts.pending || 0) + (counts.mid || 0),
     definitions: idx?.definitions || null, rules: idx?.rules || null, basis: "outcome labels — winners held ≥$1M for a week or more; graduation is not a criterion",
     note: "in-sample separation on the study cohort plus a time-split hold-out — evidence that compounds as more launches settle, not proof" },
-  headline, perBin, lateLife, survivalSignal, timeSplit,
+  headline, precision, calibration, misses, perBin, lateLife, survivalSignal, timeSplit,
 };
 writeFileSync(join(STUDY_DIR, "validation.json"), JSON.stringify(out));
 
@@ -128,5 +159,15 @@ if (lateLife.bestThreshold) console.log(`  best operating point (all): traj ≥ 
 if (lateLife.bestThresholdFaded) console.log(`  best operating point (faded): traj ≥ ${lateLife.bestThresholdFaded.thr} → catches ${pct(lateLife.bestThresholdFaded.tpr)} of winners, ${pct(lateLife.bestThresholdFaded.fpr)} false-positive`);
 console.log("\nsurvival alone (reached age at all):");
 for (const s of survivalSignal) console.log(`  past ${s.age.padEnd(4)}  winners ${pct(s.winners)}  controls ${pct(s.losers)}  faded ${pct(s.faded)}`);
-console.log(`\ntime split: ${timeSplit.ready ? `cutoff ${timeSplit.cutoff} · train ${timeSplit.trainWinners} winners → test ${timeSplit.testWinners} winners / ${timeSplit.testControls} controls · catch ${pct(timeSplit.catch)} · false-pos ${pct(timeSplit.falsePos)} (faded ${pct(timeSplit.falsePosFaded)}) · late AUC ${timeSplit.lateAuc ?? "—"}` : "not ready — " + timeSplit.reason}`);
+console.log(`\ntime split (FORWARD, out-of-sample by launch date — the honest headline): ${timeSplit.ready ? `cutoff ${timeSplit.cutoff} · train ${timeSplit.trainWinners} winners → test ${timeSplit.testWinners} winners / ${timeSplit.testControls} controls · catch ${pct(timeSplit.catch)} · false-pos ${pct(timeSplit.falsePos)} (faded ${pct(timeSplit.falsePosFaded)}) · late AUC ${timeSplit.lateAuc ?? "—"}` : "not ready — " + timeSplit.reason}`);
+console.log(`\nprecision & base rate (winners are rare — recall alone flatters):`);
+console.log(`  base rate: ${pct(precision.baseRate)} of the cohort are winners (${precision.winners} vs ${precision.controls})`);
+if (precision.atBestPoint) console.log(`  at the operating point traj ≥ ${precision.atBestPoint.thr}: precision ${pct(precision.atBestPoint.precision)} (${precision.atBestPoint.tp} winners / ${precision.atBestPoint.tp + precision.atBestPoint.fp} flagged) · lift ${precision.atBestPoint.lift ?? "—"}×`);
+console.log(`\ncalibration (does a higher score mean a higher win-rate?):`);
+for (const c of calibration) console.log(`  traj ${c.band.padEnd(7)} n=${String(c.n).padStart(3)}  win-rate ${pct(c.winRate)}`);
+if (misses) {
+  console.log(`\nmisses at traj ≥ ${misses.thr} — the honest ledger:`);
+  console.log(`  false negatives (winners the band would drop): ${misses.falseNeg.n}/${misses.falseNeg.of}  ${misses.falseNeg.tokens.map((x) => `${x.sym}(${x.traj})`).join(" ")}`);
+  console.log(`  false positives (faded/dead it would flag on-path): ${misses.falsePos.n}/${misses.falsePos.of}  ${misses.falsePos.tokens.map((x) => `${x.sym}(${x.traj})`).join(" ")}`);
+}
 console.log(`\n→ ${STUDY_DIR}/validation.json written`);

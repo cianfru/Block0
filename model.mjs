@@ -2,8 +2,9 @@
 // cohort, used to place a LIVE token against the winners' precedent in real time. model.json is regenerated
 // from the backtest study (tools/gen-model); if it's missing the helpers no-op so the board still runs.
 import { readFileSync } from "node:fs";
-let LADDER = [], CORRIDOR = [];
-try { const m = JSON.parse(readFileSync(new URL("./model.json", import.meta.url), "utf8")); LADDER = m.ladder || []; CORRIDOR = m.corridor || []; } catch { /* no model yet */ }
+let LADDER = [], CORRIDOR = [], WINNER_VENUES = null;
+try { const m = JSON.parse(readFileSync(new URL("./model.json", import.meta.url), "utf8")); LADDER = m.ladder || []; CORRIDOR = m.corridor || []; WINNER_VENUES = m.cohort?.winnerVenues || null; } catch { /* no model yet */ }
+export const winnerVenues = () => WINNER_VENUES;
 const log10 = Math.log10;
 const clamp = (x) => Math.max(0, Math.min(100, x));
 
@@ -68,7 +69,7 @@ export const hasModel = () => LADDER.length > 0;
 // holder base, sparse transfer coverage, or a stage with few comparable winners all LOWER confidence — the read is
 // still shown, but stamped so "unknown" can't masquerade as "clean". Pure + unit-tested; every reason is a plain fact.
 //   level: "high" | "limited" | "low"   reasons: short human strings   nWinners: comparable winners at this age
-export function readConfidence({ ageH = 0, holders = 0, events = null, priceReconstructed = true } = {}) {
+export function readConfidence({ ageH = 0, holders = 0, events = null, priceReconstructed = true, venue = null } = {}) {
   const reasons = [];
   // comparable winners at this age (the corridor bin's target count) — the resemblance read leans on this many examples
   const bin = CORRIDOR.find((x) => ageH >= x.lo && ageH < x.hi) || CORRIDOR[CORRIDOR.length - 1];
@@ -82,6 +83,10 @@ export function readConfidence({ ageH = 0, holders = 0, events = null, priceReco
   else if (holders > 0 && holders < 100) { reasons.push(`${holders} holders — a small sample`); drop("limited"); }
   if (events != null && events < 40)     { reasons.push(`sparse on-chain history (${events} transfers) — coverage is partial`); drop("limited"); }
   if (!priceReconstructed)               { reasons.push("price is reconstructed from swaps — treat exact figures as estimates"); drop("limited"); }
+  // calibrate by context: the resemblance read compares against winners that all launched on ONE venue so far. A token
+  // from a venue with few/no comparable winners is judged cross-venue — say so, and lower confidence (ChatGPT #3).
+  if (venue && WINNER_VENUES) { const dom = Object.entries(WINNER_VENUES).sort((a, b) => b[1] - a[1])[0];
+    if ((WINNER_VENUES[venue] || 0) < 2 && dom) { reasons.push(`no ${venue.toUpperCase()} launches among the winners yet — the model is fitted on ${dom[0].toUpperCase()} launches, so this is a cross-venue read`); drop("limited"); } }
   // NOTE: the small comparable-winner count (nWinners) is a limit of the RESEMBLANCE read, not the data/trap read —
   // it's reported here and surfaced beside the resemblance verdict, but it never caps confidence in the structure check.
   if (!reasons.length) reasons.push("enough history, holders and comparable winners for a confident read");

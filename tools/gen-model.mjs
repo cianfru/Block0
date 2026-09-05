@@ -82,6 +82,9 @@ const model = {
   source: "winner-study: outcome-labelled cohort backtests (build-cohort → corridor.mjs + projection.mjs); winners = runner + major, graduation is not a criterion",
   // the cohort the model was fitted on — published so the page, the API and the code all state the same basis
   cohort: idx ? { generatedAt: idx.generatedAt, winners: proj.winners.length, controls: corr.losers.length, counts: idx.counts, rules: idx.rules, definitions: idx.definitions,
+    // venue basis — which launch venues the WINNERS came from. Read by model.readConfidence to flag a cross-venue
+    // lookup (e.g. a direct-DEX token judged against an all-Pons winner set), and disclosed on the methodology page.
+    winnerVenues: (idx.tokens || []).filter((t) => t.label === "major" || t.label === "runner").reduce((m, t) => { const s = t.source || "pons"; m[s] = (m[s] || 0) + 1; return m; }, {}),
     winnerList: proj.winners.map((w) => ({ sym: w.sym, addr: w.addr, label: w.label, heldPeak: w.heldPeak })) } : null,
   ladder, corridor,
 };

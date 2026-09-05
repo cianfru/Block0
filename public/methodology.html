@@ -100,6 +100,7 @@
     <li><b>The valuation ladder</b> places a token's current wallet count against what winners were worth at the same count.</li>
   </ul>
   <p class="muted">The model is a committed, reproducible pipeline — every backtest is cached and re-labelled with live market caps, so the cohort compounds run after run and the model refreshes as pending tokens settle into winners or fades.</p>
+  <div class="callout"><b>One venue, so far.</b> Every winner in the model to date launched on the <b>Pons launchpad</b>. A healthy first hour on a bonding-curve launch is not the same shape as a token listed straight on the DEX, so a <b>direct-DEX</b> lookup is scored against Pons winners and <b>marked lower-confidence</b> (the read says "cross-venue"). When enough DEX launches reach and hold a real cap, they get their own calibration; until then we disclose the gap rather than pretend the shapes are identical.</div>
 
   <h2>Does it actually work?</h2>
   <p>The honest question. Below is a <b>separation test</b> on the study cohort — at each age, how well the trajectory tells eventual winners apart from the rest. Two controls are graded: <b>all</b> (faded + stalled + dead) and <b>faded only</b> — tokens that reached the same stages as the winners and then collapsed, which is the test that actually matters for a scanner. <code>AUC</code> is the probability a random winner scores above a random control: <b>0.50 is a coin flip, 1.00 is perfect.</b></p>
@@ -171,15 +172,26 @@ const barCol=(a)=>a==null?"var(--mute)":a>=0.75?"var(--lime)":a>=0.6?"var(--cyan
         <td class="n">${r.aucFaded==null?"—":r.aucFaded.toFixed(2)}</td>
         <td class="${aucCls(r.aucFaded??r.auc)}">${aucRead(r.aucFaded??r.auc)}</td></tr>`;}).join("");
     const late=v.lateLife||{}, bt=late.bestThreshold||{}, ts=v.timeSplit||{};
+    const pr=v.precision||{}, cal=v.calibration||[], ms=v.misses;
     $("#valbox").innerHTML=`
       <table><thead><tr><th>Token age</th><th class="n">median traj<br><span class="muted" style="font-weight:400">winner / control</span></th>
         <th class="n">on-band<br><span class="muted" style="font-weight:400">winner / control</span></th><th class="n">AUC<br><span class="muted" style="font-weight:400">all controls</span></th><th class="n">AUC<br><span class="muted" style="font-weight:400">faded only</span></th><th>separation</th></tr></thead>
         <tbody>${rows}</tbody></table>
       <p class="muted">Held-out headline: the band catches <b style="color:var(--tx)">${pc(v.headline?.catch)}</b> of winners (leave-one-out) at <b style="color:var(--tx)">${pc(v.headline?.falsePos)}</b> false alarms on all controls, <b style="color:var(--tx)">${pc(v.headline?.falsePosFaded)}</b> on faded tokens.
       Late-life "did it sustain the path" AUC <b style="color:var(--tx)">${late.aucWinnerVsLoser??"—"}</b> vs all controls, <b style="color:var(--tx)">${late.aucWinnerVsFaded??"—"}</b> vs faded — at trajectory ≥ ${bt.thr??"—"} that caught ${pc(bt.tpr)} of winners with a ${pc(bt.fpr)} false-positive rate. Measured ${v.generatedAt}.</p>
-      <div class="callout"><b>Time split (out-of-sample by launch date).</b> ${ts.ready
-        ? `Band fitted on the <b>${ts.trainWinners}</b> winners launched before <b>${ts.cutoff}</b>, graded only on the <b>${ts.testWinners}</b> winners and <b>${ts.testControls}</b> controls launched after it: catches <b style="color:var(--tx)">${pc(ts.catch)}</b> of the later winners at <b style="color:var(--tx)">${pc(ts.falsePos)}</b> false alarms (${pc(ts.falsePosFaded)} on faded) · late-life AUC <b style="color:var(--tx)">${ts.lateAuc??"—"}</b>.`
-        : `Not yet measurable — ${ts.reason||"the later slice is too small"}. It becomes available as more launches settle; nothing is fabricated in the meantime.`}</div>`;
+      <div class="callout"><b>The honest headline — the forward test.</b> ${ts.ready
+        ? `Out-of-sample by launch date: the band is fitted only on the <b>${ts.trainWinners}</b> winners launched before <b>${ts.cutoff}</b>, then graded on the <b>${ts.testWinners}</b> winners and <b>${ts.testControls}</b> controls launched <i>after</i> it. It catches <b style="color:var(--tx)">${pc(ts.catch)}</b> of the later winners — but at <b style="color:var(--coral)">${pc(ts.falsePos)}</b> false alarms (${pc(ts.falsePosFaded)} on faded tokens). This is the number that counts: the in-sample figures above are optimistic by construction.`
+        : `Not yet measurable — ${ts.reason||"the later slice is too small"}. It becomes available as more launches settle; nothing is fabricated in the meantime.`}</div>
+      ${pr.baseRate!=null?`<h3 style="margin:22px 0 6px;font-size:1rem">Precision, and why recall isn't enough</h3>
+      <p class="muted">Winners are <b style="color:var(--tx)">${pc(pr.baseRate)}</b> of the graded cohort (${pr.winners} winners vs ${pr.controls} controls) — a rare event. So "catches most winners" means little on its own; what matters is how many of the flagged tokens actually win.${pr.atBestPoint?` At the in-sample operating point (trajectory ≥ ${pr.atBestPoint.thr}), <b style="color:var(--tx)">${pc(pr.atBestPoint.precision)}</b> of flagged tokens were winners — a <b style="color:var(--tx)">${pr.atBestPoint.lift??"—"}×</b> lift over the base rate. That is the in-sample ceiling; the forward false-alarm rate above is the real-world floor. The truth sits between them, and tightens as the cohort grows.`:""}</p>`:""}
+      ${cal.length?`<h3 style="margin:22px 0 6px;font-size:1rem">Calibration — does a higher score mean a higher win-rate?</h3>
+      <table><thead><tr><th>Trajectory band</th><th class="n">tokens</th><th class="n">actually won</th></tr></thead><tbody>${
+        cal.map(c=>`<tr><td>${c.band}</td><td class="n">${c.n}</td><td class="n" style="color:${c.winRate>=0.5?'var(--lime)':c.winRate>0?'var(--amber)':'var(--mute)'}">${pc(c.winRate)}</td></tr>`).join("")
+      }</tbody></table><p class="muted">A meaningful score rises down this table — low bands almost never win, the top bands mostly do. It is not perfectly monotonic on a cohort this small; that's the honest state of it.</p>`:""}
+      ${ms?`<h3 style="margin:22px 0 6px;font-size:1rem">The misses — named</h3>
+      <p class="muted">At trajectory ≥ ${ms.thr}, every model has two kinds of error. We list ours rather than hide them.</p>
+      <p class="muted"><b style="color:var(--tx)">Winners it would have passed on</b> (${ms.falseNeg.n} of ${ms.falseNeg.of}): ${ms.falseNeg.tokens.length?ms.falseNeg.tokens.map(t=>`<span class="tag">${t.sym} · ${t.traj}</span>`).join(" "):"none"}<br>
+      <b style="color:var(--tx)">Faded/dead it would have flagged as on-path</b> (${ms.falsePos.n} of ${ms.falsePos.of}): ${ms.falsePos.tokens.length?ms.falsePos.tokens.map(t=>`<span class="tag">${t.sym} · ${t.traj}</span>`).join(" "):"none at this threshold"}</p>`:""}`;
   }catch(e){ $("#valbox").innerHTML='<p class="muted">Couldn\'t load the measurement — reload in a moment.</p>'; }
 })();
 </script>

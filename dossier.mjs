@@ -49,7 +49,10 @@ export async function tokenDossier(address) {
   r.trajectory = liveTrajectory({ blueprint: r.blueprint, holders: r.flags.holders, ageH });
   r.corridor = corridorStatus(ageH, r.trajectory, { wallets: r.flags.wallets ?? r.flags.holders, mcap: r.mcapUsd });
   // how much to trust this read — never a silent neutral. Surfaced on the verdict; also gates the resemblance read.
-  r.confidence = readConfidence({ ageH, holders: r.flags.holders, events: r.eventsCount ?? r.transfers ?? null, priceReconstructed: true });
+  // venue: a token found in the Pons launchpad metadata is a Pons launch; absent from it → a direct-DEX listing. The
+  // winner model is currently all-Pons, so a DEX lookup is flagged cross-venue (lower confidence) by readConfidence.
+  r.venue = meta ? "pons" : "dex";
+  r.confidence = readConfidence({ ageH, holders: r.flags.holders, events: r.eventsCount ?? r.transfers ?? null, priceReconstructed: true, venue: r.venue });
 
   // split the holder table into who's adding vs shedding right now (net flow over the live 30-min window),
   // and surface the biggest bags so a graduated token with no recent flow still shows its distribution.

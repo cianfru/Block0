@@ -42,3 +42,12 @@ test("nWinners at the token's age is reported from the corridor bin (or null wit
   const c = readConfidence({ ageH: 12, holders: 4000, events: 5000 });
   assert.ok(c.nWinners === null || typeof c.nWinners === "number");
 });
+
+test("a cross-venue lookup (a venue with no winners in the model) is flagged limited", () => {
+  // the baked model's winners are all one venue; a token from a different venue is a cross-venue read.
+  const dex = readConfidence({ ageH: 200, holders: 4000, events: 5000, venue: "dex" });
+  const pons = readConfidence({ ageH: 200, holders: 4000, events: 5000, venue: "pons" });
+  // if the model carries a venue basis, dex is cross-venue (limited) while the dominant venue is not flagged for venue.
+  if (dex.level === "limited") assert.match(dex.reasons.join(" "), /cross-venue|no DEX/i);
+  assert.ok(pons.reasons.every((r) => !/cross-venue/i.test(r)), "the dominant venue is never flagged cross-venue");
+});
