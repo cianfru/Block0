@@ -506,8 +506,22 @@ createServer(async (req, res) => {
     }
 
     if (u.pathname === "/api/validation") {
-      try { const buf = await readFile(join(__dir, "study", "validation.json"));
-        res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=3600" }); return res.end(buf);
+      try {
+        const v = JSON.parse(await readFile(join(__dir, "study", "validation.json"), "utf8"));
+        // Enrich with the live build progress + the named winner roll from the cohort so /methodology can show the
+        // study GROWING (backtested / queued-left) and the actual winners it found — both refresh on every daily run.
+        try {
+          const c = JSON.parse(await readFile(join(__dir, "study", "cohort.json"), "utf8"));
+          if (c.run) v.progress = { ...c.run, generatedAt: c.generatedAt || v.generatedAt };
+          const roll = (c.tokens || [])
+            .filter((t) => t.label === "major" || t.label === "runner")
+            .sort((a, b) => (b.heldPeak || 0) - (a.heldPeak || 0))
+            .map((t) => ({ sym: t.sym || t.name || null, addr: t.addr, tier: t.label, heldPeak: t.heldPeak || null,
+              curMcap: t.curMcap ?? null, sustainedH: t.sustainedH || null, holders: t.holders || null, peakHolders: t.peakHolders || null, graduated: !!t.graduated }));
+          if (roll.length) v.winnerRoll = roll;
+        } catch {}
+        res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=3600" });
+        return res.end(JSON.stringify(v));
       } catch { res.writeHead(404, { "content-type": "application/json" }); return res.end('{"error":"no validation data"}'); }
     }
 

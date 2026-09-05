@@ -91,6 +91,7 @@
   <h2>The winner corridor &amp; valuation ladder</h2>
   <p>These come from a <b>study of every launch on the chain, labelled by what it actually became</b> — Pons launches and direct DEX listings under one rule. <b>Graduation is not a criterion.</b> A winner is a token that reached a real valuation and <i>held</i> it: a sustainable path to multi-million, not a spike. Each winner's whole history is replayed and reduced to a trajectory (distribution health blended with real wallet inflow) and a wallets→market-cap curve.</p>
   <div id="tierbox"><p class="muted">loading cohort definitions…</p></div>
+  <div id="rollbox"></div>
   <p class="muted">"Held-peak" is the highest market cap the token stayed at for a full day (reconstructed caps wick on single swaps). <b>Pending</b> and <b>mid</b> tokens are excluded from both sides — a three-day-old token above $1M can't have held it a week yet, so it is never counted as a loser (right-censoring). The launchpad's own token and quote assets are excluded.</p>
   <ul>
     <li><b>The corridor</b> is the winners' healthy trajectory zone (25th–75th percentile) at each age. A live token's own trajectory is drawn through it — inside the band is tracking the winners, below is drifting.</li>
@@ -135,6 +136,31 @@ const barCol=(a)=>a==null?"var(--mute)":a>=0.75?"var(--lime)":a>=0.6?"var(--cyan
       $("#tierbox").innerHTML=`<table><thead><tr><th>Tier</th><th>Rule</th><th>Role</th><th class="n">Tokens</th></tr></thead><tbody>${defs.map(d=>`<tr><td><b style="color:${roleCol[d.role]}">${d.tier}</b></td><td>${d.rule}</td><td class="muted">${d.role}</td><td class="n">${counts[d.tier]??"—"}</td></tr>`).join("")}</tbody></table>
         <p class="muted">Cohort measured ${c.generatedAt||v.generatedAt}: <b style="color:var(--tx)">${c.winners} winners</b> (major + runner) vs <b style="color:var(--tx)">${c.losers} controls</b> (${c.faded??"—"} faded) · ${c.undecided??"—"} undecided excluded.</p>`;
     } else $("#tierbox").innerHTML=`<p class="muted">Cohort: ${c.winners} winners vs ${c.losers} controls.</p>`;
+    // Study progress + the winners it has found so far — both refresh on every daily run, so this page shows the
+    // cohort GROWING while the offline backfill is still profiling the chain's launch history.
+    const usd=(x)=>x==null?"—":x>=1e6?"$"+(x/1e6).toFixed(2)+"M":x>=1e3?"$"+Math.round(x/1e3)+"k":"$"+Math.round(x);
+    const pg=v.progress, roll=v.winnerRoll||[];
+    let rb="";
+    if(pg){ const done=pg.cached??pg.backtested, left=pg.queuedLeft??0, tot=done+left, frac=tot?Math.round(done/tot*100):100;
+      rb+=`<div class="callout" style="display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline;flex-wrap:wrap;gap:6px">
+          <b>Study build — in progress</b><span class="muted">${done} launches profiled${left?` · ~${left} still queued`:" · complete"}</span></div>
+        <span class="barw" style="height:8px"><i style="width:${frac}%;background:var(--lime)"></i></span>
+        <span class="muted" style="font-size:.82rem">The offline engine backtests the chain's launch history a batch at a time (cached, so it compounds daily). ${left?`About ${frac}% of the known universe is profiled — the rest settles in over the next daily runs.`:"The whole known universe is profiled; daily runs now only re-check what's new or still undecided."} Last built ${pg.generatedAt||v.generatedAt}.</span>
+      </div>`;
+    }
+    if(roll.length){
+      rb+=`<p class="muted" style="margin:14px 0 6px"><b style="color:var(--tx)">The winners it has found so far</b> — every token that reached a real cap and <i>held</i> it (≥$1M for a week+, holders intact, still alive). Not cherry-picked: this is the whole winner set the corridor is fitted on.</p>
+      <div style="overflow-x:auto"><table><thead><tr><th>Token</th><th>Tier</th><th class="n">held-peak</th><th class="n">now</th><th class="n">held $1M</th><th class="n">holders</th></tr></thead><tbody>${
+        roll.map(w=>{ const keep=w.peakHolders?Math.round((w.holders/w.peakHolders)*100):null;
+          return `<tr><td><b>${w.sym?w.sym.replace(/[<>&]/g,""):"—"}</b>${w.graduated?' <span class="muted" style="font-size:.72rem">grad</span>':""}</td>
+          <td><b style="color:${w.tier==="major"?"var(--lime)":"var(--cyan)"}">${w.tier}</b></td>
+          <td class="n">${usd(w.heldPeak)}</td><td class="n">${usd(w.curMcap)}</td>
+          <td class="n">${w.sustainedH?Math.round(w.sustainedH/24)+"d":"—"}</td>
+          <td class="n">${w.holders?w.holders.toLocaleString():"—"}${keep!=null?` <span class="muted" style="font-size:.72rem">${keep}%</span>`:""}</td></tr>`;}).join("")
+      }</tbody></table></div>`;
+    }
+    $("#rollbox").innerHTML=rb;
     const rows=v.perBin.map(r=>{
       const w=r.auc==null?0:Math.round(r.auc*100);
       return `<tr><td>${r.age}</td>
