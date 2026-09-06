@@ -383,7 +383,7 @@ function rerenderHolders(){
 
 function smartPanel(sm){
   if(!sm||!sm.count) return "";
-  const conv=sm.count>=2;
+  const cs=sm.consensus, conv=!!(cs&&cs.n>=2);
   const brk=sm.riding?` <span class="spb">${sm.proven} proven · ${sm.riding} riding</span>`:"";
   const rows=(sm.wallets||[]).map(w=>{
     const ride=w.kind==="riding";
@@ -394,7 +394,8 @@ function smartPanel(sm){
       <span class="wid"><span class="wn">${B0.codename(w.a)} ${tag}</span><span class="wm">${rec||(ride?"riding a winner":"proven wallet")}</span></span>
       <span class="wv" style="color:var(--dim)">${kT(w.bal)}</span>${g.go}</${g.tag}>`;}).join("");
   return `<div class="smartpanel${conv?" conv":""}">
-    <div class="sph">${B0.ico("target")} <b>${sm.count}</b> smart-money wallet${sm.count>1?"s":""} positioned${conv?' <span class="cvt">· converging</span>':''}${brk}
+    <div class="sph">${B0.ico("target")} <b>${sm.count}</b> smart-money wallet${sm.count>1?"s":""} positioned${conv?` <span class="cvt">· consensus ${cs.strength}</span>`:''}${brk}
+      ${conv?`<span class="spsub" style="color:var(--lime)">◎ <b>${cs.n} of them bought within ${cs.spanMin<1?"the same minute":cs.spanMin+" min"} of each other</b>${cs.tight10>=2?` (${cs.tight10} inside 10 min)`:""} — strength ${cs.strength}, weighted by each wallet's realised record. Independent proven traders landing together is the read; a position bought days apart is not.</span>`:''}
       <span class="spsub"><b>Proven</b> = realised profit on past launches. <b>Riding</b> = large unrealised gains on a real-market token they still hold. A confidence signal reconstructed from on-chain holdings — not a recommendation.</span></div>
     <div class="wlist">${rows}</div></div>`;
 }

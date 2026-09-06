@@ -28,12 +28,22 @@ test("insiders STARTING to sell fires once, then respects the cooldown", () => {
   assert.equal(r5.events.length, 1);
 });
 
-test("smart-money convergence fires when the count REACHES 2, not on every cycle", () => {
+test("smart-money convergence = CONSENSUS: fires once when record-weighted strength crosses the bar with a fresh bought-together cluster; a flat count reaching 2 does NOT", () => {
+  // holding-count alone reaching 2 → no event (bags bought days apart are a position, not an event)
   const s1 = detectEvents({}, [base({ smart: { count: 1 } })], { now: 1 }).next;
-  const r = detectEvents(s1, [base({ smart: { count: 2 } })], { now: 2 });
+  const flat = detectEvents(s1, [base({ smart: { count: 2, consensus: null } })], { now: 2 });
+  assert.equal(flat.events.length, 0, "no bought-together cluster → no alert");
+  // consensus strength crosses 2.0 with a fresh cluster → fires once, sev good, headline carries the numbers
+  const cons = { n: 2, strength: 3.6, spanMin: 14, tight10: 1, freshH: 0.4 };
+  const r = detectEvents(flat.next, [base({ smart: { count: 2, consensus: cons } })], { now: 3 });
   assert.equal(r.events.length, 1); assert.equal(r.events[0].kind, "smart-convergence"); assert.equal(r.events[0].sev, "good");
-  const r2 = detectEvents(r.next, [base({ smart: { count: 3 } })], { now: 3, lastFired: r.lastFired });
+  assert.match(r.events[0].headline, /2 proven wallets bought within 14 min/); assert.match(r.events[0].headline, /consensus 3\.6/);
+  // strength stays above the bar next cycle → NOT re-fired (a transition, plus the cooldown)
+  const r2 = detectEvents(r.next, [base({ smart: { count: 3, consensus: { ...cons, n: 3, strength: 4.9 } } })], { now: 4, lastFired: r.lastFired });
   assert.equal(r2.events.length, 0);
+  // a stale cluster (latest buy 12h ago) crossing the bar does not fire — never alert on an old cluster
+  const stale = detectEvents(flat.next, [base({ smart: { count: 2, consensus: { ...cons, freshH: 12 } } })], { now: 5 });
+  assert.equal(stale.events.length, 0);
 });
 
 test("clean-launch fires when a fresh launch clears the bar; dust and old coins never alert", () => {

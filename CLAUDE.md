@@ -307,3 +307,17 @@ dumping — places it against a study of past winners, and shows the wallet inte
 - **RULES:** never present the sustained tier as "made it past $1M"; never fit the resemblance model on survivors only;
   `winnerRoll`/`winnerVenues`/ladder all derive from `isReached(e)` (heldPeak-based, works on old index entries too).
   `definitions()` now has 8 rows (`reached` first). Pipeline test pins reached=14/sustained=14/definitions=8 on synthetic data.
+
+## ◎ SMART-MONEY "CONVERGENCE" IS NOW CONSENSUS — bought TOGETHER, record-weighted (owner greenlit, 2026-09-06)
+- Borrowed the sharpest definition in the FOMO tool ecosystem (fomosignal: "3 tracked traders buying the same token inside
+  10 minutes, weighted by realised record") and did it on-chain. The old trigger was a flat count — "≥2 proven wallets now
+  HOLD it" — which fires on bags bought days apart (a position, not an event).
+- `smart-money.mjs`: `smartWeight(meta)` = 0.5 + 0.5·winRate + min(1, log10(1+realised$)/6) (≈0.5 thin … ≈2.0 for $1M/100%);
+  `consensusOf(hits)` = the densest window (default 60 min) of proven wallets that actually BOUGHT on the pool (`bought>0`;
+  a transfer-received bag is not a buy decision) → `{n, strength(Σweights), spanMin, tight10, freshH, wallets}`; exposed as
+  `smart.consensus` by `smartHolders`. `convergence()` ranks the board by strength, then count.
+- `alert-events.mjs`: `smart-convergence` fires when `consensus.n ≥ smartMin(2)` AND strength CROSSES `consensusMin`(2.0) AND
+  the cluster's latest buy is within `consensusFreshH`(3h). The flat count trigger is GONE. Headline: "N proven wallets
+  bought within X min of each other · consensus S (record-weighted) · risk R/100". Dossier smart panel states it in words.
+- Tests: `test/consensus.test.mjs` (weighting, densest-window, days-apart = none, transfer bags ignored, ranking, detector
+  crossing/stale/seed) + the legacy alert test rewritten to the new semantics.
