@@ -321,3 +321,28 @@ dumping — places it against a study of past winners, and shows the wallet inte
   bought within X min of each other · consensus S (record-weighted) · risk R/100". Dossier smart panel states it in words.
 - Tests: `test/consensus.test.mjs` (weighting, densest-window, days-apart = none, transfer bags ignored, ranking, detector
   crossing/stale/seed) + the legacy alert test rewritten to the new semantics.
+
+## 🔴🔴 THE PICK HAS NO DEMONSTRATED ECONOMIC EDGE — measured 2026-09-06, do NOT market it as alpha
+- Owner asked the right question: "of all the tokens that went multi-million, when did we identify them?" Built
+  `tools/replay-picks.mjs` (point-in-time daily replay of the crowned pick) to answer it. **The answer is negative.**
+- **First read was WRONG and flattering. Two errors, both now fixed in the tool:**
+  1. **BASELINE** — pooling candidate-days made a RANDOM daily pick show 1.9× "lift". Correct baseline for one-pick-per-day
+     is the DAY-WEIGHTED mean of each day's hit fraction. With it, random = 1.19× (sane).
+  2. **OBJECTIVE** — "did it reach $1M" is trivially gamed by entering late. Ranking by MARKET CAP alone gets the BEST
+     hit-rate (50.9%) by entering at $815k, i.e. buying a 1.2×. The product metric is RETURN: entry → forward peak.
+- **Result (53 days, candidates <$1M, age 1–168h):** hit% / median entry / MEDIAN forward multiple
+  PROMISE (our model) 35.8% · $198k · **1.58×** | MCAP 50.9% · $815k · 1.29× | HOLDERS 32.1% · $127k · 1.37× |
+  **RANDOM 15.1% · $45k · 2.96×**. So the model beats random on hit-rate but **LOSES TO RANDOM ON RETURN**. It selects
+  tokens already part-developed (closer to $1M ⇒ likelier to cross) at the cost of the upside that is the whole point.
+- **The retrodicted "call sheet" (YOLO $9k→1027×, DELTA $21k→695×) is CHERRY-PICKED — never use it as proof.** Those are
+  the best 8 of 59 reachers out of **492 tokens the same bar flagged** (precision 12% = the base rate exactly). A bar that
+  flags 80% of the universe "catching" the winners is arithmetic, not skill.
+- **What survives:** the FORENSIC layer (bundles, coordination consensus, insider selling, concentration, hard vetoes) —
+  a structural-cleanliness claim, honest and useful, but it is RISK screening, not alpha.
+- **VERDICT RULE, permanent:** a ranker earns its place only if it beats mcap/holders/random on **median forward multiple**
+  on the same days. Hit-rate alone is not evidence. Re-run `node tools/replay-picks.mjs` after ANY ranking change.
+- **Untested levers that could still carry alpha (in order):** (1) SMART MONEY — absent from the replay entirely (not in
+  the profile series) and its current definition is broken (`tokensWon >= 1`, so one lucky/insider win = "proven"); fix to
+  ≥2–3 independent profitable round-trips excluding block-0 snipes, bake into profiles, re-run this exact test.
+  (2) Widen the pool beyond graduated-only (base rate collapses ~0.02%, so real lift would be enormous and meaningful).
+  (3) Early flow dynamics. Test each with the tool BEFORE building any UI on it.
