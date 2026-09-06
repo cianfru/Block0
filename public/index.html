@@ -173,6 +173,13 @@
   .wrow .wn{font-weight:600;font-size:.86rem;font-family:var(--sans)}
   .wrow .wm{font-size:.66rem;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
   .wrow .wv{margin-left:auto;text-align:right;font-family:ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:.82rem}
+  /* position chip: P&L + ROI on top, entry price beneath — sits between the identity and the balance/net column */
+  .wrow .wpl{display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:auto;font-family:ui-monospace,monospace;font-variant-numeric:tabular-nums;line-height:1.15;flex:0 0 auto}
+  .wrow .wpl b{font-size:.78rem;font-weight:700} .wrow .wpl b.pos{color:var(--lime)} .wrow .wpl b.neg{color:var(--coral)}
+  .wrow .wpl i{font-style:normal;font-size:.68rem;color:var(--dim);margin-left:4px}
+  .wrow .wpl small{font-size:.62rem;color:var(--mute);letter-spacing:.02em}
+  .wrow .wpl + .wv{margin-left:12px;min-width:5.5ch}
+  @media(max-width:520px){.wrow .wpl small{display:none}}
   .wrow .zl{font-size:.68rem;color:var(--lime);white-space:nowrap;margin-left:8px}
   .wrow .zl.addr{color:var(--mute);font-family:ui-monospace,monospace;cursor:copy}
   .wrow .zl.addr:hover{color:var(--dim)}
@@ -344,6 +351,17 @@ function placement(r){
   </div>`;
 }
 
+// a wallet's position on this token, when the priced reconstruction has it: total P&L (realized + unrealized),
+// ROI on what it put in, and its average entry. Wallets with no pool trades (coins arrived by transfer) get NO chip —
+// unknown cost is never dressed up as a number. Honest-low by construction (see pnl.mjs).
+function posChip(a){
+  if(!PNL||!PNL.size) return "";
+  const p=PNL.get(String(a||"").toLowerCase()); if(!p||!(p.invested>0)) return "";
+  const pnl=+p.pnl||0, roi=p.roi!=null?p.roi:(p.invested>0?pnl/p.invested:null);
+  const up=pnl>=0, cls=up?"pos":"neg", sign=up?"+":"−";
+  const roiTxt=roi==null?"":` <i>${(roi>=0?"+":"")+(roi*100).toFixed(0)}%</i>`;
+  return `<span class="wpl" title="P&amp;L on this token from its pool trades — realized + unrealized, marked at the last swap price. Coins received by transfer have unknown cost and count as zero profit (honest-low)."><b class="${cls}">${sign}$${kT(Math.abs(pnl))}</b>${roiTxt}<small>in @ ${pxFmt(p.avgCost)}</small></span>`;
+}
 function walletRows(rows,dir){
   if(!rows||!rows.length) return `<div class="empty">no wallets ${dir==='top'?'':'moving'} right now</div>`;
   return rows.map(w=>{
@@ -353,7 +371,14 @@ function walletRows(rows,dir){
     const ct=w.contract?` <span class="ctag" title="a contract — bot, router or pool, not a trader">contract</span>`:'';
     return `<${g.tag} class="wrow"${g.attrs}>${B0.avatar(w.a,30)}
       <span class="wid"><span class="wn">${B0.codename(w.a)}${ct}${w.sniper?` <span class="snipe" title="sniper">${B0.ico("bolt")}</span>`:''}</span><span class="wm">${dir==='top'?'holder':dir==='buy'?'accumulating':'distributing'}</span></span>
-      ${val}${g.go}</${g.tag}>`;}).join("");
+      ${posChip(w.a)}${val}${g.go}</${g.tag}>`;}).join("");
+}
+// redraw the three holder tables once the priced reconstruction lands (they first render without P&L, instantly)
+function rerenderHolders(){
+  const r=DOSSIER; if(!r) return;
+  const lists=document.querySelectorAll(".tables .tbl .wlist"); if(lists.length<3) return;
+  lists[0].innerHTML=walletRows(r.buyers,"buy"); lists[1].innerHTML=walletRows(r.sellers,"sell"); lists[2].innerHTML=walletRows(r.topHolders,"top");
+  const n=$("#plnote"); if(n){ n.hidden=!(PNL&&PNL.size); }
 }
 
 function smartPanel(sm){
@@ -476,7 +501,8 @@ function render(r){
       <div class="tbl"><h3 class="buy">Adding now <span>net 30m</span></h3><div class="wlist">${walletRows(r.buyers,"buy")}</div></div>
       <div class="tbl"><h3 class="sell">Shedding now <span>net 30m</span></h3><div class="wlist">${walletRows(r.sellers,"sell")}</div></div>
       <div class="tbl"><h3>Biggest bags <span>balance</span></h3><div class="wlist">${walletRows(r.topHolders,"top")}</div></div>
-    </div>`;
+    </div>
+    <div class="chnote" id="plnote" hidden>Each wallet's <b>P&amp;L and entry</b> are reconstructed from its pool trades — realized + unrealized, marked at the last swap price. Coins that arrived by wallet-to-wallet transfer have unknown cost and are credited <b>zero</b> profit, so every number is honest-low. Wallets with no pool trades show no P&amp;L rather than a guess.</div>`;
   loadHistory(r);
   loadGraph(r.address);
   loadMarket(r.address);
@@ -484,6 +510,9 @@ function render(r){
 
 /* ---------------- history chart (canvas, no deps) ---------------- */
 let SERIES=null, VIEW="mcap", CV, TIP, DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1));
+// POSITION STRUCTURE — per-wallet entry cost + P&L on THIS token, from the backtest's priced-trade reconstruction
+// (pnl.mjs). The dossier already downloads that payload for the chart, so this is a free client-side join: no RPC.
+let PNL=null, PNL_PRICE=null;
 const VMETA={mcap:{lab:"market cap",fmt:mcT,col:"#35e6e0"},price:{lab:"price",fmt:pxUsd,col:"#35e6e0"},
   wallets:{lab:"unique wallets",fmt:(x)=>Math.round(x).toLocaleString(),col:"#ff5cf0"},volUsd:{lab:"volume / bucket",fmt:mcT,col:"#ffd23d"}};
 
@@ -505,6 +534,9 @@ async function loadHistory(r){
     CV.style.display="block"; note.hidden=true; $("#cvcor").style.display="block"; noteC.hidden=true;
     SERIES=bt.series.map(s=>({t:s.t,risk:s.risk,label:s.label,mcap:s.mcap,price:s.price,wallets:s.wallets,volUsd:s.volUsd,holders:s.holders,top10:s.top10,ageH:s.ageH,traj:s.traj,blueprint:s.blueprint}));
     CORR=bt.corridor||[];
+    // position structure: join each holder to its reconstructed position and redraw the holder tables in place
+    PNL=new Map((bt.pnl||[]).map(p=>[String(p.a||"").toLowerCase(),p])); PNL_PRICE=bt.curPrice??null;
+    rerenderHolders();
     // thin tokens often have no reconstructable price → mcap/price/volUsd are null. Default the chart to a view
     // that actually has data, and dim the ones that don't, so the user never lands on an empty chart.
     const avail=(k)=>SERIES.some(s=>s[k]!=null&&isFinite(s[k]));
