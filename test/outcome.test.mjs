@@ -80,3 +80,23 @@ test("definitions mirror the rules and the platform token is excluded", () => {
   assert.equal(d.find((x) => x.tier === "runner").rule, "held-peak ≥ $1M, stayed ≥ $1M for 7 days, holders ≥ 70% of peak, still ≥ 25% of its held-peak");
   assert.ok(EXCLUDE_TOKENS.has("0x39dbed3a2bd333467115de45665cc57f813c4571"));
 });
+
+// Q1 `reached` — closed above $1M for a full day: a past fact, orthogonal to the durability label
+test("reached: true for runner AND for a token that held $1M then faded; false below the bar", async () => {
+  const { classifyOutcome, isReached, isNeverReached, funnelOf, definitions, RULES } = await import("../outcome.mjs");
+  const T0 = 1_700_000_000, H = 3600, D = 24 * H;
+  const flat = (mcap, hours, holders = 100) => Array.from({ length: hours + 1 }, (_, i) => ({ t: T0 + i * H, mcap, holders }));
+  const runner = classifyOutcome(flat(2e6, 10 * 24), { now: T0 + 12 * D, t0: T0, curMcap: 2e6 });
+  assert.equal(runner.label, "runner"); assert.equal(runner.reached, true); assert.ok(isReached(runner));
+  // held $1M for 8 days then collapsed → faded (Q2 negative) but STILL reached (Q1 positive)
+  const fadedAfter = classifyOutcome([...flat(2e6, 8 * 24), ...flat(5e4, 3 * 24).map((p, i) => ({ ...p, t: T0 + (8 * 24 + 1 + i) * H }))], { now: T0 + 12 * D, t0: T0, curMcap: 5e4 });
+  assert.equal(fadedAfter.label, "faded"); assert.equal(fadedAfter.reached, true); assert.ok(isReached(fadedAfter)); assert.ok(!isNeverReached(fadedAfter));
+  // never got near it → stalled, not reached, a Q1 negative
+  const stalled = classifyOutcome(flat(5e4, 8 * 24), { now: T0 + 9 * D, t0: T0, curMcap: 5e4 });
+  assert.equal(stalled.label, "stalled"); assert.equal(stalled.reached, false); assert.ok(isNeverReached(stalled));
+  // the funnel counts past facts
+  const f = funnelOf([runner, fadedAfter, stalled, { label: "pending", peakMcap: 1.5e6, heldPeak: 3e5 }]);
+  assert.equal(f.launched, 4); assert.equal(f.reached, 2); assert.equal(f.sustained, 1); assert.equal(f.touched, 3);
+  const d = definitions(); assert.equal(d[0].tier, "reached"); assert.equal(d.length, 8);
+  assert.match(d[0].rule, /closed above \$1M for a full day/);
+});

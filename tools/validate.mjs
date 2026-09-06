@@ -14,6 +14,7 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { STUDY_DIR, loadIndex } from "./cohort-lib.mjs";
+import { funnelOf, isReached, definitions } from "../outcome.mjs";
 const rd = (f) => JSON.parse(readFileSync(join(STUDY_DIR, f), "utf8"));
 const med = (a) => { if (!a.length) return null; const s = a.slice().sort((x, y) => x - y); const m = Math.floor(s.length / 2); return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
 const pctile = (arr, p) => { const s = arr.slice().sort((a, b) => a - b); if (!s.length) return 0; const i = (s.length - 1) * p; const l = Math.floor(i), h = Math.ceil(i); return l === h ? s[l] : s[l] + (s[h] - s[l]) * (i - l); };
@@ -77,6 +78,15 @@ function bestPoint(pos, neg) {
 }
 const lateLife = { aucWinnerVsLoser: r2(auc(wl, ll)), aucWinnerVsFaded: r2(auc(wl, fl)), bestThreshold: bestPoint(wl, ll), bestThresholdFaded: bestPoint(wl, fl) };
 
+// Q2 — DURABILITY. Among the tokens that DID reach $1M: did the trajectory tell the ones that HELD it (major/runner)
+// from the ones that collapsed (faded after $1M)? A different, smaller question than Q1 — reported on its own so a
+// strong Q1 can't be mistaken for "and it will hold". This is where the trap detector earns its keep.
+const SUS = W.filter((t) => t.cls === "major" || t.cls === "runner"), FA = W.filter((t) => t.cls === "faded");
+const sl = SUS.map(lateTraj).filter((x) => x != null), fal = FA.map(lateTraj).filter((x) => x != null);
+const durability = { sustained: SUS.length, fadedAfter: FA.length, undecidedAfter: W.length - SUS.length - FA.length,
+  aucLate: r2(auc(sl, fal)), bestPoint: bestPoint(sl, fal),
+  note: "graded only among tokens that closed above $1M for a day: held it a week+ (holders kept, alive) vs collapsed after. Undecided = reached $1M but too young / unresolved." };
+
 // PRECISION + BASE RATE — the honest counterweight to recall (ChatGPT #5). Winners are RARE, so even a low false-
 // positive rate leaves most "on-path" tokens fading. Precision = of everything the band flags, how many were winners;
 // lift = precision ÷ base rate (how much better than the prior). AUC/recall alone hide this; on a 6%-base-rate problem
@@ -138,19 +148,23 @@ if (Wd.length >= MIN_TEST * 2) {
   } else timeSplit = { ready: false, reason: `later slice too small (${test.length} winners / ${testL.length} controls after the cutoff; need ${MIN_TEST} each)` };
 }
 
-const counts = idx?.counts || {};
+const funnel = idx ? funnelOf(idx.tokens || []) : null;
+const counts = { ...(idx?.counts || {}), reached: funnel ? funnel.reached : (idx?.counts?.reached ?? null) };
 const out = {
   generatedAt: new Date().toISOString().slice(0, 10),
-  cohort: { winners: W.length, losers: L.length, faded: LF.length, counts, undecided: (counts.pending || 0) + (counts.mid || 0),
-    definitions: idx?.definitions || null, rules: idx?.rules || null, basis: "outcome labels — winners held ≥$1M for a week or more; graduation is not a criterion",
+  cohort: { winners: W.length, sustained: SUS.length, fadedAfter: FA.length, losers: L.length, faded: LF.length, counts, funnel,
+    undecided: idx ? (idx.tokens || []).filter((e) => !isReached(e) && (e.label === "pending" || e.label === "mid")).length : null,
+    definitions: definitions(), rules: idx?.rules || null,   // the CODE's rules, so the published table can't lag an older index
+    basis: "Q1 — winners = closed above $1M for a full day (held-peak ≥ $1M, a past fact); controls = decided and never reached $1M. Q2 (durability) reported separately. Graduation is not a criterion.",
     note: "in-sample separation on the study cohort plus a time-split hold-out — evidence that compounds as more launches settle, not proof" },
-  headline, precision, calibration, misses, perBin, lateLife, survivalSignal, timeSplit,
+  headline, precision, calibration, misses, perBin, lateLife, durability, survivalSignal, timeSplit,
 };
 writeFileSync(join(STUDY_DIR, "validation.json"), JSON.stringify(out));
 
 // print
 const pct = (x) => x == null ? "  —" : (Math.round(x * 100) + "%").padStart(4);
-console.log(`\nSIGNAL VALIDATION · ${W.length} winners vs ${L.length} controls (${LF.length} faded) · undecided excluded: ${out.cohort.undecided}\n`);
+console.log(`\nSIGNAL VALIDATION — Q1 reach $1M · ${W.length} closed above $1M for a day vs ${L.length} never-reached controls (${LF.length} faded below $1M) · undecided excluded: ${out.cohort.undecided}`);
+if (funnel) console.log(`funnel: ${funnel.launched} launched → ${funnel.touched} touched $1M (${funnel.pctTouched}%) → ${funnel.reached} closed above $1M a day (${funnel.pctReached}%) → ${funnel.sustained} held it a week+ (${funnel.pctSustained}%)\n`);
 console.log("age bin    alive:W/L   median traj W/L/F   on-band W/L   AUC all / faded   read");
 for (const r of perBin) {
   const a = r.aucFaded ?? r.auc; const sep = a == null ? "—" : a >= 0.75 ? "STRONG" : a >= 0.65 ? "useful" : a >= 0.55 ? "weak" : "≈coin-flip";
@@ -162,6 +176,7 @@ if (lateLife.bestThresholdFaded) console.log(`  best operating point (faded): tr
 console.log("\nsurvival alone (reached age at all):");
 for (const s of survivalSignal) console.log(`  past ${s.age.padEnd(4)}  winners ${pct(s.winners)}  controls ${pct(s.losers)}  faded ${pct(s.faded)}`);
 console.log(`\ntime split (FORWARD, out-of-sample by launch date — the honest headline): ${timeSplit.ready ? `cutoff ${timeSplit.cutoff} · train ${timeSplit.trainWinners} winners → test ${timeSplit.testWinners} winners / ${timeSplit.testControls} controls · catch ${pct(timeSplit.catch)} · false-pos ${pct(timeSplit.falsePos)} (faded ${pct(timeSplit.falsePosFaded)}) · late AUC ${timeSplit.lateAuc ?? "—"}` : "not ready — " + timeSplit.reason}`);
+console.log(`\nQ2 durability — among the ${W.length} that reached $1M: ${durability.sustained} held it · ${durability.fadedAfter} faded after · ${durability.undecidedAfter} undecided → late-life AUC held-vs-faded ${durability.aucLate ?? "—"}${durability.bestPoint ? ` (traj ≥ ${durability.bestPoint.thr}: catches ${pct(durability.bestPoint.tpr)} of holders, ${pct(durability.bestPoint.fpr)} of faders)` : ""}`);
 console.log(`\nprecision & base rate (winners are rare — recall alone flatters):`);
 console.log(`  base rate: ${pct(precision.baseRate)} of the cohort are winners (${precision.winners} vs ${precision.controls})`);
 if (precision.atBestPoint) console.log(`  at the operating point traj ≥ ${precision.atBestPoint.thr}: precision ${pct(precision.atBestPoint.precision)} (${precision.atBestPoint.tp} winners / ${precision.atBestPoint.tp + precision.atBestPoint.fp} flagged) · lift ${precision.atBestPoint.lift ?? "—"}×`);

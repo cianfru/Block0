@@ -4,7 +4,7 @@
 // winner/control split can never differ between builders.
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { classifyOutcome, isWinner, isControl, RULES, definitions, TIERS } from "../outcome.mjs";
+import { classifyOutcome, isWinner, isControl, isReached, isNeverReached, funnelOf, RULES, definitions, TIERS } from "../outcome.mjs";
 
 export const STUDY_DIR = process.env.STUDY_DIR || "study";
 export const PROFILES_DIR = join(STUDY_DIR, "profiles");
@@ -50,7 +50,7 @@ export function classifyProfile(p, live = null, now = Date.now() / 1000) {
 
 export function indexEntry(p, o) {
   return { addr: p.addr, sym: p.sym, name: p.name, source: p.source, graduated: p.graduated, launchedAt: p.launchedAt || new Date(p.t0 * 1000).toISOString(),
-    label: o.label, why: o.why, wasRunner: !!o.wasRunner, heldPeak: o.heldPeak, peakMcap: o.peakMcap, peakAtH: o.peakAtH, curMcap: o.curMcap,
+    label: o.label, why: o.why, reached: !!o.reached, wasRunner: !!o.wasRunner, heldPeak: o.heldPeak, peakMcap: o.peakMcap, peakAtH: o.peakAtH, curMcap: o.curMcap,
     sustainedH: o.sustainedH, ageH: o.ageH, holders: o.curHolders, peakHolders: o.peakHolders, retention: o.retention,
     transfers: p.transfers, capped: p.capped, cachedAt: p.cachedAt };
 }
@@ -60,22 +60,30 @@ export function tierCounts(entries) { const c = {}; for (const t of TIERS) c[t] 
 export function writeIndex(entries, extra = {}) {
   mkdirSync(STUDY_DIR, { recursive: true });
   entries.sort((a, b) => (b.heldPeak || 0) - (a.heldPeak || 0));
-  const out = { generatedAt: new Date().toISOString().slice(0, 10), rules: RULES, definitions: definitions(), counts: tierCounts(entries),
+  const funnel = funnelOf(entries);
+  const out = { generatedAt: new Date().toISOString().slice(0, 10), rules: RULES, definitions: definitions(), counts: { ...tierCounts(entries), reached: funnel.reached },
+    funnel, reached: funnel.reached, sustained: funnel.sustained,
     winners: entries.filter((e) => isWinner(e.label)).length, controls: entries.filter((e) => isControl(e.label)).length, ...extra, tokens: entries };
   writeFileSync(INDEX_PATH, JSON.stringify(out));
   return out;
 }
 export function loadIndex() { try { return JSON.parse(readFileSync(INDEX_PATH, "utf8")); } catch { return null; } }
 
-// What every downstream builder consumes: profiles joined to their index label. Winners = major+runner (sorted by
-// held-peak), controls = faded/stalled/dead (each carries `kind`), plus the undecided for the record.
+// What every downstream builder consumes: profiles joined to their index label, split by the TWO questions.
+//   Q1 (reach $1M)   winners  = every token that closed above $1M for a day (reached — a past fact, includes the ones
+//                              that later faded and the ones still too young to judge) · controls = decided & never
+//                              reached (stalled, dead, faded below $1M) · undecided = pending/mid still below $1M.
+//   Q2 (durability)  sustained = reached AND held it (major/runner) · fadedAfter = reached then collapsed.
+// The resemblance corridor is fitted on Q1 winners (n≈75, not 13); Q2 is reported separately by validate.
 export function loadCohort() {
   const idx = loadIndex();
   if (!idx) throw new Error(`no cohort index at ${INDEX_PATH} — run tools/build-cohort.mjs first`);
   const byAddr = new Map(idx.tokens.map((e) => [e.addr, e]));
   const profiles = loadProfiles().map((p) => ({ ...p, meta: byAddr.get(p.addr) || null })).filter((p) => p.meta);
-  const winners = profiles.filter((p) => isWinner(p.meta.label)).sort((a, b) => (b.meta.heldPeak || 0) - (a.meta.heldPeak || 0));
-  const controls = profiles.filter((p) => isControl(p.meta.label)).map((p) => ({ ...p, kind: p.meta.label }));
-  const undecided = profiles.filter((p) => !isWinner(p.meta.label) && !isControl(p.meta.label));
-  return { index: idx, profiles, winners, controls, undecided };
+  const winners = profiles.filter((p) => isReached(p.meta)).sort((a, b) => (b.meta.heldPeak || 0) - (a.meta.heldPeak || 0));
+  const controls = profiles.filter((p) => isNeverReached(p.meta)).map((p) => ({ ...p, kind: p.meta.label }));
+  const sustained = winners.filter((p) => isWinner(p.meta.label));
+  const fadedAfter = winners.filter((p) => p.meta.label === "faded");
+  const undecided = profiles.filter((p) => !isReached(p.meta) && !isNeverReached(p.meta));
+  return { index: idx, profiles, winners, controls, sustained, fadedAfter, undecided, funnel: funnelOf(idx.tokens) };
 }

@@ -174,7 +174,9 @@
           <span class="farr">→</span>
           <span class="fs"><b class="fn dimn" id="fGrad">—</b><i>reached the market</i></span>
           <span class="farr" id="fWinArr" hidden>→</span>
-          <span class="fs" id="fWinWrap" hidden><b class="fn limen" id="fWin">—</b><i>made it past $1M</i></span>
+          <span class="fs" id="fWinWrap" hidden><b class="fn limen" id="fWin">—</b><i>closed above $1M for a day</i></span>
+          <span class="farr" id="fSusArr" hidden>→</span>
+          <span class="fs" id="fSusWrap" hidden><b class="fn limen" id="fSus">—</b><i>held it a week+</i></span>
         </div>
         <p class="sub">Most new coins are traps. Paste any one — Block0 checks the wallets behind it and tells you, free, if it's <b style="color:var(--lime)">clean</b> or a <b style="color:var(--coral)">trap</b>. Then it shows you the one launch actually worth watching right now.</p>
         <form class="scan" onsubmit="return scan(event)">
@@ -210,7 +212,7 @@
 
   <!-- PROOF: the winners the model caught (free, retrospective) — the LIVE best shot is gated below -->
   <section class="sec" id="shotsec" hidden>
-    <div class="stitle"><p class="micro eye">proof · it works</p><h2>The coins that made it — and Block0 saw them early</h2><p class="sub" id="proofSub">These are the launches that grew past $1M and stayed there. Block0 flagged every one as clean while it was still small.</p></div>
+    <div class="stitle"><p class="micro eye">the funnel · real numbers</p><h2>The launches that closed above $1M — and which ones held it</h2><p class="sub" id="proofSub">Every launch on the chain, graded by what it actually did. Loading the numbers…</p></div>
     <div class="wins" id="wins"></div>
     <p class="sub" style="margin-top:14px;font-size:.82rem">A clean read is the green light to <b style="color:var(--tx)">look closer</b> — not a promise. A dirty launch almost never wins; some clean ones still fade. That honest limit is <a href="/methodology">measured, not hidden</a>.</p>
     <a class="shotlock" href="/board" id="shotlock">
@@ -443,11 +445,12 @@ function tickTo(el,target){
   el._tick=requestAnimationFrame(step);
 }
 // winners leg of the funnel — only from the OUTCOME-labelled study (counts present); never faked from older data
+// the funnel's last two stages come from the study: closed above $1M for a day (a past fact) → held it a week+
 async function loadWinners(){
   try{ const v=await fetch("/api/validation").then(r=>r.json());
-    const c=v&&v.cohort&&v.cohort.counts;
-    if(c&&(c.major!=null||c.runner!=null)){ const w=(c.major||0)+(c.runner||0);
-      if(w>0){ $("#fWin").textContent=w; $("#fWinWrap").hidden=false; $("#fWinArr").hidden=false; } }
+    const f=v&&(v.funnel||(v.cohort&&v.cohort.funnel));
+    if(f&&f.reached>0){ $("#fWin").textContent=f.reached; $("#fWinWrap").hidden=false; $("#fWinArr").hidden=false;
+      if(f.sustained>0){ $("#fSus").textContent=f.sustained; $("#fSusWrap").hidden=false; $("#fSusArr").hidden=false; } }
   }catch(e){}
 }
 // PROOF — the winners the model caught (retrospective, real). The LIVE best shot stays gated (the .shotlock CTA).
@@ -456,17 +459,19 @@ async function loadWins(){
   try{ const v=await fetch("/api/validation").then(r=>r.json());
     const roll=(v.winnerRoll||[]).slice(0,6);
     if(!roll.length) return;
-    const c=v.cohort||{}, p=v.progress||{}, ts=v.timeSplit||{};
-    const done=p.cached??p.backtested, nWin=(c.winners!=null?c.winners:roll.length);
-    let sub=`We checked ${done?done.toLocaleString():"every"} launch${done?"es":""}. ${nWin} grew past $1M and stayed there.`;
-    if(ts&&ts.ready&&ts.testWinners&&ts.catch>=1) sub+=` Block0 spotted every one while it was still small.`;
-    else if(ts&&ts.ready&&ts.testWinners) sub+=` Block0 flagged them clean early.`;
+    const f=v.funnel||(v.cohort&&v.cohort.funnel)||{}, p=v.progress||{};
+    const done=f.launched||p.cached||p.backtested||0, reached=f.reached||roll.length, sus=f.sustained||0;
+    // the honest funnel, in plain words — never one scary tier
+    let sub=done?`We checked ${done.toLocaleString()} launches. ${reached} closed above $1M for a full day — about 1 in ${Math.max(2,Math.round(done/Math.max(1,reached)))}.`:`${reached} launches closed above $1M for a full day.`;
+    if(sus) sub+=` ${sus} of those held it a week or more. The biggest are below, with what happened next.`;
     $("#proofSub").textContent=sub;
-    $("#wins").innerHTML=roll.map(w=>{ const keep=w.peakHolders?Math.round((w.holders/w.peakHolders)*100):null;
-      const bits=[]; if(w.sustainedH) bits.push("held for "+Math.round(w.sustainedH/24)+" days"); if(keep!=null) bits.push(keep+"% still holding");
-      return `<div class="win"><span class="win-top"><span class="win-sym">${esc(w.sym||"?")}</span><span class="win-tier ${w.tier}">${esc(w.tier||"")}</span></span>
-        <span class="win-cap">${B0.mcT(w.heldPeak)}</span><span class="win-cl">reached</span>
-        <span class="win-meta">${bits.join(" · ")||"still holding its value"}</span></div>`;}).join("");
+    // fate = the Q2 answer, per token: held it / faded after / still too young to call
+    const FATE={major:["held it",'var(--lime)'],runner:["held it",'var(--lime)'],faded:["faded after",'var(--coral)'],pending:["too young to call",'var(--mute)'],mid:["still open",'var(--mute)']};
+    $("#wins").innerHTML=roll.map(w=>{ const [ft,fc]=FATE[w.tier]||["—","var(--mute)"]; const keep=w.peakHolders?Math.round((w.holders/w.peakHolders)*100):null;
+      const bits=[]; if(w.sustainedH>=24) bits.push("above $1M for "+Math.round(w.sustainedH/24)+"d"); if(keep!=null&&(w.tier==="major"||w.tier==="runner")) bits.push(keep+"% still holding");
+      return `<div class="win"><span class="win-top"><span class="win-sym">${esc(w.sym||"?")}</span><span class="win-tier" style="color:${fc};border-color:${fc}">${ft}</span></span>
+        <span class="win-cap">${B0.mcT(w.heldPeak)}</span><span class="win-cl">closed above · a full day</span>
+        <span class="win-meta">${bits.join(" · ")||"closed above $1M for a day"}</span></div>`;}).join("");
     $("#shotsec").hidden=false;
   }catch(e){}
 }

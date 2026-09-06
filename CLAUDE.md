@@ -281,3 +281,29 @@ dumping — places it against a study of past winners, and shows the wallet inte
   they trigger on-chain reconstruction (cached, but a distinct-address spray costs RPC).
 - **🔲 Still flagged:** mobile hamburger nav (most traffic is mobile-from-X), OG images + favicon, out-of-sample model
   tracking as the cohort grows, scroll-linked replay of the corridor animation.
+
+## ⭐⭐ THE STUDY ASKS TWO QUESTIONS NOW — "13 winners" WAS A MISLEADING TIER (owner, 2026-09-05)
+- **The problem the owner caught:** after the full 618-launch backfill the "winner" count *fell* to 13, and "13 made it past
+  $1M" read as if most launches never get there. False: **160 touched $1M, 75 closed above $1M for a full day, 13 held it a
+  week+.** The single strict sustained-winner definition collapsed a deep funnel into its scariest tier, and its 7-day
+  sustain window *excluded the chain's biggest current tokens* (SHROOM $38M, BUN, OPTIMUS, ROBINCAT… pending because <7d
+  old). A study can't claim value on n=13 — and it never needed to.
+- **The fix — split the question (`outcome.mjs`):** `reached` = **closed above $1M for a full day** (held-peak ≥ $1M; the
+  owner's chosen bar). It is a PAST FACT — never censored — so every token that did it counts: held, faded-after, or still
+  young. Labels (major/runner/faded/…) still encode durability, orthogonally.
+  - **Q1 "will it reach $1M?"** — `loadCohort().winners` = reached (n=75), controls = decided & never reached (stalled/dead/
+    faded-below-$1M, n=266). The corridor, ladder and blueprint are fitted on THIS class (bins n=75, ladder rungs n≈40–58,
+    vs ~14 before). Base rate 22%.
+  - **Q2 "will it hold?"** — among reached: `sustained` (13) vs `fadedAfter` (30), 32 undecided. Reported by `validate.mjs`
+    as `durability` — late-life AUC **0.83**, traj≥80 keeps 69% of holders while flagging 3% of faders. Never folded into Q1.
+- **Honest consequence (say it, don't hide it):** the Q1 numbers are *weaker* than the old n=13 figures (in-sample late AUC
+  0.79/0.72 vs 0.86/0.83; forward split catch 77% / false-pos 67% / AUC 0.68 on 23 test winners) — because the old numbers
+  were partly SURVIVORSHIP (13 hand-picked durable survivors separate easily). The new Q1 is a harder, larger, real problem;
+  Q2 is where the sharp signal lives. Precision at the Q1 operating point 61% (lift 2.8×); misses named (27/75 FN, 31/266 FP).
+- **The FUNNEL is the proof number, never a tier:** `funnelOf(entries)` → {launched, touched, reached, sustained, pct…}, carried
+  in cohort.json, corridor_data, model.json.cohort, validation.json, `/api/validation` (`v.funnel`). Landing funnel =
+  launched → reached the market → **closed above $1M for a day** → **held it a week+**; the proof roll = every reached
+  token with its Q2 fate (held / faded after / too young). Methodology renders the funnel + both questions + a Q2 block.
+- **RULES:** never present the sustained tier as "made it past $1M"; never fit the resemblance model on survivors only;
+  `winnerRoll`/`winnerVenues`/ladder all derive from `isReached(e)` (heldPeak-based, works on old index entries too).
+  `definitions()` now has 8 rows (`reached` first). Pipeline test pins reached=14/sustained=14/definitions=8 on synthetic data.

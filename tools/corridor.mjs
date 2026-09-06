@@ -40,7 +40,7 @@ function profileToken(r, cls) {
 const cohort = loadCohort();
 const winners = cohort.winners.map((r) => profileToken(r, r.meta.label));
 const losers = cohort.controls.map((r) => profileToken(r, r.kind));
-console.log(`cohort: ${winners.length} winners (${cohort.index.counts.major} major · ${cohort.index.counts.runner} runner) · ${losers.length} controls (${cohort.index.counts.faded} faded · ${cohort.index.counts.stalled} stalled · ${cohort.index.counts.dead} dead) · ${cohort.undecided.length} undecided excluded`);
+console.log(`cohort (Q1 reach $1M): ${winners.length} closed above $1M for a day (${cohort.sustained.length} held it a week+ · ${cohort.fadedAfter.length} faded after) · ${losers.length} never-reached controls · ${cohort.undecided.length} undecided excluded`);
 
 // age bins (hours), log-spaced-ish
 const EDGES = [0, 0.5, 1, 2, 4, 8, 16, 32, 64, 128, 256, 600];
@@ -57,7 +57,7 @@ for (let b = 0; b < EDGES.length - 1; b++) {
 const thin = (pts) => { const step = Math.max(1, Math.floor(pts.length / 40)); return pts.filter((_, i) => i % step === 0 || i === pts.length - 1); };
 const outTok = (arr) => arr.map((w) => ({ sym: w.sym, addr: w.addr, cls: w.cls, mcapUsd: w.mcapUsd, heldPeak: w.heldPeak, launchedAt: w.launchedAt, t0: w.t0, hours: w.hours, path: thin(w.pts).map((p) => ({ a: p.ageH, t: p.traj, h: p.holders, c: p.top10 })) }));
 
-writeFileSync(`${STUDY_DIR}/corridor_data.json`, JSON.stringify({ generatedAt: new Date().toISOString().slice(0, 10), cohort: { winners: winners.length, controls: losers.length, counts: cohort.index.counts }, bins, winners: outTok(winners), losers: outTok(losers) }, null, 0));
+writeFileSync(`${STUDY_DIR}/corridor_data.json`, JSON.stringify({ generatedAt: new Date().toISOString().slice(0, 10), cohort: { winners: winners.length, sustained: cohort.sustained.length, fadedAfter: cohort.fadedAfter.length, controls: losers.length, counts: cohort.index.counts, funnel: cohort.funnel, basis: "winners = closed above $1M for a full day (Q1 reached); controls = decided and never reached $1M" }, bins, winners: outTok(winners), losers: outTok(losers) }, null, 0));
 
 // debug
 console.log("age bin        winners: p10  q1  med  q3  p90   (n)");

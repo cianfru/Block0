@@ -53,11 +53,14 @@ test("pipeline: synthetic cohort → corridor → projection → model → valid
   run("gen-model.mjs", ["--out=" + modelPath]);
   const model = JSON.parse(readFileSync(modelPath, "utf8"));
   assert.ok(model.ladder.length >= 3 && model.corridor.length >= 3, `ladder ${model.ladder.length} corridor ${model.corridor.length} ${JSON.stringify(model.ladder)}`);
-  assert.equal(model.cohort.winners, 14); assert.equal(model.cohort.definitions.length, 7);
+  // winners = Q1 reached (closed above $1M a day): all 14 synthetic winners reach, no fade/stalled does → 14
+  assert.equal(model.cohort.winners, 14); assert.equal(model.cohort.sustained, 14); assert.equal(model.cohort.definitions.length, 8);
+  assert.equal(model.cohort.funnel.reached, 14); assert.equal(model.cohort.funnel.launched, 36);
   assert.ok(model.corridor.some((b) => b.tw != null && b.tm != null), "stage targets attached");
   run("validate.mjs");
   const v = JSON.parse(readFileSync(join(dir, "validation.json"), "utf8"));
   assert.equal(v.cohort.winners, 14); assert.equal(v.cohort.losers, 22); assert.equal(v.cohort.faded, 16);
+  assert.equal(v.durability.sustained, 14, "Q2: every synthetic winner held it"); assert.equal(v.durability.fadedAfter, 0);
   assert.ok(v.perBin.length >= 3 && v.perBin.every((r) => "aucFaded" in r));
   assert.ok(v.headline.falsePosFaded != null);
   assert.equal(v.timeSplit.ready, true, JSON.stringify(v.timeSplit));

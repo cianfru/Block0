@@ -1,7 +1,14 @@
 // OUTCOME LABELS — what a launch actually became, from its reconstructed history. ONE rule for every token on the
-// chain (Pons or direct DEX listing); graduation is NOT a criterion. A "winner" is a token that reached a real
-// valuation AND HELD it — a sustainable path to multi-million, not a spike.
+// chain (Pons or direct DEX listing); graduation is NOT a criterion.
 //
+// TWO QUESTIONS, kept apart (they have very different data support — conflating them starved the model to n=13):
+//   Q1 REACHED  — did it close above $1M for a full day? (`reached` = held-peak ≥ $1M). A PAST FACT: once true it
+//                 can never be censored or undone, so every token that did it is a positive — pending, faded or held.
+//                 This is the runner question and the class the resemblance corridor is fitted on (n≈75, not 13).
+//   Q2 DURABLE  — among those that reached $1M, did it HOLD (major/runner) or collapse (faded)? A sustainable path
+//                 to multi-million vs a spike. Fewer tokens, a different question — where the trap detector matters.
+//
+// The labels below encode Q2 (durability); `reached` is orthogonal and derived from held-peak.
 //   major    held-peak ≥ $5M, held ≥ $1M for 14 consecutive days, holders retained, not collapsed since
 //   runner   held-peak ≥ $1M, held ≥ $1M for  7 consecutive days, holders retained, not collapsed since
 //   ("held-peak" = the highest cap the token stayed at for a full day — reconstructed caps wick on single swaps;
@@ -80,6 +87,7 @@ export function classifyOutcome(series, { now = Date.now() / 1000, t0 = null, cu
   const keptHolders = retention == null || retention >= R.holderKeep;
   const alive = cur >= heldPeak * R.fadeKeep;   // hasn't collapsed relative to its own held level
   const base = { ageH: +ageH.toFixed(1), peakMcap: Math.round(peak), heldPeak: Math.round(heldPeak), peakAtH: peakT == null ? null : +((peakT - start) / 3600).toFixed(1),
+    reached: heldPeak >= R.runnerMcap,   // Q1: closed above $1M for a full day — a past fact, never censored
     curMcap: Math.round(cur), sustainedH: +sustainedH.toFixed(1), curHolders: curH, peakHolders, retention };
   const out = (label, why, extra = {}) => ({ label, why, ...base, ...extra });
 
@@ -109,11 +117,31 @@ export const isWinner = (label) => WINNER_TIERS.has(label);
 export const isControl = (label) => CONTROL_TIERS.has(label);
 export const isSettled = (label) => label !== "pending" && label !== "mid";
 
+// Q1 — closed above $1M for a full day. Derived from held-peak so it works on any index entry, old or new.
+export const isReached = (e, rules = RULES) => !!(e && (e.reached || (e.heldPeak || 0) >= rules.runnerMcap));
+// Q1 negatives — decided AND never reached $1M: stalled/dead, or faded below the $1M bar. (A faded token that DID
+// hold $1M a day is a Q1 positive — it reached — and a Q2 negative — it didn't hold.)
+export const isNeverReached = (e, rules = RULES) => !!(e && !isReached(e, rules) && (e.label === "stalled" || e.label === "dead" || e.label === "faded"));
+
+// The funnel — the honest shape of the chain, not one scary tier. All PAST FACTS except the last (sustained).
+export function funnelOf(entries, rules = RULES) {
+  const T = entries || [];
+  const touched = T.filter((e) => (e.peakMcap || 0) >= rules.runnerMcap).length;      // any moment ≥ $1M (wicks count)
+  const reached = T.filter((e) => isReached(e, rules)).length;                          // closed above $1M for a day
+  const sustained = T.filter((e) => isWinner(e.label)).length;                          // held it a week+, holders kept, alive
+  const major = T.filter((e) => e.label === "major").length;
+  return { launched: T.length, touched, reached, sustained, major,
+    pctTouched: T.length ? +(touched / T.length * 100).toFixed(1) : null,
+    pctReached: T.length ? +(reached / T.length * 100).toFixed(1) : null,
+    pctSustained: T.length ? +(sustained / T.length * 100).toFixed(1) : null };
+}
+
 // human definitions, published verbatim on the methodology page and in model.json so the rule can't drift from the text
 export function definitions(rules = RULES) {
   const $ = (x) => x >= 1e6 ? "$" + (x / 1e6) + "M" : "$" + Math.round(x / 1e3) + "k";
   const d = (h) => Math.round(h / 24) + " days";
   return [
+    { tier: "reached", role: "reached", rule: `closed above ${$(rules.runnerMcap)} for a full day (held-peak ≥ ${$(rules.runnerMcap)}) — the runner bar. A past fact, so never censored: every token that did it counts, whether it later held or faded` },
     { tier: "major", role: "winner", rule: `held-peak ≥ ${$(rules.majorMcap)}, stayed ≥ ${$(rules.runnerMcap)} for ${d(rules.majorSustainH)}, holders ≥ ${Math.round(rules.holderKeep * 100)}% of peak, still ≥ ${Math.round(rules.fadeKeep * 100)}% of its held-peak` },
     { tier: "runner", role: "winner", rule: `held-peak ≥ ${$(rules.runnerMcap)}, stayed ≥ ${$(rules.runnerMcap)} for ${d(rules.runnerSustainH)}, holders ≥ ${Math.round(rules.holderKeep * 100)}% of peak, still ≥ ${Math.round(rules.fadeKeep * 100)}% of its held-peak` },
     { tier: "pending", role: "excluded", rule: `too young to have satisfied or failed the sustain window (right-censored)` },

@@ -14,6 +14,7 @@
 import { readFileSync, writeFileSync, existsSync } from "node:fs";
 import { join } from "node:path";
 import { STUDY_DIR, loadIndex } from "./cohort-lib.mjs";
+import { funnelOf, isReached, isWinner, definitions } from "../outcome.mjs";
 
 const arg = Object.fromEntries(process.argv.slice(2).map((a) => { const [k, v] = a.replace(/^--/, "").split("="); return [k, v ?? true]; }));
 const MIN_WINNERS = Number(arg.minWinners || 10);   // below this the study can't state a corridor — keep the previous model rather than degrade it
@@ -79,13 +80,17 @@ for (const c of corridor) {
 
 const model = {
   generatedAt: new Date().toISOString().slice(0, 10),
-  source: "winner-study: outcome-labelled cohort backtests (build-cohort → corridor.mjs + projection.mjs); winners = runner + major, graduation is not a criterion",
-  // the cohort the model was fitted on — published so the page, the API and the code all state the same basis
-  cohort: idx ? { generatedAt: idx.generatedAt, winners: proj.winners.length, controls: corr.losers.length, counts: idx.counts, rules: idx.rules, definitions: idx.definitions,
+  source: "winner-study: outcome-labelled cohort backtests (build-cohort → corridor.mjs + projection.mjs); Q1 winners = closed above $1M for a full day (held-peak ≥ $1M); graduation is not a criterion",
+  // the cohort the model was fitted on — published so the page, the API and the code all state the same basis.
+  // `winners` = Q1 reached (the class the corridor/ladder are fitted on); `sustained` = the Q2 subset that held it.
+  cohort: idx ? (() => { const T = idx.tokens || []; const funnel = funnelOf(T); return {
+    generatedAt: idx.generatedAt, winners: proj.winners.length, sustained: T.filter((t) => isWinner(t.label)).length, controls: corr.losers.length,
+    counts: { ...idx.counts, reached: funnel.reached }, funnel, rules: idx.rules, definitions: definitions(),   // the code's rules, never a stale index copy
+    basis: "winners = closed above $1M for a full day (Q1 reached); sustained = held it a week+ with holders kept (Q2)",
     // venue basis — which launch venues the WINNERS came from. Read by model.readConfidence to flag a cross-venue
     // lookup (e.g. a direct-DEX token judged against an all-Pons winner set), and disclosed on the methodology page.
-    winnerVenues: (idx.tokens || []).filter((t) => t.label === "major" || t.label === "runner").reduce((m, t) => { const s = t.source || "pons"; m[s] = (m[s] || 0) + 1; return m; }, {}),
-    winnerList: proj.winners.map((w) => ({ sym: w.sym, addr: w.addr, label: w.label, heldPeak: w.heldPeak })) } : null,
+    winnerVenues: T.filter((t) => isReached(t)).reduce((m, t) => { const s = t.source || "pons"; m[s] = (m[s] || 0) + 1; return m; }, {}),
+    winnerList: proj.winners.map((w) => ({ sym: w.sym, addr: w.addr, label: w.label, heldPeak: w.heldPeak })) }; })() : null,
   ladder, corridor,
 };
 writeFileSync(OUT, JSON.stringify(model));
