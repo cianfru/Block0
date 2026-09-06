@@ -21,6 +21,11 @@ export function slimProfile(r, meta = {}) {
     t0: r.t0, t1: r.t1, supply: r.supply || null, ethUsd: r.ethUsd || null, transfers: r.transfers, capped: !!r.capped,
     bundles: r.bundles, snipers: r.snipers, firstPoolBlock: r.firstPoolBlock ?? null,
     cachedAt: new Date().toISOString(), cacheMcap: meta.mcapUsd ?? null,
+    // compact per-wallet records: enough to reconstruct WHO was proven WHEN, without storing full trade streams.
+    // exitT = when a round trip closed (null while still holding); sniper = bought at block 0 on THIS token.
+    traders: (r.pnl || []).filter((p) => p.invested > 0).slice(0, 120).map((p) => ({
+      a: p.a, firstBuyT: p.firstBuyT ?? null, exitT: p.exitT ?? null,
+      realized: +(p.realized || 0).toFixed(2), invested: +(p.invested || 0).toFixed(2), sniper: !!p.sniper })),
     series: (r.series || []).map((p) => { const o = {}; for (const k of SERIES_FIELDS) if (p[k] != null) o[k] = p[k]; return o; }),
   };
 }

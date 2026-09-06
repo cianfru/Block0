@@ -31,6 +31,7 @@ export function walletPnl(trades, currentPrice) {
   for (const t of trades) {
     if (!t.w || !(t.qty > 0) || !(t.price > 0)) continue;
     const e = get(t.w);
+    if (t.t != null) { if (e.firstBuyT == null && t.side === "buy") e.firstBuyT = t.t; e.lastT = t.t; }
     if (t.side === "buy") {
       e.qty += t.qty; e.cost += t.qty * t.price; e.invested += t.qty * t.price; e.nBuys++;
     } else if (t.side === "sell") {
@@ -45,6 +46,9 @@ export function walletPnl(trades, currentPrice) {
       }
       const excess = t.qty - matched;
       if (excess > EPS) e.untrackedSold += excess; // sold coins we never saw bought on-pool → no profit credited
+      // a ROUND TRIP closes the moment the tracked position returns to ~flat. exitT is when the wallet's result on
+      // this token became a FACT — the only honest timestamp for "this wallet had proven itself by then".
+      if (e.qty <= EPS && t.t != null) e.exitT = t.t;
     }
   }
   const cp = currentPrice > 0 ? currentPrice : 0;
@@ -62,6 +66,7 @@ export function walletPnl(trades, currentPrice) {
     e.realized = +e.realized.toFixed(2); e.unrealized = +e.unrealized.toFixed(2); e.proceeds = +e.proceeds.toFixed(2);
     e.avgCost = +e.avgCost.toFixed(8); e.pnl = +e.pnl.toFixed(2); e.pnlPct = +e.pnlPct.toFixed(1); e.roi = +e.roi.toFixed(3);
     e.untrackedSold = +e.untrackedSold.toFixed(2);
+    if (e.holding) e.exitT = null;   // still holding → the round trip has NOT closed; no proof yet
   }
   return pos;
 }
@@ -75,8 +80,8 @@ export function tradesFromTransfers(sorted, { isBuy, isSell, priceAt }) {
     if (!(e.amt > 0)) continue;
     const p = priceAt(e.ts);
     if (!(p > 0)) continue;
-    if (isBuy(e)) trades.push({ w: e.to, side: "buy", qty: e.amt, price: p });
-    else if (isSell(e)) trades.push({ w: e.from, side: "sell", qty: e.amt, price: p });
+    if (isBuy(e)) trades.push({ w: e.to, side: "buy", qty: e.amt, price: p, t: e.ts ?? null });
+    else if (isSell(e)) trades.push({ w: e.from, side: "sell", qty: e.amt, price: p, t: e.ts ?? null });
   }
   return trades;
 }

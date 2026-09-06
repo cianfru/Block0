@@ -13,7 +13,7 @@
 // needs real skin (minInvested) and a real gain (minRealized) on a token to count, so dust and rounding never mint
 // a "winner"; and untracked-cost coins credit zero profit (see pnl.mjs), so the numbers understate if anything.
 
-const DEFAULTS = { minInvested: 200, minRealized: 100, topN: 100, perToken: 60,
+const DEFAULTS = { minInvested: 200, minRealized: 100, minTokensWon: 2, topN: 100, perToken: 60,
   // "riding a winner" (unrealized) qualification — gated so paper gains on thin tokens can't count:
   minRiding: 250,          // per-token unrealized $ needed for a "riding" position
   rideMinMcap: 250000,     // the token must be a real market (≥ this mcap)…
@@ -21,14 +21,14 @@ const DEFAULTS = { minInvested: 200, minRealized: 100, topN: 100, perToken: 60,
   rideWeight: 0.5 };       // unrealized counts half of realized when ranking (paper < cash)
 
 export async function buildLeaderboard(tokens, computeBt, opts = {}) {
-  const { minInvested, minRealized, topN, perToken, minRiding, rideMinMcap, rideMinTraders, rideWeight } = { ...DEFAULTS, ...opts };
+  const { minInvested, minRealized, minTokensWon, topN, perToken, minRiding, rideMinMcap, rideMinTraders, rideWeight } = { ...DEFAULTS, ...opts };
   const budgetMs = opts.budgetMs || 0;          // 0 = no budget; else stop scanning after this long (partial result)
   const startMs = Date.now();
   let partial = false;
   const wallets = new Map();
   const get = (a) => {
     let e = wallets.get(a);
-    if (!e) wallets.set(a, e = { a, realized: 0, unrealized: 0, invested: 0, tokensWon: 0, tokensLost: 0, riding: 0, tokensRiding: 0, tokens: [] });
+    if (!e) wallets.set(a, e = { a, realized: 0, unrealized: 0, invested: 0, tokensWon: 0, tokensWonClean: 0, tokensLost: 0, riding: 0, tokensRiding: 0, tokens: [] });
     return e;
   };
   let scanned = 0;
@@ -51,7 +51,7 @@ export async function buildLeaderboard(tokens, computeBt, opts = {}) {
       e.unrealized += p.unrealized || 0;
       e.invested += p.invested || 0;
       const won = (p.realized || 0) >= minRealized;
-      if (won) e.tokensWon++; else if ((p.realized || 0) < 0) e.tokensLost++;
+      if (won) { e.tokensWon++; if (!p.sniper) e.tokensWonClean++; } else if ((p.realized || 0) < 0) e.tokensLost++;
       // riding: still holding a meaningful unrealized gain on a real-market token
       const riding = realMarket && !!p.holding && (p.unrealized || 0) >= minRiding;
       if (riding) { e.riding += p.unrealized || 0; e.tokensRiding++; }
@@ -59,7 +59,10 @@ export async function buildLeaderboard(tokens, computeBt, opts = {}) {
         pnl: p.pnl, roi: p.roi, holding: !!p.holding, up: !!p.up, riding });
     }
   }
-  const isProven = (e) => e.realized >= minRealized && e.tokensWon >= 1;   // cash actually taken out
+  // PROVEN = a repeatable trader, not one lucky exit. One win is indistinguishable from being the insider of a single
+  // launch, so we require wins on MULTIPLE INDEPENDENT tokens and ignore wins on tokens the wallet sniped at block 0
+  // (those are launch access, not skill). Tunable via minTokensWon.
+  const isProven = (e) => e.realized >= minRealized && (e.tokensWonClean ?? e.tokensWon) >= minTokensWon;
   const isRiding = (e) => e.riding >= minRiding && e.tokensRiding >= 1;     // unrealized on a real-market runner
   const ranked = [...wallets.values()]
     .filter((e) => isProven(e) || isRiding(e))
@@ -76,6 +79,7 @@ export async function buildLeaderboard(tokens, computeBt, opts = {}) {
         invested: +e.invested.toFixed(2),
         roi: e.invested > 0 ? +((e.realized + e.unrealized) / e.invested).toFixed(2) : null,
         tokensWon: e.tokensWon,
+        tokensWonClean: e.tokensWonClean,   // wins that are PROOF: not on tokens this wallet sniped at block 0
         tokensRiding: e.tokensRiding,
         tokensTraded: traded,
         winRate: traded ? Math.round((e.tokensWon / traded) * 100) : null,

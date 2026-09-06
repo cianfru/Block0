@@ -66,6 +66,8 @@ test("tradesFromTransfers emits only priced pool trades, mapped to the right wal
   ];
   const trades = tradesFromTransfers(sorted, { isBuy, isSell, priceAt });
   assert.equal(trades.length, 2);
-  assert.deepEqual(trades[0], { w: "0xw1", side: "buy", qty: 10, price: 2 });
-  assert.deepEqual(trades[1], { w: "0xw1", side: "sell", qty: 4, price: 2 });
+  // trades now carry the timestamp — without it there is no way to know WHEN a wallet's round trip closed,
+  // which is what makes point-in-time "was this wallet proven back then" possible at all.
+  assert.deepEqual(trades[0], { w: "0xw1", side: "buy", qty: 10, price: 2, t: 100 });
+  assert.deepEqual(trades[1], { w: "0xw1", side: "sell", qty: 4, price: 2, t: 300 });
 });

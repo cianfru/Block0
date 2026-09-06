@@ -9,6 +9,35 @@
 // money" = proven realized-PnL wallets from OUR swap-implied reconstruction, not insider knowledge; convergence is a
 // confidence signal (independent proven traders landing on the same token), never a recommendation.
 
+// PROVEN, POINT-IN-TIME — the only honest way to ask "was this wallet smart money BACK THEN". A wallet earns proof
+// on a token at the moment its round trip CLOSED (exitT) with real realized profit. Wins on tokens the wallet SNIPED
+// at block 0 are excluded: that is launch access, not skill, and it is exactly how an insider of one launch would
+// otherwise be minted "smart money". Proof is counted on OTHER tokens only, so a wallet can never be credited as
+// smart for the very token being judged.
+//   provenLedger(profiles) → Map wallet → [{ t, token }] of CLEAN wins, ascending
+//   provenAt(ledger, wallet, T, { exclude, minWins }) → was this wallet proven strictly BEFORE T?
+export function provenLedger(profiles, { minRealized = 100, minInvested = 200 } = {}) {
+  const led = new Map();
+  for (const p of profiles || []) {
+    for (const w of p.traders || []) {
+      if (w.sniper) continue;                                   // launch access, not skill
+      if (!(w.realized >= minRealized) || !(w.invested >= minInvested)) continue;
+      if (w.exitT == null) continue;                            // still holding → nothing proven yet
+      const a = (w.a || "").toLowerCase(); if (!a) continue;
+      if (!led.has(a)) led.set(a, []);
+      led.get(a).push({ t: w.exitT, token: p.addr });
+    }
+  }
+  for (const v of led.values()) v.sort((x, y) => x.t - y.t);
+  return led;
+}
+export function provenAt(ledger, wallet, T, { exclude = null, minWins = 2 } = {}) {
+  const wins = ledger.get((wallet || "").toLowerCase()); if (!wins) return false;
+  const seen = new Set();
+  for (const w of wins) { if (w.t >= T) break; if (exclude && w.token === exclude) continue; seen.add(w.token); if (seen.size >= minWins) return true; }
+  return false;
+}
+
 // Shared current smart-money set — set by the server after each leaderboard refresh, read by every verdict (board
 // AND the token dossier) so smart-money positioning is consistent everywhere. Empty until the first leaderboard build.
 let CURRENT = { set: new Set(), meta: {}, size: 0, updated: 0 };

@@ -29,6 +29,9 @@ const POINTS = Number(arg.points || 90), DRY = !!arg.dry;
 const ONLY = arg.only ? new Set(String(arg.only).toLowerCase().split(",")) : null;   // --only=0x…,0x… → profile just these (smoke / repair)
 const DEX_BLOCKS = Number(arg.dexBlocks || 2_500_000), DEX_CAP = Number(arg.dexCap || 300);
 const BT_TIMEOUT_MS = Number(arg.btTimeoutMin || 8) * 60e3;   // one runaway token can't eat the whole budget
+// --refresh=traders → re-backtest CACHED profiles that predate a field we now need (per-wallet trader records).
+// Backfill only: it queues at the lowest priority so live/new tokens are never starved, and it is a no-op once done.
+const REFRESH = arg.refresh ? String(arg.refresh) : null;
 const REFRESH_OPEN_H = 12, REFRESH_GROWING_H = 48, GROWING_AGE_H = 30 * 24, SKIP_RETRY_H = 7 * 24;
 const $ = (x) => x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1e3 ? "$" + Math.round(x / 1e3) + "k" : "$" + Math.round(x || 0);
 const now = () => Date.now() / 1000;
@@ -66,6 +69,7 @@ for (const [addr, p] of profiles) {
   if (!isSettled(o.label) && cacheAge >= REFRESH_OPEN_H) queue.push({ addr, meta, prio: 2, why: `${o.label} · re-read` });
   else if (live && live.mcapUsd > 0 && live.mcapUsd > (o.peakMcap || 0) * 0.9 && cacheAge >= REFRESH_OPEN_H && !isWinner(o.label)) queue.push({ addr, meta, prio: 3, why: "new highs" });
   else if (isWinner(o.label) && tokAgeAtCache < GROWING_AGE_H && cacheAge >= REFRESH_GROWING_H) queue.push({ addr, meta, prio: 4, why: "winner path still growing" });
+  else if (REFRESH === "traders" && !(p.traders && p.traders.length)) queue.push({ addr, meta, prio: 7, why: "backfill trader records" });
 }
 // never-profiled tokens: the likely winners/faded first (they carry the most information per backtest), then a
 // bounded set of small/aged launches as stalled/dead controls, then DEX discoveries.
@@ -83,7 +87,7 @@ for (const [addr, m] of universe) {
 if (ONLY) { queue.length = 0; for (const a of ONLY) { const m = universe.get(a) || (profiles.get(a) ? { address: a, sym: profiles.get(a).sym, pool: profiles.get(a).pool, graduated: profiles.get(a).graduated, launchedAt: profiles.get(a).launchedAt, mcapUsd: 0, source: profiles.get(a).source } : null); if (m) queue.push({ addr: a, meta: m, prio: 0, why: "--only" }); else console.log("  --only: not in the universe:", a); } }
 queue.sort((a, b) => a.prio - b.prio || (b.meta.mcapUsd || 0) - (a.meta.mcapUsd || 0));
 console.log(`\ncached profiles: ${profiles.size} · queue: ${queue.length} backtests (budget ${BUDGET_MIN} min, max ${MAX})`);
-for (const p of [1, 1.5, 2, 3, 4, 5, 6]) { const n = queue.filter((q) => q.prio === p).length; if (n) console.log(`  prio ${p}: ${n}`); }
+for (const p of [1, 1.5, 2, 3, 4, 5, 6, 7]) { const n = queue.filter((q) => q.prio === p).length; if (n) console.log(`  prio ${p}: ${n}`); }
 if (DRY) { console.log(queue.slice(0, 40).map((q) => `  ${(q.meta.sym || q.addr.slice(0, 10)).padEnd(14)} ${q.why}`).join("\n")); process.exit(0); }
 
 // ─── 3. run the queue inside the budget; every profile is written the moment it lands ─────────────────────────

@@ -20,6 +20,7 @@ on:
       dex:            { description: "Include direct DEX listings (non-Pons)", type: boolean, default: true }
       dexBlocks:      { description: "DEX scan depth (blocks)", default: "2500000" }
       dexCap:         { description: "DEX tokens to profile (chain-wide: v2/v3/v4)", default: "300" }
+      refresh:        { description: "Backfill cached profiles missing a field: 'traders' (per-wallet records) or blank", default: "" }
   schedule:
     # DAILY 06:17 UTC. Until the whole universe is profiled + cached, consecutive daily runs clear the ~900-token
     # queue in a couple of days (a single job is capped at 170 min ≈ ~600 tokens, so no one run finishes it). Once the
@@ -58,7 +59,8 @@ jobs:
             --controls="${{ github.event.inputs.controls || '300' }}" \
             ${{ (github.event.inputs.dex == 'false') && ' ' || '--dex' }} \
             --dexBlocks="${{ github.event.inputs.dexBlocks || '2500000' }}" \
-            --dexCap="${{ github.event.inputs.dexCap || '300' }}"
+            --dexCap="${{ github.event.inputs.dexCap || '300' }}" \
+            ${{ github.event.inputs.refresh && format('--refresh={0}', github.event.inputs.refresh) || '' }}
       - name: Commit the profile cache FIRST (the expensive part) — so no downstream failure can throw the backtests away
         run: |
           git config user.name "block0-bot"

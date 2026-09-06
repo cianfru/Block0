@@ -346,3 +346,23 @@ dumping — places it against a study of past winners, and shows the wallet inte
   ≥2–3 independent profitable round-trips excluding block-0 snipes, bake into profiles, re-run this exact test.
   (2) Widen the pool beyond graduated-only (base rate collapses ~0.02%, so real lift would be enormous and meaningful).
   (3) Early flow dynamics. Test each with the tool BEFORE building any UI on it.
+
+## 🧪 THE SMART-MONEY EXPERIMENT — set up 2026-09-06, ANSWER PENDING A DATA REBUILD
+- After the pick replay came back with NO economic edge, the one untested lever is SMART MONEY: it was absent from the
+  replay entirely (profiles carried no wallet data) and its definition was broken.
+- **The broken bar, now fixed:** `isProven` was `tokensWon >= 1` — ONE win, which is indistinguishable from being that
+  launch's insider (exactly the owner's objection). Now `minTokensWon: 2` on **`tokensWonClean`** = wins on distinct
+  tokens EXCLUDING any the wallet sniped at block 0 (launch access ≠ skill). `tokensWonClean` is exposed on rows.
+  ⚠ This SHRINKS the live smart-money set on purpose.
+- **Point-in-time proof (`smart-money.provenLedger` / `provenAt`, unit-tested in `test/proven.test.mjs`)** — a wallet is
+  smart at day D only if ≥2 clean round trips CLOSED strictly before D, on OTHER tokens than the one being judged.
+  `exitT` (round trip closes, qty→flat) is the honest timestamp; still-holding ⇒ `exitT = null` ⇒ no proof yet.
+  Without this the experiment would leak the future and "prove" itself.
+- **Data the experiment needs:** `pnl.mjs` trades now carry `t`; `walletPnl` records `firstBuyT`/`exitT`; backtest tags
+  `sniper` per wallet; `slimProfile` persists a bounded `traders[] {a,firstBuyT,exitT,realized,invested,sniper}`.
+  Cached profiles predate this → `build-cohort --refresh=traders` (workflow input `refresh`) re-backtests them at
+  prio 7 (never starves live tokens; no-op once done). ~830 tokens ≈ 2 daily runs.
+- **The test:** `node tools/replay-smart.mjs` ranks by smart-money-in-token and is judged by the SAME verdict rule as
+  everything else — it earns its place ONLY if it beats mcap/holders/random on **median forward return**. It refuses to
+  run (exit 2) until ≥50% of profiles carry trader records, so a partial cache can never produce a biased half-answer.
+- **If it fails too:** we have a forensic/risk tool, not an alpha product, and we say so rather than dressing it up.

@@ -219,7 +219,7 @@ export async function backtest(addr, opts = {}) {
   const curPrice = prices.length ? prices[prices.length - 1] : null;
   const trades = tradesFromTransfers(sorted, { isBuy, isSell, priceAt });
   const pnlMap = walletPnl(trades, curPrice);
-  const pnl = [...pnlMap.entries()].map(([a, e]) => ({ a, ...e }))
+  const pnl = [...pnlMap.entries()].map(([a, e]) => ({ a, ...e, sniper: snipers.has(a) }))
     .filter((e) => e.invested > 0 || e.realized !== 0) // real traders only
     .sort((x, y) => Math.abs(y.pnl) - Math.abs(x.pnl))
     .slice(0, 100);

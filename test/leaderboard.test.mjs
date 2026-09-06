@@ -12,13 +12,16 @@ const BT = {
     { a: "w3", invested: 50, realized: 80, unrealized: 0, pnl: 80, roi: 1.6, up: true, holding: false }, // dust: below minInvested
     { a: "w4", invested: 2000, realized: 1000, unrealized: 0, pnl: 1000, roi: 0.5, up: true, holding: false },
   ] },
+  "0xtc": { sym: "TC", pnl: [
+    { a: "w4", invested: 1500, realized: 600, unrealized: 0, pnl: 600, roi: 0.4, up: true, holding: false },
+  ] },
 };
 const computeBt = async (addr) => BT[addr];
-const tokens = [{ address: "0xta", sym: "TA" }, { address: "0xtb", sym: "TB" }];
+const tokens = [{ address: "0xta", sym: "TA" }, { address: "0xtb", sym: "TB" }, { address: "0xtc", sym: "TC" }];
 
 test("aggregates realized PnL across tokens; proven multi-token winner surfaces", async () => {
   const lb = await buildLeaderboard(tokens, computeBt);
-  assert.equal(lb.tokensScanned, 2);
+  assert.equal(lb.tokensScanned, 3);
   const w1 = lb.rows.find((r) => r.a === "w1");
   assert.ok(w1, "w1 should be on the board");
   assert.equal(w1.realized, 800);       // 500 + 300
@@ -37,8 +40,28 @@ test("a loser and a dust trader never make the board", async () => {
 
 test("ranking is by realized cash first", async () => {
   const lb = await buildLeaderboard(tokens, computeBt);
-  assert.equal(lb.rows[0].a, "w4"); // 1000 realized > w1's 800
+  assert.equal(lb.rows[0].a, "w4"); // 1600 realized > w1's 800
   assert.equal(lb.rows[1].a, "w1");
+});
+
+test("PROVEN needs wins on MULTIPLE tokens — one win is indistinguishable from being that launch's insider", async () => {
+  const oneHit = { sym: "ONE", pnl: [{ a: "w9", invested: 5000, realized: 99999, unrealized: 0, pnl: 99999, roi: 20, up: true, holding: false }] };
+  const lb = await buildLeaderboard([{ address: "0xone", sym: "ONE" }], async () => oneHit);
+  const w9 = lb.rows.find((r) => r.a === "w9");
+  assert.ok(!w9 || w9.proven !== true, "a single-token winner is never 'proven', however large the win");
+});
+
+test("a win on a token the wallet SNIPED at block 0 does not count toward proof (launch access, not skill)", async () => {
+  const row = (a, sniper) => ({ a, invested: 1000, realized: 5000, unrealized: 0, pnl: 5000, roi: 5, up: true, holding: false, sniper });
+  // wS: one sniped win + one clean win → only 1 clean → NOT proven. wC: two clean wins → proven.
+  const A = { sym: "A", pnl: [row("wS", true), row("wC", false)] };
+  const B = { sym: "B", pnl: [row("wS", false), row("wC", false)] };
+  const lb = await buildLeaderboard([{ address: "0xa", sym: "A" }, { address: "0xb", sym: "B" }], async (x) => (x === "0xa" ? A : B));
+  const wC = lb.rows.find((r) => r.a === "wC");
+  assert.ok(wC && wC.proven === true, "two clean wins → proven");
+  assert.equal(wC.tokensWonClean, 2);
+  const wS = lb.rows.find((r) => r.a === "wS");
+  assert.ok(!wS || wS.proven !== true, "the sniped win cannot be the second proof — same cash, not proven");
 });
 
 test("riding: a diamond-hand with big unrealized on a REAL-MARKET token qualifies (kind=riding), gated by market quality", async () => {
@@ -87,6 +110,6 @@ test("a token that fails to backtest is skipped, not fatal", async () => {
     [...tokens, { address: "0xbad", sym: "BAD" }],
     async (a) => { if (a === "0xbad") throw new Error("no data"); return BT[a]; },
   );
-  assert.equal(lb.tokensScanned, 2);
+  assert.equal(lb.tokensScanned, 3);
   assert.ok(lb.rows.length >= 1);
 });
