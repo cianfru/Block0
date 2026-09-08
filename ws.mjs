@@ -2,11 +2,22 @@
 // One shared socket; one log-subscription per watched token, added when the first viewer opens it and
 // dropped when the last leaves. Auto-reconnects and re-subscribes on drop. If RPC_WS is unset the server
 // falls back to HTTP polling. The only npm dependency in the project — everything else is Node built-ins.
-import WebSocket from "ws";
+import { createRequire } from "node:module";
 import { TRANSFER_TOPIC } from "./rpc.mjs";
 
+// `ws` is loaded through require rather than a static import so that a missing package DEGRADES to the HTTP
+// polling path this module already documents, instead of preventing the server from booting at all. A static
+// import made an optional transport a hard boot requirement: CI, which installs nothing, could not start the
+// server for an HTTP test, and a deploy whose install partially failed would lose the whole service rather
+// than just its websocket tail.
+const require_ = createRequire(import.meta.url);
+let WebSocket = null, wsLoadError = null;
+try { WebSocket = require_("ws"); } catch (e) { wsLoadError = e.message; }
+
 const WS_URL = (process.env.RPC_WS || "").trim();
-export const WS_ENABLED = !!WS_URL;
+export const WS_ENABLED = !!WS_URL && !!WebSocket;
+export const WS_STATUS = { url: !!WS_URL, packageLoaded: !!WebSocket, error: wsLoadError };
+if (WS_URL && !WebSocket) console.warn(`[ws] RPC_WS is set but the 'ws' package did not load (${wsLoadError}) — falling back to HTTP polling.`);
 
 let ws = null, ready = false, nextId = 1, reconnectT = null;
 const pending = new Map();       // rpc id -> resolver

@@ -45,7 +45,12 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
-        with: { node-version: "22" }
+        with: { node-version: "22", cache: "npm" }
+      # The suite boots the real server (test/forward-http.test.mjs), so the runtime dependency has to exist.
+      # Until PR #1 nothing in the suite loaded server.mjs, which is why a workflow with no install step
+      # passed for ten runs and then failed on the eleventh.
+      - name: Install dependencies
+        run: npm ci --omit=dev
       - name: Unit tests (cheap gate, BEFORE the expensive build — a red test must never discard a finished build)
         run: node --test test/*.test.mjs
       - name: Guard — RPC secret present
