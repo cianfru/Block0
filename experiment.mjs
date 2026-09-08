@@ -8,6 +8,9 @@ import { evaluateDecision, summarize } from "./evaluation.mjs";
 
 export const EXPERIMENT_KEY = "experiment:v1:index";
 export const recordKey = (address) => `experiment:v1:token:${address}`;
+export const callKey = (address) => `experiment:v1:calls:${address}`;
+const INDEX_FIELDS = ["address", "sym", "firstSeenAt", "sampledAt", "status", "pending", "lastSeenAt", "launchedAt", "graduated", "setupState", "observationAt", "decisionAt", "everEligible"];
+const compact = (r) => Object.fromEntries(INDEX_FIELDS.filter(k => r[k] !== undefined).map(k => [k, r[k]]));
 const MIN = 60000;
 const emptyIndex = () => ({ schema: 1, startedAt: null, updated: 0, registry: {}, nextPage: 2,
   coverage: { complete: false, scope: "Pons API-visible active and graduated catalogs; not all on-chain deployments" } });
@@ -25,7 +28,7 @@ export function advanceRecord(record, next, sym) {
   if (setup.state === "triggered" && !r.decisions.some((d) => d.strategy === SETUP_VERSION)) {
     r.decisions.push(freezeDecision(next.address, features, SETUP_VERSION, { sym: r.sym, venue: next.venue }));
   }
-  r.setup = setup; r.features = features;
+  r.setup = setup; r.features = features; r.everEligible = !!(r.everEligible || features.ready);
   r.decisions = r.decisions.map((d) => d.outcome && d.outcome.status !== "pending" ? d : { ...d, outcome: evaluateDecision(d, r.observations, next.observedAt) });
   return r;
 }
@@ -41,6 +44,17 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
     if (!initializing) initializing = (async () => {
       const loaded = await read(EXPERIMENT_KEY) || emptyIndex();
       if (loaded.schema !== 1) throw new Error("unsupported experiment schema");
+      // Migrate mirrored v1 payloads without losing published calls. Eligibility from older
+      // observations was not tracked: the migrated count is explicitly a lower bound.
+      for (const [address, item] of Object.entries(loaded.registry)) {
+        if (item.decisions?.length) await write(callKey(address), item.decisions);
+        if (item.features) loaded.eligibilityLowerBound = true;
+        loaded.registry[address] = compact({ ...item,
+          setupState: item.setupState ?? item.setup?.state,
+          observationAt: item.observationAt ?? item.latest?.observedAt,
+          decisionAt: item.decisionAt ?? item.decisions?.at(-1)?.at,
+          everEligible: !!(item.everEligible || item.features?.ready || item.decisions?.length) });
+      }
       index = loaded;
     })().finally(() => { initializing = null; });
     await initializing;
@@ -104,7 +118,8 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
             record.decisions = record.decisions.map((d) => d.outcome && d.outcome.status !== "pending" ? d : { ...d, outcome: evaluateDecision(d, record.observations, now) });
             record.setup = nextSetup(record.setup, { at: now, ready: false, reasons: ["token absent from the polled source pages"] });
             await write(recordKey(item.address), record);
-            item.decisions = record.decisions; item.setup = record.setup; item.pending = record.decisions.some((d) => d.outcome?.status === "pending");
+            await write(callKey(item.address), record.decisions);
+            item.decisionAt = record.decisions.at(-1)?.at; item.setupState = record.setup.state; item.pending = record.decisions.some((d) => d.outcome?.status === "pending");
           }
           item.sampledAt = now;
           continue;
@@ -119,8 +134,10 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
         const o = observation(meta, { now: clock(), forensic: f, market: quote });
         const advanced = advanceRecord(record, o, meta.sym);
         await write(recordKey(item.address), advanced); // persist before exposing any new decision
-        item.sampledAt = o.observedAt; item.status = "observed"; item.setup = advanced.setup;
-        item.features = advanced.features; item.decisions = advanced.decisions; item.latest = o; item.transitions = advanced.transitions;
+        if (advanced.decisions.length) await write(callKey(item.address), advanced.decisions);
+        item.sampledAt = o.observedAt; item.observationAt = o.observedAt; item.status = "observed";
+        item.setupState = advanced.setup.state; item.decisionAt = advanced.decisions.at(-1)?.at;
+        item.everEligible = !!(item.everEligible || advanced.everEligible);
         item.pending = advanced.decisions.some((d) => d.outcome?.status === "pending"); sampled++;
       }
       next.coverage.sampledThisCycle = sampled; next.coverage.dueRemaining = Math.max(0, due.length - sampleBudget);
@@ -130,15 +147,41 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
     } catch (e) { error = String(e.message || e).slice(0, 240); }
     finally { running = false; }
   }
-  async function snapshot() {
+  async function snapshot({ limit = 200, state = "", address = "", includeCalls = true } = {}) {
     try { await initialize(); } catch (e) { error = e.message; }
-    const now = clock(), rows = Object.values(index?.registry || {});
-    const calls = rows.flatMap((r) => (r.decisions || []).map((d) => ({ ...d, sym: r.sym }))).sort((a, b) => b.at - a.at);
-    return { schema: 1, enabled, running, error, startedAt: index?.startedAt ?? null, updated: index?.updated || 0,
-      coverage: index?.coverage || emptyIndex().coverage,
-      rows: rows.map((r) => ({ ...r, stale: now - (r.latest?.observedAt || 0) > 5 * MIN,
-        displayState: now - (r.latest?.observedAt || 0) > 5 * MIN ? "unavailable" : r.setup?.state || "observing" })),
-      calls, strategies: summarize(calls), note: "Forward experiment. Indicative prices, not verified fills. Reflex is not connected." };
+    const now = clock(), registry = Object.values(index?.registry || {});
+    const display = r => r.status === "unavailable" || now - (r.observationAt || 0) > 5 * MIN ? "unavailable" : r.setupState || "observing";
+    const order = { triggered: 0, building: 1, deteriorating: 2, invalidated: 3, expired: 4, observing: 5, unavailable: 6 };
+    const matching = registry.filter(r => (!state || display(r) === state) && (!address || r.address === address))
+      .sort((a,b) => (order[display(a)] ?? 9) - (order[display(b)] ?? 9) || b.sampledAt - a.sampledAt || a.address.localeCompare(b.address));
+    const rows = [], calls = [];
+    let snapshotError = error;
+    try {
+      // Filter and cap BEFORE reading records. Never load the entire observation history into a response.
+      for (const item of matching.slice(0, Math.min(200, Math.max(0, limit)))) {
+        const r = await read(recordKey(item.address));
+        rows.push({ ...item, setup: r?.setup, features: r?.features, latest: r?.observations?.at(-1),
+          transitions: r?.transitions, decisions: r?.decisions,
+          stale: now - (item.observationAt || 0) > 5 * MIN, displayState: display(item) });
+      }
+      if (includeCalls) {
+        // Separate small call values avoid rereading megabytes of observations per decision.
+        for (const item of registry.filter(r => r.decisionAt != null)) {
+          const ds = await read(callKey(item.address));
+          if (!ds) throw new Error("published decision record unavailable");
+          calls.push(...ds.map(d => ({ ...d, sym: item.sym })));
+        }
+      }
+    } catch (e) { snapshotError = e.message; calls.length = 0; }
+    calls.sort((a,b) => b.at - a.at);
+    const eligibleTokens = registry.filter(r => r.everEligible).length;
+    const coverage = { ...(index?.coverage || emptyIndex().coverage), eligibleTokens,
+      eligibilityLowerBound: !!index?.eligibilityLowerBound,
+      eligibilityDefinition: "Distinct tokens ever observed with features.ready; eligibility depends on sampling and forensic budgets." };
+    return { schema: 1, enabled, running, error: snapshotError, startedAt: index?.startedAt ?? null, updated: index?.updated || 0,
+      coverage, total: matching.length, rows, calls,
+      strategies: summarize(calls).map(s => ({ ...s, eligibleTokens })),
+      note: "Forward experiment. Budget-conditioned eligible universe. Indicative prices, not verified fills. Reflex is not connected." };
   }
   return { cycle, snapshot };
 }

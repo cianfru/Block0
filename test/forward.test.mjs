@@ -127,3 +127,80 @@ test("LLM cannot reorder picks or insert unsupported numbers", async () => {
   const r = await buildPicks(tokens, async () => { called = true; return { text: JSON.stringify({ pick: B, why: "999999 holders" }) }; });
   assert.equal(called, false); assert.equal(r.brackets[0].pick.address, A); assert.doesNotMatch(r.brackets[0].pick.why, /999999/);
 });
+
+test("a missing current price invalidates readiness even with sufficient history", () => {
+  const h = path(); h.at(-1).priceUsd = null;
+  const f = featuresAt(h, h.at(-1).observedAt);
+  assert.equal(f.ready, false); assert.ok(f.reasons.includes("current price unavailable"));
+});
+
+test("eligibility survives deterioration and restart without mirrored evidence in the index", async () => {
+  let current;
+  const h = harness({ active: async () => ({ items: [{ ...meta(), priceUsd: current.priceUsd }], total: 1 }),
+    board: () => [{ address: A, observedAt: current.observedAt, risk: current.risk,
+      flags: { holders: current.holders, insiderSellersNow: 0 } }], market: async () => ({ liqUsd: 20000 }) });
+  for (current of path()) { h.setTime(current.observedAt); await h.service.cycle(); }
+  const item = h.db.get(EXPERIMENT_KEY).registry[A];
+  assert.equal(item.everEligible, true); assert.ok(item.decisionAt);
+  for (const key of ["features", "setup", "latest", "decisions", "transitions", "observations"]) assert.equal(item[key], undefined);
+  current = { ...current, observedAt: current.observedAt + MIN, priceUsd: null };
+  h.setTime(current.observedAt); await h.service.cycle();
+  const s = await createExperiment(h.options).snapshot({ limit: 0 });
+  assert.equal(s.coverage.eligibleTokens, 1); assert.equal(s.calls.length, 1);
+  assert.equal(s.strategies[0].eligibleTokens, 1);
+});
+
+test("5000-token index stays bounded and snapshots filter before loading at most 200 records", async (t) => {
+  const h = harness(); const registry = {};
+  for (let i = 1; i <= 5000; i++) {
+    const address = "0x" + i.toString(16).padStart(40, "0");
+    registry[address] = { address, sym: "S".repeat(80), firstSeenAt: T, lastSeenAt: T,
+      sampledAt: T, observationAt: T, status: "observed", pending: false, launchedAt: new Date(T).toISOString(),
+      graduated: false, everEligible: i % 2 === 0, setupState: i === 5000 ? "triggered" : "observing" };
+  }
+  h.db.set(EXPERIMENT_KEY, { schema: 1, updated: T, registry, nextPage: 2, coverage: { registrySize: 5000 } });
+  const reads = [];
+  const service = createExperiment({ ...h.options, read: async key => { reads.push(key); return structuredClone(h.db.get(key) ?? null); } });
+  let s = await service.snapshot({ limit: 9999, includeCalls: false });
+  assert.equal(s.rows.length, 200); assert.equal(s.total, 5000);
+  assert.equal(reads.filter(k => k.includes(":token:")).length, 200);
+  assert.equal(s.coverage.eligibleTokens, 2500);
+  reads.length = 0;
+  s = await service.snapshot({ state: "triggered", includeCalls: false });
+  assert.equal(s.rows.length, 1); assert.equal(reads.length, 1);
+  await service.cycle();
+  const bytes = Buffer.byteLength(JSON.stringify(h.db.get(EXPERIMENT_KEY)));
+  assert.ok(bytes < 3_000_000, `index is ${bytes} bytes`);
+  t.diagnostic(`5000-token index: ${bytes} bytes; snapshot record reads capped at 200`);
+});
+
+test("migration preserves legacy mirrored calls but removes their payload from the index", async () => {
+  const h = harness(), r = path().reduce((r,o) => advanceRecord(r,o,"TOKEN"), null);
+  h.setTime(r.features.at);
+  h.db.set(recordKey(A), r);
+  h.db.set(EXPERIMENT_KEY, { schema: 1, updated: T, registry: { [A]: { address: A, sampledAt: r.features.at,
+    setup: r.setup, features: r.features, decisions: r.decisions, latest: r.observations.at(-1), transitions: r.transitions } }, coverage: {} });
+  const service = createExperiment(h.options);
+  const s = await service.snapshot({ limit: 0 });
+  assert.equal(s.calls.length, 1); assert.equal(s.coverage.eligibilityLowerBound, true);
+  await service.cycle();
+  assert.equal(h.db.get(EXPERIMENT_KEY).registry[A].decisions, undefined);
+});
+
+test("failed call-value persistence cannot publish a decision and a retry recovers it", async () => {
+  let current;
+  const h = harness({ active: async () => ({ items: [{ ...meta(), priceUsd: current.priceUsd }], total: 1 }),
+    board: () => [{ address: A, observedAt: current.observedAt, risk: 20, flags: { holders: current.holders, insiderSellersNow: 0 } }],
+    market: async () => ({ liqUsd: 20000 }) });
+  const service = createExperiment({ ...h.options, write: async (key,v) => {
+    if (key.includes(":calls:")) throw Error("call write failed");
+    await h.options.write(key,v);
+  } });
+  for (current of path()) { h.setTime(current.observedAt); await service.cycle(); }
+  const s = await service.snapshot({ limit: 0 });
+  assert.match(s.error, /call write failed/); assert.equal(s.calls.length, 0);
+  assert.equal(h.db.get(recordKey(A)).decisions.length, 1);
+  current = { ...current, observedAt: current.observedAt + MIN }; h.setTime(current.observedAt);
+  const retry = createExperiment(h.options); await retry.cycle();
+  assert.equal((await retry.snapshot({ limit: 0 })).calls.length, 1);
+});

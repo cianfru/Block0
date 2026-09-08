@@ -436,16 +436,12 @@ const server = createServer(async (req, res) => {
     }
 
     if (u.pathname === "/api/setups") {
-      const s = await experiment.snapshot();
-      const state = u.searchParams.get("state");
-      const n = Math.min(200, Math.max(1, Number(u.searchParams.get("n")) || 100));
+      const state = u.searchParams.get("state") || "";
+      const limit = Math.min(200, Math.max(1, Number(u.searchParams.get("n")) || 100));
       const address = (u.searchParams.get("address") || "").toLowerCase();
-      const order = { triggered: 0, building: 1, deteriorating: 2, invalidated: 3, expired: 4, observing: 5, unavailable: 6 };
-      const rows = s.rows.filter(r => (!state || r.displayState === state) && (!address || r.address === address))
-        .sort((a,b) => (order[a.displayState] ?? 9) - (order[b.displayState] ?? 9) || b.sampledAt - a.sampledAt);
+      const { calls, ...s } = await experiment.snapshot({ limit, state, address, includeCalls: false });
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
-      const { calls, ...rest } = s;
-      return res.end(JSON.stringify({ ...rest, total: rows.length, rows: rows.slice(0,n) }));
+      return res.end(JSON.stringify(s));
     }
     if (u.pathname === "/api/track-record/legacy") {
       res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });

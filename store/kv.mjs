@@ -8,6 +8,7 @@
 // so the scanner runs even if the store is down. Precedence: REST > TCP > file.
 import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
+import { createHash } from "node:crypto";
 import { redisCmd, HAS_REDIS_URL } from "./redis-tcp.mjs";
 
 const R_URL = (process.env.KV_REST_API_URL || process.env.UPSTASH_REDIS_REST_URL || "").replace(/\/$/, "");
@@ -26,9 +27,17 @@ async function rcmd(...args) {
 }
 
 // Research cannot interpret a failed read as an empty experiment or publish an unpersisted decision.
-// The file backend atomically replaces the document; deploy it on a persistent volume. Single writer only.
+// Experiment keys use independent files, so one observation does not serialize every token.
+// Atomic rename protects a single value from partial writes; this is not a multi-key transaction,
+// fsync durability guarantee, or multi-process lock. Deploy one writer on a persistent volume.
+const experimentFile = key => join(DIR, "experiment", createHash("sha256").update(key).digest("hex") + ".json");
 export async function getJSONStrict(key) {
   if (KV_BACKEND === "redis") { const v = await rcmd("GET", key); return v == null ? null : JSON.parse(v); }
+  if (key.startsWith("experiment:")) {
+    try { return JSON.parse(readFileSync(experimentFile(key), "utf8")); }
+    catch (e) { if (e.code !== "ENOENT") throw e; }
+    // Read-only fallback for the original monolithic store. New writes never grow it.
+  }
   if (!strictLoaded) {
     let disk;
     try { disk = JSON.parse(readFileSync(FILE, "utf8")); }
@@ -39,6 +48,12 @@ export async function getJSONStrict(key) {
 }
 export async function setJSONStrict(key, val) {
   if (KV_BACKEND === "redis") { await rcmd("SET", key, JSON.stringify(val)); return; }
+  if (key.startsWith("experiment:")) {
+    const file = experimentFile(key);
+    mkdirSync(join(DIR, "experiment"), { recursive: true });
+    writeFileSync(file + ".tmp", JSON.stringify(val)); renameSync(file + ".tmp", file);
+    return;
+  }
   await getJSONStrict(key);
   const next = { ...mem, [key]: val };
   mkdirSync(DIR, { recursive: true });
@@ -63,6 +78,8 @@ function load() {
   try { mem = JSON.parse(readFileSync(FILE, "utf8")); } catch { mem = {}; }
   return mem;
 }
+// Legacy soft and strict writes share mem; their renames are per-value replacements, not transactions.
+// Experiment files are independent of this legacy debounce.
 function flush() {
   if (wt) return; wt = setTimeout(() => { wt = null; try { mkdirSync(DIR, { recursive: true }); writeFileSync(FILE + ".flush.tmp", JSON.stringify(mem)); renameSync(FILE + ".flush.tmp", FILE); } catch { /* best-effort */ } }, 200);
 }

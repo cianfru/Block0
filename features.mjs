@@ -17,6 +17,7 @@ export function featuresAt(history, at) {
   const holderRows = rows.filter((o) => o.holders != null && o.forensicAt != null && o.observedAt <= at - 15 * MIN);
   const hr = holderRows.at(-1);
   const reasons = [];
+  if (!(last.priceUsd > 0)) reasons.push("current price unavailable");
   if (at - last.observedAt > 5 * MIN) reasons.push("latest observation is stale");
   if (priced.length < 6 || !ref || at - ref.observedAt > 30 * MIN || at - priced[0].observedAt < 30 * MIN) reasons.push("need at least 30 minutes of forward price observations");
   if (!hr || hr.forensicAt === last.forensicAt || at - hr.observedAt > 30 * MIN || last.holders == null || last.risk == null || last.insiderSellers == null) reasons.push("need fresh comparable forensic observations");
