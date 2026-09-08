@@ -116,6 +116,18 @@
   details.hist .body{margin-top:18px;color:var(--dim);font-size:.9rem;line-height:1.65;max-width:72ch}
   details.hist a{color:var(--lime)}
 
+  /* One question, asked once, at the point where the reader has just seen the evidence. Not a survey. */
+  .ask{border:1px solid var(--line);border-radius:14px;padding:20px 22px;background:rgba(255,255,255,.014)}
+  .ask p{margin:0;font-size:.95rem;color:var(--dim)}
+  .ask .btns{display:flex;gap:10px;margin-top:14px;flex-wrap:wrap}
+  .ask button{background:rgba(255,255,255,.05);border:1px solid var(--line-2);color:var(--tx);
+              border-radius:10px;padding:9px 16px;font-size:.85rem;font-weight:600;cursor:pointer}
+  .ask button:hover{border-color:rgba(200,255,77,.45)}
+  .ask textarea{width:100%;margin-top:12px;background:rgba(255,255,255,.04);border:1px solid var(--line);
+                border-radius:10px;padding:11px 13px;color:var(--tx);font:inherit;font-size:.86rem;resize:vertical;min-height:64px}
+  .ask textarea:focus{outline:none;border-color:rgba(200,255,77,.45)}
+  .ask .thanks{color:var(--lime);font-size:.9rem}
+
   .scan{display:flex;gap:10px;margin-top:4px;max-width:520px}
   .scan input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:11px;
               padding:12px 14px;color:var(--tx);font-family:var(--mono);font-size:.84rem}
@@ -437,6 +449,20 @@ function render(d) {
   const price = `<section class="sec"><p class="eyebrow">Price <b>· context, not the product</b></p>
     <div id="pricebox">${unavailable("Price history", "Loading market data…")}</div></section>`;
 
+  // The pilot's actual question. Asked at the bottom, after the evidence, and only once per token per browser —
+  // a prompt that follows someone around is worse than no answer. Both replies are recorded; "no" is the more
+  // useful one, and the free-text box is where the reason lives.
+  const asked = (() => { try { return localStorage.getItem("b0.asked." + ADDR) === "1"; } catch { return true; } })();
+  const ask = asked ? "" : `<section class="sec"><p class="eyebrow">One question</p>
+    <div class="ask" id="ask">
+      <p>Did this tell you something you could not get from a price chart?</p>
+      <div class="btns">
+        <button data-a="yes">Yes</button>
+        <button data-a="no">No</button>
+        <button data-a="unsure">Not sure</button>
+      </div>
+    </div></section>`;
+
   const another = `<section class="sec"><p class="eyebrow">Read another launch</p>
     <form class="scan" onsubmit="return go(event)">
       <input id="q" placeholder="0x… token address" autocomplete="off" spellcheck="false">
@@ -456,7 +482,34 @@ function render(d) {
     </div>
   </details>`;
 
-  $("#root").innerHTML = identity + readBlock + launch + flow + holders + deployer + price + another + study;
+  $("#root").innerHTML = identity + readBlock + launch + flow + holders + deployer + price + ask + another + study;
+  wireAsk();
+
+  // What was actually read, so the pilot can count DISTINCT tokens per tester rather than page loads.
+  window.B0T && window.B0T("token_view", { token: d.address || ADDR });
+  // Whether anyone opens the retrospective study at all is itself a finding about what people want.
+  const hist = document.querySelector("details.hist");
+  if (hist) hist.addEventListener("toggle", function once() {
+    if (hist.open) { window.B0T && window.B0T("evidence_open", { token: ADDR }); hist.removeEventListener("toggle", once); }
+  });
+}
+
+function wireAsk() {
+  const box = $("#ask"); if (!box) return;
+  box.addEventListener("click", (e) => {
+    const b = e.target.closest("button[data-a]"); if (!b) return;
+    const answer = b.dataset.a;
+    window.B0T && window.B0T("feedback", { token: ADDR, answer });
+    try { localStorage.setItem("b0.asked." + ADDR, "1"); } catch {}
+    box.innerHTML = `<p>Thank you. If you have a moment — what were you actually trying to find out?</p>
+      <textarea id="note" placeholder="Optional. One line is plenty." maxlength="400"></textarea>
+      <div class="btns"><button id="sendnote">Send</button></div>`;
+    $("#sendnote").addEventListener("click", () => {
+      const note = ($("#note").value || "").trim();
+      if (note) window.B0T && window.B0T("feedback", { token: ADDR, answer, note });
+      box.innerHTML = `<p class="thanks">Noted — thank you.</p>`;
+    });
+  });
 }
 
 function go(e) {
