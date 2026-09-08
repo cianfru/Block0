@@ -37,3 +37,21 @@ export async function fetchGraduated({ fetch: fetchImpl = fetch } = {}) {
   const arr = Array.isArray(d) ? d : (d.items || d.graduated?.items || []);
   return { items: arr.map(norm), total: arr.length, observedAt: Date.now() };
 }
+
+// The launchpad's own batched quote refresh. Token identity is checked against the request;
+// missing entries remain missing, never filled with an old catalog price.
+export async function fetchLiveMarkets(tokens, { fetch: fetchImpl = fetch } = {}) {
+  if (!tokens.length) return { items: [], observedAt: Date.now() };
+  const requested = new Map(tokens.map(t => [t.address.toLowerCase(), t]));
+  const params = new URLSearchParams();
+  for (const t of tokens) params.append("market", `${t.address.toLowerCase()},${t.pool || "0x" + "0".repeat(40)}`);
+  const d = await j(`${BASE}/api/pons-launches/live-markets?${params}`, fetchImpl);
+  if (!Array.isArray(d)) throw new Error("pons live market schema changed");
+  const observedAt = Date.now();
+  return { observedAt, items: d.filter(t => requested.has(String(t.token).toLowerCase())).map(t => {
+    const old = requested.get(t.token.toLowerCase());
+    return { ...old, address: old.address, priceUsd: t.priceUsd ?? null, mcapUsd: t.marketCapUsd ?? null,
+      graduated: t.graduated ?? old.graduated, pool: t.pool?.toLowerCase() || old.pool,
+      latestBuyAt: t.latestBuyAt || null, availableAt: observedAt, priceSource: "pons-live-markets" };
+  }) };
+}

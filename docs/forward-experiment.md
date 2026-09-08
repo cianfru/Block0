@@ -76,3 +76,17 @@ The registry stores only identity, scheduling cursors, state/timestamp pointers 
 The collector still persists its compact index twice per cycle. On the file backend, each token write serializes only that token value, rather than the combined database; legacy soft flushes cannot overwrite the new experiment files. Retaining 2,048 observations for 5,000 tokens can still require several gigabytes of disk/Redis capacity. These changes bound write amplification, not total retained storage. Budget for capacity and monitor errors; collection failure is exposed through the API/UI.
 
 Original monolithic experiment values have a read-only fallback. New writes use separate files. The old monolithic file is not automatically deleted or compacted; deployments that already accumulated large histories should archive it and migrate retained values before relying on the file backend. Mirrored index call payloads are migrated into call values before being removed from the in-memory index, and the next successful cycle persists the compact index.
+
+## Collector v2: stable follow-up (September 8)
+
+The production stall occurred because absent registry members exhausted the sampling budget while discovery pages moved on. `tracked-cohort-v2` filters available work before applying the observation budget; missing pending decisions are maintained separately so they still become unknown on deadline.
+
+The runtime reserves eight cohort slots by default (`EXPERIMENT_COHORT_SIZE`, capped by the observation budget). Admission waits for fresh board forensics, prioritizes pre-graduation tokens, and uses address order for ties. The cohort is held for six hours, survives restarts and discovery-page changes, and keeps pending decisions until evaluation finishes. A token cannot be re-admitted within 24 hours. This is explicitly a selected, budget-conditioned cohort, not a random sample or a token quality ranking.
+
+Pons' own `/api/pons-launches/live-markets` endpoint refreshes cohort prices using token/pool identity, in batches of at most 20. Cached board metadata is used only for admission identity; it is never republished as a fresh price. Failed/missing tracked quotes do not fall back to old catalog prices. Prices remain indicative and their underlying quote timestamps are unverified.
+
+Liquidity calls prioritize the cohort and rotate by last attempt. Previously fetched liquidity retains its original receipt time and expires under the existing five-minute freshness rule. Eight slots permit two rounds with the default four-request budget; source delays can still reduce eligibility. No extra Alchemy reads are introduced.
+
+When the registry is full, admission can retire absent discoveries that have no decision, no past eligibility and no active lease. Their metadata is archived in address-prefix shards before removal, and their per-token histories remain unchanged. Exports include archival addresses. Eligible tokens, decisions and active cohort members are protected. If all registry entries are protected, admission remains capped and omissions stay visible. Archived storage still needs capacity planning; it is not garbage-collected.
+
+Coverage now includes collector version, cohort size/capacity, tracked refreshes, missing follow-ups, available tokens and retired registry entries. `dueRemaining` counts available observation work waiting for budget, not absent addresses. A zero-eligible result can still reflect missing forensics/liquidity or insufficient history; recovered collection is not proof of alpha.

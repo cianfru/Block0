@@ -22,7 +22,7 @@ export function observation(meta, { now, forensic = null, market = null, maxFore
     eventAt: Number.isFinite(lastEvent) && lastEvent <= now ? lastEvent : null,
     launchedAt: Number.isFinite(launchedAt) && launchedAt <= now ? launchedAt : null,
     venue: "pons", graduated: !!meta.graduated, priceUsd: price, mcapUsd: positive(meta.mcapUsd),
-    priceSource: "pons-catalog", priceAsOf: null, executable: false,
+    priceSource: meta.priceSource || "pons-catalog", priceAsOf: null, executable: false,
     forensicAt: fresh ? forensicAt : null, holders: finite(flags.holders), risk: fresh ? finite(forensic.risk) : null,
     top10Pct: finite(flags.top10Pct), insiderSellers: finite(flags.insiderSellersNow),
     liquidityUsd: marketFresh ? positive(market.liqUsd) : null,
