@@ -7,6 +7,7 @@
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Block0 — token dossier</title>
+<meta name="description" content="Every wallet behind a Robinhood Chain launch: who bought first, who is connected, who is adding and who is reducing. Reconstructed from transfer history.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
@@ -14,214 +15,122 @@
 <script src="/blockclock.js" defer></script>
 <script src="/track.js" defer></script>
 <style>
-  :root{--bg:#08080b;--glass:rgba(255,255,255,.035);--line:rgba(255,255,255,.09);--line-2:rgba(255,255,255,.16);
-    --tx:#fff;--dim:#b6b6bd;--mute:#7f7f88;--lime:#c8ff4d;--cyan:#35e6e0;--magenta:#ff5cf0;--amber:#ffd23d;--coral:#ff3b5c;
-    --serif:"Instrument Serif",Georgia,serif;--sans:"Inter",system-ui,sans-serif;}
-  *{box-sizing:border-box}
-  .wrap{padding-bottom:70px}
-  /* unify every dossier card to the shared glassmorphism (frosted pane, top inner-edge highlight, soft shadow) */
-  .top,.fac,.depwrap,.pcard,.chartwrap,.tbl,.bmwrap{
-    background:linear-gradient(180deg,rgba(255,255,255,.055),rgba(255,255,255,.014))!important;
-    border:1px solid rgba(255,255,255,.08)!important;
-    backdrop-filter:blur(18px) saturate(1.15);-webkit-backdrop-filter:blur(18px) saturate(1.15);
-    box-shadow:inset 0 1px 0 rgba(255,255,255,.07),0 16px 44px -18px rgba(0,0,0,.55)}
-  .fac,.pcard{border-radius:16px}
-
-  .state{color:var(--mute);font-size:.95rem;padding:46px 2px}
+  /* ── The dossier is a document, not a wall of cards. Sections are separated by hairlines and space; a border
+     is spent only where something is genuinely a separate object. One accent (lime) for action and for the
+     single most important number; the cyan/coral pair ONLY for direction of flow, which is data, not styling. */
+  .wrap{padding-bottom:80px;max-width:1060px}
+  .state{color:var(--mute);font-size:.95rem;padding:56px 2px}
   .state.err{color:var(--coral)}
+  .sec{padding:34px 0;border-top:1px solid var(--line)}
+  .eyebrow{font-size:.68rem;font-weight:700;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:0 0 18px}
+  .eyebrow b{color:var(--lime);font-weight:700}
 
-  /* identity + verdict header */
-  .top{display:grid;grid-template-columns:1fr auto;gap:20px;align-items:start;margin-top:10px;
-    border:1px solid var(--line);border-radius:18px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));backdrop-filter:blur(12px);padding:20px 22px}
-  .idn{display:flex;gap:15px;align-items:center;min-width:0}
-  .ic{width:58px;height:58px;border-radius:15px;flex:0 0 auto;display:grid;place-items:center;font-weight:800;font-size:1.5rem;color:#0a0a0a;letter-spacing:-.02em;overflow:hidden}
+  /* ── identity ─────────────────────────────────────────────────────────── */
+  .idrow{display:flex;gap:18px;align-items:center;padding:30px 0 26px;flex-wrap:wrap}
+  .ic{width:62px;height:62px;border-radius:17px;flex:0 0 auto;display:grid;place-items:center;overflow:hidden;
+      font-weight:800;font-size:1.6rem;color:#0a0a0a;letter-spacing:-.02em}
   .ic img{width:100%;height:100%;object-fit:cover;display:block}
-  .who{min-width:0}
-  .sym{font-size:1.9rem;font-weight:800;letter-spacing:-.02em;line-height:1;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
-  .badge{font-size:.62rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;padding:4px 8px;border-radius:7px}
-  .badge.grad{color:#08080b;background:var(--cyan)} .badge.cook{color:#08080b;background:var(--lime)}
-  .name{color:var(--dim);font-size:.95rem;margin-top:5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46ch}
-  .addr{font-family:ui-monospace,monospace;font-size:.72rem;color:var(--mute);margin-top:6px;cursor:pointer}
+  .idmain{min-width:0;flex:1 1 240px}
+  .sym{font-size:2.1rem;font-weight:800;letter-spacing:-.025em;line-height:1.05;display:flex;align-items:baseline;gap:12px;flex-wrap:wrap}
+  .sym .nm{font-size:.95rem;font-weight:500;color:var(--dim);letter-spacing:0}
+  .addr{margin-top:7px;font-family:var(--mono);font-size:.76rem;color:var(--mute);cursor:pointer;
+        border:0;background:none;padding:0;letter-spacing:.02em}
   .addr:hover{color:var(--dim)}
-  .facts{display:flex;gap:18px;flex-wrap:wrap;margin-top:13px}
-  .fact .v{font-size:1.05rem;font-weight:700;font-variant-numeric:tabular-nums}
-  .fact .k{font-size:.68rem;color:var(--mute);text-transform:uppercase;letter-spacing:.05em;margin-top:2px}
-  .verdict{text-align:right;flex:0 0 auto}
-  .verdict .n{font-family:var(--serif);font-size:3.6rem;line-height:.85}
-  .verdict .l{font-size:.74rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;margin-top:3px}
-  .verdict .drv{font-size:.72rem;color:var(--mute);margin-top:7px;max-width:20ch;margin-left:auto}
-  .verdict .conf{display:inline-flex;align-items:center;gap:6px;font-size:.66rem;font-weight:700;text-transform:uppercase;letter-spacing:.06em;margin-top:10px}
-  .verdict .cdot{width:7px;height:7px;border-radius:50%;flex:0 0 auto}
-  .verdict .confwhy{font-size:.68rem;color:var(--mute);margin-top:3px;max-width:24ch;margin-left:auto;line-height:1.35}
-  .prog{margin-top:14px;grid-column:1/-1}
-  .prog .lab{display:flex;justify-content:space-between;font-size:.72rem;color:var(--mute);margin-bottom:5px}
-  .prog .lab b{color:var(--lime)}
-  .prog .track{height:6px;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden}
-  .prog .fill{height:100%;background:linear-gradient(90deg,var(--cyan),var(--lime));border-radius:4px}
+  .facts{display:flex;gap:26px;flex-wrap:wrap;margin-left:auto}
+  .fact .k{font-size:.63rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:700}
+  .fact .v{font-size:1.12rem;font-weight:700;font-variant-numeric:tabular-nums;margin-top:5px;letter-spacing:-.01em}
 
-  h2.sec{font-family:var(--serif);font-style:italic;font-size:1.4rem;font-weight:400;margin:30px 0 13px}
+  /* ── the read: one sentence, assembled from fields ────────────────────── */
+  .read{font-family:var(--serif);font-size:clamp(1.5rem,3.4vw,2.15rem);line-height:1.28;letter-spacing:-.01em;
+        max-width:26ch;margin:0}
+  .read .hi{color:var(--lime)}
+  .readwrap{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,1fr);gap:40px;align-items:start}
+  .readside{padding-top:4px}
+  .prov{font-size:.72rem;color:var(--mute);font-family:var(--mono);line-height:1.75;margin-top:16px}
+  .prov code{color:var(--dim)}
 
-  /* sub-score meters */
-  .facs{display:grid;grid-template-columns:repeat(5,1fr);gap:14px}
-  .fac{border:1px solid var(--line);border-radius:13px;background:var(--glass);padding:13px 14px}
-  .fac .fh{display:flex;justify-content:space-between;align-items:baseline;margin-bottom:9px}
-  .fac .fk{font-size:.74rem;color:var(--dim);font-weight:600}
-  .fac .fv{font-family:var(--serif);font-size:1.5rem;line-height:.8}
-  .fac .fd{font-size:.7rem;color:var(--mute);margin-top:8px;min-height:1.1em}
-  .ftrack{height:5px;border-radius:3px;background:rgba(255,255,255,.09);overflow:hidden;margin-top:2px}
-  .ffill{height:100%;border-radius:3px}
+  /* ── measures ─────────────────────────────────────────────────────────── */
+  .meas{display:grid;grid-template-columns:repeat(auto-fit,minmax(148px,1fr));gap:1px;
+        background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .m{background:#0b0b0f;padding:16px 17px}
+  .m .k{font-size:.63rem;letter-spacing:.13em;text-transform:uppercase;color:var(--mute);font-weight:700}
+  .m .v{font-size:1.5rem;font-weight:700;font-variant-numeric:tabular-nums;margin-top:6px;line-height:1;letter-spacing:-.02em}
+  .m .s{font-size:.74rem;color:var(--mute);margin-top:7px;line-height:1.5}
+  .m .v.warn{color:var(--amber)} .m .v.bad{color:var(--coral)}
 
-  /* deployer track record */
-  .depwrap{border:1px solid var(--line);border-radius:13px;background:var(--glass);padding:13px 15px;margin-top:14px}
-  .dephead{display:flex;align-items:center;gap:11px;flex-wrap:wrap}
-  .depbadge{font-size:.68rem;font-weight:800;letter-spacing:.05em;padding:4px 9px;border-radius:7px}
-  .depmeta{font-size:.86rem;color:var(--dim)} .depmeta b{color:var(--tx)}
-  .depaddr{margin-left:auto;font-family:ui-monospace,monospace;font-size:.74rem;color:var(--mute)}
-  .depchips{display:flex;flex-wrap:wrap;gap:7px;margin-top:11px}
-  .depchip{display:inline-flex;align-items:center;gap:5px;font-size:.78rem;font-weight:600;padding:5px 10px;border-radius:8px;border:1px solid var(--line);background:rgba(255,255,255,.03);color:var(--tx)}
-  .depchip:hover{border-color:var(--line-2)} .depchip .dm{color:var(--mute);font-weight:500}
-  .depnote{font-size:.8rem;color:var(--mute);margin-top:9px}
-  /* placement: blueprint / corridor / ladder */
-  .place{display:grid;grid-template-columns:1fr 1fr 1.3fr;gap:14px}
-  .pcard{border:1px solid var(--line);border-radius:14px;background:var(--glass);padding:15px 16px}
-  .pcard .ph{font-size:.68rem;letter-spacing:.05em;text-transform:uppercase;color:var(--mute);margin-bottom:9px}
-  .pcard .pv{font-size:1.5rem;font-weight:800;font-variant-numeric:tabular-nums;display:flex;align-items:baseline;gap:8px}
-  .pcard .pv .u{font-size:.8rem;font-weight:600;color:var(--dim)}
-  .pcard .pl{font-size:.78rem;font-weight:600;margin-top:5px}
-  .pcard .psub{font-size:.74rem;color:var(--mute);margin-top:8px;line-height:1.4}
-  .ladbar{position:relative;height:8px;border-radius:5px;margin:12px 0 6px;background:linear-gradient(90deg,rgba(255,255,255,.06),rgba(200,255,77,.18))}
-  .ladbar .band{position:absolute;top:0;bottom:0;background:rgba(200,255,77,.22);border-left:1px solid var(--lime);border-right:1px solid var(--lime)}
-  .ladbar .you{position:absolute;top:-4px;width:2px;height:16px;background:var(--cyan);box-shadow:0 0 8px var(--cyan)}
-  .ladlab{display:flex;justify-content:space-between;font-size:.68rem;color:var(--mute);font-variant-numeric:tabular-nums}
+  /* ── arrival: the launch signature ────────────────────────────────────── */
+  .arr{border:1px solid var(--line);border-radius:14px;padding:20px 20px 14px;background:rgba(255,255,255,.014)}
+  .arr svg{display:block;width:100%;height:190px;overflow:visible}
+  .arrleg{display:flex;gap:18px;flex-wrap:wrap;margin-top:14px;font-size:.74rem;color:var(--mute)}
+  .arrleg i{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:7px;vertical-align:1px}
+  .dot{transition:opacity .12s}
+  .arr:hover .dot{opacity:.4}
+  .arr .dot:hover{opacity:1}
 
-  /* history chart */
-  .chartwrap{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));overflow:hidden}
-  .ch-h{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .views{display:inline-flex;gap:6px;flex-wrap:wrap}
-  .view{font-size:.78rem;font-weight:600;color:var(--dim);border:1px solid var(--line);border-radius:9px;padding:6px 12px;background:transparent;cursor:pointer}
-  .view.on{border-color:var(--lime);color:var(--lime);background:rgba(200,255,77,.08)}
-  .legend{display:flex;gap:14px;align-items:center;font-size:.72rem;color:var(--mute)}
-  .legend i{width:16px;height:3px;border-radius:2px;display:inline-block;margin-right:5px;vertical-align:middle}
-  canvas{display:block;width:100%;height:380px;touch-action:none}
-  /* live price — our own candles in the Block0 palette (data sourced, rendered first-party) */
-  .mkt-h{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
-  .mkt-tf{display:flex;gap:2px}
-  .mkt-tf button{font-family:var(--mono);font-size:.72rem;color:var(--dim);background:rgba(255,255,255,.03);border:1px solid var(--line);border-radius:6px;padding:4px 9px;cursor:pointer}
-  .mkt-tf button.on{color:var(--bg);background:var(--lime);border-color:var(--lime);font-weight:700}
-  .mkt-stats{display:flex;flex-wrap:wrap;gap:8px 22px;padding:12px 2px 4px;font-variant-numeric:tabular-nums}
-  .mkt-stats .st{display:flex;flex-direction:column;gap:2px}
-  .mkt-stats .st b{font-family:var(--mono);font-size:1rem;color:var(--tx)}
-  .mkt-stats .st b.g{color:var(--lime)} .mkt-stats .st b.c{color:var(--coral)}
-  .mkt-stats .st i{font-style:normal;font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--mute)}
-  .mkt-src{font-size:.72rem;color:var(--mute)} .mkt-src a{color:var(--dim)}
-  /* the market chart lives on its own richer surface — a soft radial lime glow over deep black */
-  #mktwrap{position:relative;background:
-     radial-gradient(120% 90% at 84% -20%, rgba(200,255,77,.10), transparent 55%),
-     radial-gradient(90% 120% at 8% 120%, rgba(53,230,224,.06), transparent 55%),
-     linear-gradient(180deg,#0c0e0b,#080809 70%)}
-  #mktwrap .ch-h,#mktwrap .mkt-stats,#mktwrap .mkt-src{position:relative;z-index:2}
-  #cvmkt{height:320px}
-  .mkt-phase{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin:2px 0 10px;padding:9px 13px;border:1px solid var(--line);border-radius:11px;background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.006))}
-  .mkt-phase .phw{font-weight:700;font-size:.9rem;display:inline-flex;align-items:baseline;gap:7px}
-  .mkt-phase .phi{font-size:.8rem}
-  .mkt-phase .phh{font-size:.78rem;color:var(--dim);flex:1;min-width:180px}
-  .mkt-lastpill{position:absolute;right:0;transform:translateY(-50%);font-family:var(--mono);font-size:.68rem;font-weight:700;
-    padding:2px 7px;border-radius:5px;pointer-events:none;white-space:nowrap;z-index:3}
-  .tip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:9px 11px;font-size:.74rem;z-index:5;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
-  .tip .d{color:var(--mute);margin-bottom:4px} .tip b{font-variant-numeric:tabular-nums}
-  .chnote{padding:34px 16px;color:var(--mute);font-size:.86rem;text-align:center}
-  .corcap{padding:13px 16px;border-top:1px solid var(--line);font-size:.8rem;color:var(--mute);line-height:1.55}
-  .zswatch{display:inline-block;width:15px;height:10px;background:rgba(200,255,77,.16);border:1px solid var(--lime);border-radius:2px;margin-right:6px;vertical-align:middle}
-  .corverdict b.pill{display:inline-block;font-weight:800;font-size:.76rem;letter-spacing:.02em;padding:3px 9px;border-radius:8px;margin-right:8px;color:#08080b}
+  /* ── flow ─────────────────────────────────────────────────────────────── */
+  .flow{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);
+        border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-bottom:22px}
+  .fl{background:#0b0b0f;padding:20px 21px}
+  .fl .k{font-size:.63rem;letter-spacing:.13em;text-transform:uppercase;color:var(--mute);font-weight:700}
+  .fl .n{font-size:2.5rem;font-weight:800;line-height:1;margin-top:10px;font-variant-numeric:tabular-nums;letter-spacing:-.03em}
+  .fl.add .n{color:var(--cyan)} .fl.red .n{color:var(--coral)}
+  .fl .amt{font-size:.82rem;color:var(--dim);margin-top:8px;font-variant-numeric:tabular-nums}
+  .bar{height:3px;background:rgba(255,255,255,.07);border-radius:2px;margin-top:14px;overflow:hidden}
+  .bar i{display:block;height:100%;background:var(--coral)}
+  .fl.add .bar i{background:var(--cyan)}
 
-  /* holder tables */
-  .smartpanel{margin:26px 0 4px;border:1px solid rgba(53,230,224,.3);border-radius:16px;
-    background:linear-gradient(180deg,rgba(53,230,224,.06),rgba(53,230,224,.015));overflow:hidden}
-  .smartpanel.conv{border-color:rgba(200,255,77,.45);background:linear-gradient(180deg,rgba(200,255,77,.08),rgba(200,255,77,.02));
-    box-shadow:0 0 26px rgba(200,255,77,.1)}
-  .smartpanel .sph{padding:14px 16px;border-bottom:1px solid var(--line);font-size:1.02rem;color:var(--cyan)}
-  .smartpanel.conv .sph{color:var(--lime)}
-  .smartpanel .sph .ic{font-size:1.05rem} .smartpanel .sph b{color:var(--tx);font-variant-numeric:tabular-nums}
-  .smartpanel .cvt{font-weight:600}
-  .smartpanel .spsub{display:block;margin-top:4px;font-size:.76rem;color:var(--mute)}
-  .smartpanel .spsub b{color:var(--dim);font-weight:600}
-  .smartpanel .spb{font-size:.78rem;color:var(--dim);font-weight:500}
-  .kind{display:inline-flex;align-items:center;gap:3px;font-size:.64rem;text-transform:uppercase;letter-spacing:.06em;
-    padding:1px 6px;border-radius:6px;border:1px solid var(--line);vertical-align:middle;margin-left:5px}
-  .kind .ic{width:.85em;height:.85em}
-  .kind.prov{color:var(--lime);border-color:rgba(200,255,77,.4)}
-  .kind.ride{color:var(--cyan);border-color:rgba(53,230,224,.4)}
-  .smartpanel .wlist{display:grid;grid-template-columns:1fr 1fr;gap:0}
-  @media(max-width:640px){.smartpanel .wlist{grid-template-columns:1fr}}
-  .tables{display:grid;grid-template-columns:1fr 1fr 1fr;gap:14px}
-  .tbl{border:1px solid var(--line);border-radius:14px;background:var(--glass);overflow:hidden}
-  .tbl h3{font-size:.74rem;letter-spacing:.05em;text-transform:uppercase;margin:0;padding:12px 15px;border-bottom:1px solid var(--line);color:var(--dim);display:flex;justify-content:space-between}
-  .tbl h3.buy{color:var(--lime)} .tbl h3.sell{color:var(--coral)}
-  table{width:100%;border-collapse:collapse;font-family:ui-monospace,monospace;font-size:.8rem}
-  td{padding:8px 15px;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
-  tr:first-child td{border-top:none}
-  .num{text-align:right} .pos{color:var(--lime)} .neg{color:var(--coral)}
-  td a.wal{color:var(--tx);text-decoration:none} td a.wal:hover{color:var(--cyan)}
-  .depaddr a{color:var(--mute);text-decoration:none} .depaddr a:hover{color:var(--cyan)}
-  .snipe{color:var(--amber);margin-left:5px;font-size:.72rem}
-  .empty{color:var(--mute);padding:16px 15px;font-size:.8rem}
-  .foot{color:var(--mute);font-size:.8rem;margin-top:30px;line-height:1.55;max-width:88ch}
-  /* clean wallet rows (no raw hex — avatar + codename + explorer / copy) */
-  .wrow{display:flex;align-items:center;gap:11px;padding:9px 15px;border-top:1px solid var(--line)}
-  .wrow:first-child{border-top:none}
-  .wrow .wid{display:flex;flex-direction:column;gap:1px;min-width:0}
-  .wrow .wn{font-weight:600;font-size:.86rem;font-family:var(--sans)}
-  .wrow .wm{font-size:.66rem;color:var(--mute);text-transform:uppercase;letter-spacing:.06em}
-  .wrow .wv{margin-left:auto;text-align:right;font-family:ui-monospace,monospace;font-variant-numeric:tabular-nums;font-size:.82rem}
-  /* position chip: P&L + ROI on top, entry price beneath — sits between the identity and the balance/net column */
-  .wrow .wpl{display:flex;flex-direction:column;align-items:flex-end;gap:1px;margin-left:auto;font-family:ui-monospace,monospace;font-variant-numeric:tabular-nums;line-height:1.15;flex:0 0 auto}
-  .wrow .wpl b{font-size:.78rem;font-weight:700} .wrow .wpl b.pos{color:var(--lime)} .wrow .wpl b.neg{color:var(--coral)}
-  .wrow .wpl i{font-style:normal;font-size:.68rem;color:var(--dim);margin-left:4px}
-  .wrow .wpl small{font-size:.62rem;color:var(--mute);letter-spacing:.02em}
-  .wrow .wpl + .wv{margin-left:12px;min-width:5.5ch}
-  @media(max-width:520px){.wrow .wpl small{display:none}}
-  .wrow .zl{font-size:.68rem;color:var(--lime);white-space:nowrap;margin-left:8px}
-  .wrow .zl.addr{color:var(--mute);font-family:ui-monospace,monospace;cursor:copy}
-  .wrow .zl.addr:hover{color:var(--dim)}
-  .wrow .ctag{font-size:.58rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);border:1px solid var(--line);border-radius:5px;padding:1px 5px;margin-left:6px;vertical-align:middle}
-  .wrow:hover{background:rgba(255,255,255,.02)}
-  /* bubble map */
-  .bmwrap{border:1px solid var(--line);border-radius:16px;background:linear-gradient(180deg,var(--glass),rgba(255,255,255,.01));overflow:hidden}
-  .bm-h{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:13px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
-  .bm-h .t{font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim)}
-  .bm-btns{display:flex;gap:8px;flex-wrap:wrap}
-  .bm-btn{font-size:.76rem;font-weight:600;color:var(--dim);border:1px solid var(--line);border-radius:9px;padding:6px 12px;background:transparent;cursor:pointer}
-  .bm-btn:hover{border-color:var(--line-2);color:var(--tx)}
-  .bm-btn.on{border-color:var(--lime);color:var(--lime);background:rgba(200,255,77,.08)}
-  #cvbm{height:460px;cursor:grab;touch-action:none;display:block;width:100%}
-  #cvbm:active{cursor:grabbing}
-  /* bundle / wallet panel that opens on click */
-  .bmpanel{position:absolute;top:12px;right:12px;width:min(300px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;z-index:7;
-    background:rgba(11,11,16,.92);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);border:1px solid var(--line-2);border-radius:14px;
-    box-shadow:0 24px 60px -24px rgba(0,0,0,.85);padding:14px 15px}
-  .bmp-head{display:flex;justify-content:space-between;align-items:flex-start;gap:10px}
-  .bmp-head b{font-size:.95rem}
-  .bmp-sub{display:block;font-size:.7rem;color:var(--mute);margin-top:3px}
-  .bmp-x{background:none;border:none;color:var(--mute);font-size:1rem;cursor:pointer;line-height:1;padding:2px 4px}
-  .bmp-x:hover{color:var(--tx)}
-  .bmp-list{margin-top:11px;display:flex;flex-direction:column;gap:2px}
-  .bmp-row{display:flex;align-items:center;gap:9px;padding:7px 8px;border-radius:9px;text-decoration:none;color:var(--tx);transition:background .12s}
-  .bmp-row:hover{background:rgba(255,255,255,.05)}
-  .bmp-dot{width:8px;height:8px;border-radius:50%;flex:0 0 auto}
-  .bmp-nm{font-size:.82rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .bmp-pct{font-family:var(--mono);font-size:.76rem;color:var(--dim)}
-  .bmp-foot{margin-top:10px;font-size:.68rem;color:var(--mute);line-height:1.5}
-  .bm-legend{display:flex;gap:14px;flex-wrap:wrap;padding:11px 16px;border-top:1px solid var(--line);font-size:.72rem;color:var(--mute)}
-  .bm-legend i{width:9px;height:9px;border-radius:50%;display:inline-block;margin-right:5px;vertical-align:middle}
-  .bmtip{position:absolute;pointer-events:none;background:#0b0b10;border:1px solid var(--line-2);border-radius:9px;padding:8px 11px;font-size:.74rem;z-index:6;display:none;white-space:nowrap;box-shadow:0 8px 24px rgba(0,0,0,.5)}
-  /* the "now" beacon on the winner cone — a steady core that pulses a halo, showing the live position */
-  #corbeacon{position:absolute;width:9px;height:9px;border-radius:50%;background:#5ff0ea;transform:translate(-50%,-50%);pointer-events:none;display:none;z-index:4;
-    box-shadow:0 0 10px 2px rgba(53,230,224,.9)}
-  #corbeacon::after{content:"";position:absolute;inset:-3px;border-radius:50%;box-shadow:0 0 0 0 rgba(53,230,224,.55);animation:beacon 1.9s cubic-bezier(.35,0,.35,1) infinite}
-  @keyframes beacon{0%{box-shadow:0 0 0 0 rgba(53,230,224,.55)}70%{box-shadow:0 0 0 13px rgba(53,230,224,0)}100%{box-shadow:0 0 0 0 rgba(53,230,224,0)}}
-  @media(prefers-reduced-motion:reduce){#corbeacon::after{animation:none}}
-  @media(max-width:860px){.top{grid-template-columns:1fr}.verdict{text-align:left}.verdict .drv{margin-left:0}
-    .facs{grid-template-columns:repeat(2,1fr)}.place{grid-template-columns:1fr}.tables{grid-template-columns:1fr}}
+  /* ── wallet table ─────────────────────────────────────────────────────── */
+  .tbl{width:100%;border-collapse:collapse;font-size:.86rem}
+  .tbl th{text-align:left;font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:var(--mute);
+          font-weight:700;padding:0 12px 11px;border-bottom:1px solid var(--line)}
+  .tbl th.r,.tbl td.r{text-align:right}
+  .tbl td{padding:12px;border-bottom:1px solid rgba(255,255,255,.05);font-variant-numeric:tabular-nums;vertical-align:middle}
+  .tbl tr:last-child td{border-bottom:0}
+  .tbl tr:hover td{background:rgba(255,255,255,.022)}
+  .wa{font-family:var(--mono);font-size:.79rem;color:var(--dim);border:0;background:none;padding:0;cursor:pointer}
+  .wa:hover{color:var(--tx)}
+  .tg{font-size:.58rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:3px 6px;
+      border-radius:4px;border:1px solid var(--line-2);color:var(--mute);margin-left:8px;white-space:nowrap}
+  .tg.snip{color:var(--amber);border-color:rgba(255,210,61,.34)}
+  .tg.bund{color:var(--magenta);border-color:rgba(255,92,240,.32)}
+  .net.up{color:var(--cyan)} .net.dn{color:var(--coral)}
+  .hbar{display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.09);min-width:2px}
+  .hbar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--lime),var(--cyan))}
+
+  /* ── unavailable is a first-class state, never a zero ─────────────────── */
+  .unk{border:1px dashed var(--line-2);border-radius:14px;padding:20px 22px;background:rgba(255,255,255,.012)}
+  .unk .l{font-size:.74rem;font-weight:800;letter-spacing:.11em;text-transform:uppercase;color:var(--amber)}
+  .unk .r{font-size:.88rem;color:var(--dim);margin-top:8px;max-width:64ch;line-height:1.6}
+  .chip-unk{display:inline-block;font-size:.62rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;
+            padding:3px 8px;border-radius:5px;border:1px solid var(--line-2);color:var(--mute)}
+
+  .spark{width:100%;height:120px;display:block}
+
+  /* ── retrospective study: bottom of the page, closed by default ───────── */
+  details.hist{border-top:1px solid var(--line);padding-top:26px;margin-top:10px}
+  details.hist summary{cursor:pointer;font-size:.68rem;font-weight:700;letter-spacing:.16em;
+                       text-transform:uppercase;color:var(--mute);list-style:none}
+  details.hist summary::-webkit-details-marker{display:none}
+  details.hist summary:after{content:" ▸";color:var(--line-2)}
+  details.hist[open] summary:after{content:" ▾"}
+  details.hist .body{margin-top:18px;color:var(--dim);font-size:.9rem;line-height:1.65;max-width:72ch}
+  details.hist a{color:var(--lime)}
+
+  .scan{display:flex;gap:10px;margin-top:4px;max-width:520px}
+  .scan input{flex:1;background:rgba(255,255,255,.04);border:1px solid var(--line);border-radius:11px;
+              padding:12px 14px;color:var(--tx);font-family:var(--mono);font-size:.84rem}
+  .scan input:focus{outline:none;border-color:rgba(200,255,77,.45)}
+  .scan button{background:var(--lime);color:#0a0a0a;border:0;border-radius:11px;padding:0 20px;
+               font-weight:800;font-size:.85rem;cursor:pointer}
+
+  @media(max-width:820px){
+    .readwrap{grid-template-columns:1fr;gap:26px}
+    .read{max-width:none}
+    .facts{margin-left:0;gap:20px}
+    .flow{grid-template-columns:1fr}
+    .sym{font-size:1.7rem}
+    .tbl td:nth-child(3),.tbl th:nth-child(3){display:none}
+  }
 </style>
 </head>
 <body>
@@ -244,815 +153,360 @@
   <div class="gatebar" id="gatebar" hidden></div>
 </header>
 <main class="wrap">
-  <div id="root"><div class="state">Loading the dossier…</div></div>
+  <div id="root"><div class="state">Reading the chain…</div></div>
 </main>
 <footer class="ft">
   <div class="ft-in">
     <div class="ft-top">
-      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag"><b>Signal, not proof — never a buy recommendation.</b> Every number is reconstructed from public Robinhood-Chain transfer data and is reproducible.</p></div>
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag"><b>Block0 does not predict price.</b> Every number here is reconstructed from public Robinhood-Chain transfer data and is reproducible.</p></div>
       <div class="ft-cols">
-        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a></div>
+        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/setups">Experiment</a></div>
         <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a></div>
       </div>
     </div>
-    <p class="fine">Prices are swap-implied reconstructions, smoothed — treat exact figures as estimates. Not financial advice.</p>
+    <p class="fine">Prices are swap-implied reconstructions — treat exact figures as estimates. Not financial advice.</p>
   </div>
 </footer>
 
 <script src="/block0-cards.js"></script>
 <script src="/block0-gate.js"></script>
 <script>
-const $=(s,r=document)=>r.querySelector(s);
-const short=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"—";
-const mcT=(x)=>x==null?"—":x>=1e6?"$"+(x/1e6).toFixed(2)+"M":x>=1e3?"$"+(x/1e3).toFixed(0)+"k":"$"+Math.round(x||0);
-const kT=(x)=>{const n=Math.abs(x),s=x<0?"-":"";return n>=1e9?s+(n/1e9).toFixed(2)+"B":n>=1e6?s+(n/1e6).toFixed(2)+"M":n>=1e3?s+(n/1e3).toFixed(1)+"k":s+Math.round(n);};
-const pxUsd=(x)=>x==null?"—":x>=1?"$"+x.toFixed(3):"$"+x.toPrecision(3);
-const band=(r)=>r>=66?"var(--coral)":r>=45?"var(--amber)":r>=25?"var(--cyan)":"var(--lime)";
-const sev=(v)=>v>=60?"var(--coral)":v>=30?"var(--amber)":v>=12?"var(--cyan)":"var(--lime)";
-const HUES=["#c8ff4d","#35e6e0","#ff5cf0","#ffd23d","#ff8a5c","#7ee787","#8ab4ff","#ff7ab6"];
-const q=new URLSearchParams(location.search), ADDR=(q.get("address")||"").toLowerCase();
-let EXPLORER=null;
-const exHref=(a)=>EXPLORER?`${EXPLORER}/address/${a}`:null;
-const shortA=(a)=>a?a.slice(0,6)+"…"+a.slice(-4):"";
-// A wallet row opens OUR per-wallet PnL page (/wallet?a=) — our own reconstruction, not a third-party
-// portfolio service (Zerion & co. don't index this chain). The explorer link lives on the wallet page.
-function wGo(a){ return {tag:"a",attrs:` href="/wallet?a=${a}"`,go:`<span class="zl">PnL →</span>`}; }
-const addrLink=(a,cls="")=>{const h=exHref(a);return h?`<a href="${h}" target="_blank" rel="noreferrer" class="${cls}">${short(a)}</a>`:`<span class="${cls}">${short(a)}</span>`;};
+/* ══════════════════════════════════════════════════════════════════════════════════════════════════════════
+   THE DOSSIER.
 
-function icon(r){const sym=r.sym||"?";let h=0;for(let i=0;i<sym.length;i++)h=(h*31+sym.charCodeAt(i))|0;
-  const bg=HUES[Math.abs(h)%HUES.length],ini=sym.replace(/[^A-Za-z0-9]/g,"").slice(0,2).toUpperCase()||"?";
-  return r.logo?`<div class="ic" style="background:${bg}"><img src="${r.logo}" alt="" onerror="this.parentNode.textContent='${ini}'"></div>`:`<div class="ic" style="background:${bg}">${ini}</div>`;}
+   One rule governs everything below: if the chain cannot settle it, the page does not assert it. A missing
+   value renders as UNKNOWN with the reason — never as 0, never as an empty cell, never as an estimate. In a
+   market where every other surface shows a confident number, an honest "we cannot tell you" is the product.
 
-function meter(k,v,detail){const c=sev(v);return `<div class="fac"><div class="fh"><span class="fk">${k}</span><span class="fv" style="color:${c}">${v}</span></div>
-  <div class="ftrack"><div class="ffill" style="width:${Math.max(3,Math.min(100,v))}%;background:${c}"></div></div><div class="fd">${detail}</div></div>`;}
+   Nothing here predicts. The retrospective winner-resemblance study sits at the bottom, closed, labelled as
+   history rather than a forecast.
+   ══════════════════════════════════════════════════════════════════════════════════════════════════════════ */
+const $ = (s) => document.querySelector(s);
+const ADDR = (new URLSearchParams(location.search).get("address") || "").toLowerCase();
 
-const DRV={concentration:"top-heavy — a few wallets hold the float",dumping:"insiders are selling into the market now",
-  bundles:"coordinated same-block buying at launch",snipers:"heavy block-0 sniping",deployer:"the deployer still holds a big bag",
-  coordination:"linked wallets moving as one — a hidden cluster, not a same-block bundle"};
+const has = (v) => v !== null && v !== undefined && !(typeof v === "number" && !isFinite(v));
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const UNK = '<span class="chip-unk">unknown</span>';
+const val = (v, fmt) => (has(v) ? (fmt ? (fmt(v) ?? UNK) : esc(v)) : UNK);
+// a market cap of exactly 0 is a failed reconstruction, not a $0 token — the distinction is the whole point
+const money = (n) => { if (!has(n) || n === 0) return null; const a = Math.abs(n);
+  return "$" + (a >= 1e9 ? (n / 1e9).toFixed(2) + "b" : a >= 1e6 ? (n / 1e6).toFixed(2) + "m"
+    : a >= 1e3 ? (n / 1e3).toFixed(1) + "k" : n.toFixed(2)); };
+const qty = (n) => { if (!has(n)) return null; const a = Math.abs(n);
+  return (n < 0 ? "−" : "") + (a >= 1e9 ? (a / 1e9).toFixed(2) + "b" : a >= 1e6 ? (a / 1e6).toFixed(2) + "m"
+    : a >= 1e3 ? (a / 1e3).toFixed(1) + "k" : a.toFixed(0)); };
+const pct = (n, d = 1) => (has(n) ? n.toFixed(d) + "%" : null);
+const short = (a) => (a ? a.slice(0, 6) + "…" + a.slice(-4) : "");
+const age = (h) => { if (!has(h)) return null;
+  return h < 1 ? Math.max(1, Math.round(h * 60)) + "m" : h < 48 ? h.toFixed(1) + "h" : (h / 24).toFixed(1) + "d"; };
+const clock = (t) => (t ? new Date(t * 1000).toISOString().slice(11, 19) : "");
+// The dossier emits sym "?" when a token is absent from the launchpad catalog. That is a missing name, not a
+// token called "?", and rendering it as $? is exactly the kind of confident-looking nonsense this page exists
+// to avoid. Same for the icon initial.
+const symOf = (d) => { const s = String(d.sym || "").replace("$", "").trim(); return s && s !== "?" ? s : null; };
+const nameFor = (d) => symOf(d) || "this token";
 
-// how much to trust the read — uncertainty made visible (never a silent neutral). high=lime, limited=amber, low=coral.
-function confStamp(cf){
-  if(!cf||!cf.level) return "";
-  const col={high:"var(--lime)",limited:"var(--amber)",low:"var(--coral)"}[cf.level]||"var(--mute)";
-  const why=(cf.reasons&&cf.reasons[0])?String(cf.reasons[0]).replace(/[<>&]/g,""):"";
-  return `<div class="conf" style="color:${col}" title="${(cf.reasons||[]).join(' · ').replace(/"/g,'')}">
-    <span class="cdot" style="background:${col}"></span>${cf.level} confidence</div>
-    <div class="confwhy">${why}</div>`;
+const unavailable = (label, reason) =>
+  `<div class="unk"><div class="l">${esc(label)} — not available</div><div class="r">${esc(reason)}</div></div>`;
+
+/* No third-party explorer indexes this chain reliably, so an address is click-to-copy rather than a dead link. */
+const copyable = (a, cls) => `<button class="${cls}" data-copy="${esc(a)}" title="${esc(a)} — click to copy">${esc(short(a))}</button>`;
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-copy]"); if (!b) return;
+  navigator.clipboard?.writeText(b.dataset.copy);
+  const was = b.textContent; b.textContent = "copied"; setTimeout(() => { b.textContent = was; }, 900);
+});
+
+/* ═══ THE READ ═════════════════════════════════════════════════════════════════════════════════════════════
+   A sentence assembled from live fields, not written prose. Each clause is bound to one field and is dropped
+   entirely when that field is unavailable, so the page cannot describe something it did not measure. ═══════ */
+function readSentence(d) {
+  const f = d.flags || {}, out = [], nm = esc(nameFor(d));
+  if (has(f.wallets) && has(d.ageH))
+    out.push(`<span class="hi">${qty(f.wallets)}</span> wallets have traded ${nm} in its first ${age(d.ageH)}`);
+  else if (has(f.holders)) out.push(`<span class="hi">${qty(f.holders)}</span> wallets hold ${nm}`);
+  if (has(f.bundles) && f.bundles > 0 && has(f.bundleWallets))
+    out.push(`${f.bundleWallets} of them bought together in one block`);
+  else if (has(f.snipers) && f.snipers > 0)
+    out.push(`${f.snipers} bought within three blocks of the first trade`);
+  if (has(f.top10Pct)) out.push(`The largest ten hold ${pct(f.top10Pct)} of supply`);
+  if (!out.length) return "Not enough transfer history yet to describe this token.";
+  return out.join(". ") + ".";
 }
 
-function deployerCard(r){
-  const d=r.deployer; if(!d) return "";
-  const REP={proven:["PROVEN BUILDER","var(--lime)","has graduated a token before"],
-    serial:["SERIAL LAUNCHER","var(--coral)","many launches, none graduated"],
-    repeat:["REPEAT DEPLOYER","var(--amber)","has launched before"],
-    first:["FIRST LAUNCH","var(--mute)","no prior launches Block0 has seen"]};
-  const t=REP[d.reputation]||REP.first;
-  const chips=(d.others||[]).map(o=>`<a class="depchip" href="/token?address=${o.address}">${B0.esc(o.sym)}${o.graduated?'<span style="color:var(--cyan)"> ◆</span>':''} <span class="dm">${mcT(o.mcapUsd)}</span></a>`).join("");
-  return `<div class="depwrap">
-    <div class="dephead"><span class="depbadge" style="color:#08080b;background:${t[1]}">${t[0]}</span>
-      <span class="depmeta"><b>${d.launched}</b> launch${d.launched>1?'es':''} · <b style="color:${d.graduated?'var(--cyan)':'var(--mute)'}">${d.graduated}</b> graduated — ${t[2]}</span>
-      <span class="depaddr" title="deployer">${addrLink(d.address)}</span></div>
-    ${chips?`<div class="depchips">${chips}</div>`:`<div class="depnote">This is the only launch Block0 has seen from this wallet.</div>`}
+/* ═══ ARRIVAL — the launch signature ═══════════════════════════════════════════════════════════════════════
+   Every holder plotted at the moment it first appeared. A launch where the whole cohort lands in one column
+   looks nothing like one where wallets arrive steadily, and no aggregate number shows that difference. Dot
+   size is proportional to the balance held now; colour marks how the wallet entered. ═══════════════════════ */
+function arrival(d) {
+  // Wallets that have exited to zero still arrived, and leaving them out drew a near-empty panel on a token
+  // 468 wallets had traded. They are kept, ranked last and drawn faint: the churn is the story.
+  const w = (d.whales || []).filter((x) => has(x.first) && has(x.bal));
+  if (w.length < 4) return unavailable("Arrival",
+    "Fewer than four holders carry a first-seen timestamp in the observed window, so there is nothing to plot.");
+
+  const bundled = new Set((d.bundles || []).flatMap((b) => b.wallets || []).map((a) => String(a).toLowerCase()));
+  const t0 = Math.min(...w.map((x) => x.first)), t1 = Math.max(...w.map((x) => x.first));
+  const span = Math.max(1, t1 - t0), maxBal = Math.max(...w.map((x) => x.bal));
+  // Balance on a token this young spans several orders of magnitude, so plotting it directly pins almost every
+  // dot to the floor and leaves the panel empty. Rank spreads them evenly and still answers the question the
+  // axis is for — who is large — while size carries the actual magnitude.
+  const byBal = [...w].sort((a, b) => (b.bal || 0) - (a.bal || 0));
+  const rank = new Map(byBal.map((p, i) => [p, i]));
+  const W = 1000, H = 190, padL = 10, padR = 10, padT = 18, padB = 26;
+  const x = (t) => padL + ((t - t0) / span) * (W - padL - padR);
+  const y = (p) => padT + (rank.get(p) / Math.max(1, w.length - 1)) * (H - padT - padB);
+
+  const ticks = [[t0, "start"], [t0 + span / 2, "middle"], [t1, "end"]].map(([t, anchor]) =>
+    `<text x="${x(t).toFixed(1)}" y="${H - 7}" fill="#7f7f88" font-size="11"
+      font-family="ui-monospace,monospace" text-anchor="${anchor}">${clock(Math.round(t))}</text>`).join("");
+
+  const dots = w.map((p) => {
+    const isB = bundled.has(String(p.a || "").toLowerCase()), isS = !!p.sniper;
+    const c = isB ? "#ff5cf0" : isS ? "#ffd23d" : "#35e6e0";
+    const gone = !(p.bal > 0);
+    const r = gone ? 2.5 : Math.max(3, Math.sqrt(p.bal / maxBal) * 13);
+    const how = isB ? "bundled" : isS ? "sniper" : "open market";
+    const held = gone ? "has since exited" : `${qty(p.bal)} tokens`;
+    return `<circle class="dot" cx="${x(p.first).toFixed(1)}" cy="${y(p).toFixed(1)}" r="${r.toFixed(1)}"
+      fill="${c}" fill-opacity="${gone ? ".12" : ".45"}" stroke="${c}" stroke-opacity="${gone ? ".3" : ".85"}"
+      stroke-width="1"><title>${esc(short(p.a))} · ${held} · first seen ${clock(p.first)} · ${how}</title></circle>`;
+  }).join("");
+
+  return `<div class="arr">
+    <svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img"
+         aria-label="Each holder plotted at the time it first appeared, ordered by the balance it holds now.">
+      <line x1="${padL}" y1="${H - padB}" x2="${W - padR}" y2="${H - padB}" stroke="rgba(255,255,255,.09)"/>
+      ${dots}${ticks}
+    </svg>
+    <div class="arrleg">
+      <span><i style="background:#35e6e0"></i>arrived on the open market</span>
+      <span><i style="background:#ffd23d"></i>sniper · within 3 blocks of the first trade</span>
+      <span><i style="background:#ff5cf0"></i>bundled · bought in the same block as others</span>
+      <span>higher = larger holder · faded = has since exited</span>
+    </div>
   </div>`;
 }
-function placement(r){
-  if(r.graduated){
-    return `<div class="place"><div class="pcard" style="grid-column:1/-1">
-      <div class="ph">graduated token</div>
-      <div class="pl" style="color:var(--cyan)">This token completed the bonding curve.</div>
-      <div class="psub">The blueprint & launch-corridor signals grade a token's <i>path to graduation</i> — they no longer apply once it's out. The forensic verdict above (concentration, dumping, distribution) is the live read for a graduated coin; the history below shows how its score and valuation evolved.</div></div></div>`;
-  }
-  const bp=r.blueprint||0, bpc=bp>=75?"var(--lime)":bp>=55?"var(--cyan)":bp>=35?"var(--amber)":"var(--mute)";
-  const cor=r.corridor, CS={"on-track":"var(--lime)","adoption-behind":"var(--amber)","behind":"var(--amber)","failing":"var(--coral)"},
-    CSL={"on-track":"on winner pace","adoption-behind":"clean shape · adoption behind pace","behind":"behind winner pace","failing":"stalling — off pace"};
-  const p=r.path, pre=r.precedent;
-  const PC={ahead:"var(--amber)","on-path":"var(--lime)",lagging:"var(--cyan)","off-path":"var(--mute)"},
-    PL={ahead:"ahead of the winner band",lagging:"lagging the winners","on-path":"inside the winner band","off-path":"below the winner band"};
-  let ladder="";
-  if(p&&pre){
-    const lo=pre.p25,hi=pre.p75,med=pre.med,cur=r.mcapUsd||0;
-    const axLo=Math.min(lo,cur)*0.6||1, axHi=Math.max(hi,cur)*1.25||1;
-    const X=(v)=>Math.max(0,Math.min(100,(Math.log10(v)-Math.log10(axLo))/(Math.log10(axHi)-Math.log10(axLo))*100));
-    ladder=`<div class="ladbar"><div class="band" style="left:${X(lo)}%;right:${100-X(hi)}%"></div><div class="you" style="left:${X(cur)}%"></div></div>
-      <div class="ladlab"><span>${mcT(axLo)}</span><span>winner band ${mcT(lo)}–${mcT(hi)}</span><span>${mcT(axHi)}</span></div>`;
-  }
-  return `<div class="place">
-    <div class="pcard"><div class="ph">◆ Blueprint fit</div><div class="pv" style="color:${bpc}">${bp}<span class="u">/100</span></div>
-      <div class="pl" style="color:${bpc}">${r.blueprintLabel||""}</div>
-      <div class="psub">How well this launch matches the winner fingerprint from the 10 biggest graduations: no bundles, an opening float, a settled score, real adoption.</div></div>
-    <div class="pcard"><div class="ph">▸ Launch corridor</div>${cor?`<div class="pv" style="color:${CS[cor.status]}">${cor.traj}<span class="u">/100</span></div>
-      <div class="pl" style="color:${CS[cor.status]}">${CSL[cor.status]||""}</div>
-      <div class="psub">Its live trajectory score vs the healthy zone winners sat in at ${r.ageH}h old (${cor.zoneLo}–${cor.zoneHi}). Combines distribution health with real wallet inflow.</div>`:`<div class="pv" style="color:var(--mute)">—</div><div class="psub">not enough history yet</div>`}</div>
-    <div class="pcard"><div class="ph">Valuation ladder · where the winners were at ${(r.wallets||0).toLocaleString()} wallets</div>
-      ${pre?`<div class="pv" style="color:var(--cyan)">${mcT(pre.med)}<span class="u">precedent mcap</span></div>
-      <div class="pl" style="color:${p?PC[p.pos]:'var(--mute)'}">${p?`${PL[p.pos]} · ${p.ratio}× the median`:""}</div>${ladder}
-      <div class="psub">Now at <b style="color:var(--tx)">${mcT(r.mcapUsd)}</b> with ${(r.wallets||0).toLocaleString()} unique buyer wallets. The band is the 25th–75th percentile mcap winners carried at this wallet count.</div>`
-      :`<div class="pv" style="color:var(--mute)">—</div><div class="psub">need more unique wallets to place on the ladder</div>`}</div>
+
+/* ═══ WALLET TABLE ═════════════════════════════════════════════════════════════════════════════════════════ */
+function walletTable(rows, d, { showNet = true, showFirst = false } = {}) {
+  if (!rows || !rows.length) return null;
+  const bundled = new Set((d.bundles || []).flatMap((b) => b.wallets || []).map((a) => String(a).toLowerCase()));
+  const top = Math.max(...rows.map((r) => Math.abs(r.bal) || 0)) || 1;
+  return `<table class="tbl"><thead><tr>
+      <th>Wallet</th><th>Holds</th><th>Relative size</th>
+      ${showFirst ? "<th>First seen</th>" : ""}${showNet ? '<th class="r">Net, 30 min</th>' : ""}
+    </tr></thead><tbody>
+    ${rows.map((r) => {
+      const tags = (r.sniper ? '<span class="tg snip">sniper</span>' : "")
+        + (bundled.has(String(r.a || "").toLowerCase()) ? '<span class="tg bund">bundled</span>' : "");
+      const w = Math.max(1, Math.round((Math.abs(r.bal) / top) * 100));
+      const net = has(r.net) && r.net !== 0
+        ? `<span class="net ${r.net > 0 ? "up" : "dn"}">${r.net > 0 ? "+" : ""}${qty(r.net)}</span>` : "—";
+      return `<tr><td>${copyable(r.a, "wa")}${tags}</td><td>${val(r.bal, qty)}</td>
+        <td><span class="hbar"><i style="width:${w}%"></i></span></td>
+        ${showFirst ? `<td style="color:var(--mute);font-size:.79rem">${has(r.first) ? clock(r.first) : "—"}</td>` : ""}
+        ${showNet ? `<td class="r">${net}</td>` : ""}</tr>`;
+    }).join("")}
+  </tbody></table>`;
+}
+
+/* ═══ PRICE — market context, deliberately secondary ════════════════════════════════════════════════════════ */
+function sparkline(candles) {
+  const pts = candles.map((c) => +(c.c ?? c.close)).filter((v) => isFinite(v) && v > 0);
+  if (pts.length < 3) return null;
+  const lo = Math.min(...pts), hi = Math.max(...pts), W = 1000, H = 120, pad = 6;
+  const x = (i) => (i / (pts.length - 1)) * W;
+  const y = (v) => pad + (1 - (v - lo) / Math.max(1e-12, hi - lo)) * (H - pad * 2);
+  const line = pts.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
+  const up = pts[pts.length - 1] >= pts[0], c = up ? "#35e6e0" : "#ff3b5c";
+  return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
+    <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="${c}" stop-opacity=".22"/><stop offset="1" stop-color="${c}" stop-opacity="0"/>
+    </linearGradient></defs>
+    <path d="${line}L${W},${H}L0,${H}Z" fill="url(#sg)"/>
+    <path d="${line}" fill="none" stroke="${c}" stroke-width="2" stroke-linejoin="round"/></svg>`;
+}
+
+/* ═══ RENDER ═══════════════════════════════════════════════════════════════════════════════════════════════ */
+function render(d) {
+  const f = d.flags || {};
+  const sym = symOf(d), mcap = money(d.mcapUsd);
+  // no symbol → identify by the address's own leading characters rather than inventing or printing "?"
+  const initial = sym ? sym.slice(0, 2).toUpperCase() : (d.address || "0x").slice(2, 4).toUpperCase();
+  const logo = d.logo ? `<img src="https://ipfs.io/ipfs/${esc(d.logo)}" alt="" onerror="this.remove()">` : "";
+  const conf = d.confidence || {};
+
+  const identity = `<div class="idrow">
+    <div class="ic" style="background:linear-gradient(140deg,var(--lime),var(--cyan))">${logo || esc(initial)}</div>
+    <div class="idmain">
+      <div class="sym">${sym ? "$" + esc(sym) : '<span style="color:var(--dim)">Unnamed token</span>'}
+        ${d.name ? `<span class="nm">${esc(d.name)}</span>`
+          : !sym ? '<span class="nm">not listed in the launchpad catalog</span>' : ""}</div>
+      ${d.address ? copyable(d.address, "addr") : ""}
+    </div>
+    <div class="facts">
+      <div class="fact"><div class="k">Market cap</div><div class="v">${mcap || UNK}</div></div>
+      <div class="fact"><div class="k">Holders</div><div class="v">${val(f.holders, qty)}</div></div>
+      <div class="fact"><div class="k">Age</div><div class="v">${val(d.ageH, age)}</div></div>
+      <div class="fact"><div class="k">Venue</div><div class="v" style="font-size:.95rem">${esc(d.venue || "—")}</div></div>
+    </div>
   </div>`;
-}
 
-// a wallet's position on this token, when the priced reconstruction has it: total P&L (realized + unrealized),
-// ROI on what it put in, and its average entry. Wallets with no pool trades (coins arrived by transfer) get NO chip —
-// unknown cost is never dressed up as a number. Honest-low by construction (see pnl.mjs).
-function posChip(a){
-  if(!PNL||!PNL.size) return "";
-  const p=PNL.get(String(a||"").toLowerCase()); if(!p||!(p.invested>0)) return "";
-  const pnl=+p.pnl||0, roi=p.roi!=null?p.roi:(p.invested>0?pnl/p.invested:null);
-  const up=pnl>=0, cls=up?"pos":"neg", sign=up?"+":"−";
-  const roiTxt=roi==null?"":` <i>${(roi>=0?"+":"")+(roi*100).toFixed(0)}%</i>`;
-  return `<span class="wpl" title="P&amp;L on this token from its pool trades — realized + unrealized, marked at the last swap price. Coins received by transfer have unknown cost and count as zero profit (honest-low)."><b class="${cls}">${sign}$${kT(Math.abs(pnl))}</b>${roiTxt}<small>in @ ${pxFmt(p.avgCost)}</small></span>`;
-}
-function walletRows(rows,dir){
-  if(!rows||!rows.length) return `<div class="empty">no wallets ${dir==='top'?'':'moving'} right now</div>`;
-  return rows.map(w=>{
-    const val = dir==="top" ? `<span class="wv" style="color:var(--dim)">${kT(w.bal)}</span>`
-      : `<span class="wv ${dir==='buy'?'pos':'neg'}">${w.net>0?"+":""}${kT(w.net)}</span>`;
-    const g=wGo(w.a);
-    const ct=w.contract?` <span class="ctag" title="a contract — bot, router or pool, not a trader">contract</span>`:'';
-    return `<${g.tag} class="wrow"${g.attrs}>${B0.avatar(w.a,30)}
-      <span class="wid"><span class="wn">${B0.codename(w.a)}${ct}${w.sniper?` <span class="snipe" title="sniper">${B0.ico("bolt")}</span>`:''}</span><span class="wm">${dir==='top'?'holder':dir==='buy'?'accumulating':'distributing'}</span></span>
-      ${posChip(w.a)}${val}${g.go}</${g.tag}>`;}).join("");
-}
-// redraw the three holder tables once the priced reconstruction lands (they first render without P&L, instantly)
-function rerenderHolders(){
-  const r=DOSSIER; if(!r) return;
-  const lists=document.querySelectorAll(".tables .tbl .wlist"); if(lists.length<3) return;
-  lists[0].innerHTML=walletRows(r.buyers,"buy"); lists[1].innerHTML=walletRows(r.sellers,"sell"); lists[2].innerHTML=walletRows(r.topHolders,"top");
-  const n=$("#plnote"); if(n){ n.hidden=!(PNL&&PNL.size); }
-}
-
-function smartPanel(sm){
-  if(!sm||!sm.count) return "";
-  const cs=sm.consensus, conv=!!(cs&&cs.n>=2);
-  const brk=sm.riding?` <span class="spb">${sm.proven} proven · ${sm.riding} riding</span>`:"";
-  const rows=(sm.wallets||[]).map(w=>{
-    const ride=w.kind==="riding";
-    const rec=[w.tokensWon?`${w.tokensWon} win${w.tokensWon>1?"s":""}`:null,w.winRate!=null?`${w.winRate}% hit`:null,w.realized?`+$${Math.round(w.realized).toLocaleString()} realised`:null].filter(Boolean).join(" · ");
-    const tag=`<span class="kind ${ride?'ride':'prov'}">${ride?B0.ico("trend"):B0.ico("check")} ${ride?"riding":"proven"}</span>`;
-    const g=wGo(w.a);
-    return `<${g.tag} class="wrow"${g.attrs}>${B0.avatar(w.a,30)}
-      <span class="wid"><span class="wn">${B0.codename(w.a)} ${tag}</span><span class="wm">${rec||(ride?"riding a winner":"proven wallet")}</span></span>
-      <span class="wv" style="color:var(--dim)">${kT(w.bal)}</span>${g.go}</${g.tag}>`;}).join("");
-  return `<div class="smartpanel${conv?" conv":""}">
-    <div class="sph">${B0.ico("target")} <b>${sm.count}</b> smart-money wallet${sm.count>1?"s":""} positioned${conv?` <span class="cvt">· consensus ${cs.strength}</span>`:''}${brk}
-      ${conv?`<span class="spsub" style="color:var(--lime)">◎ <b>${cs.n} of them bought within ${cs.spanMin<1?"the same minute":cs.spanMin+" min"} of each other</b>${cs.tight10>=2?` (${cs.tight10} inside 10 min)`:""} — strength ${cs.strength}, weighted by each wallet's realised record. Independent proven traders landing together is the read; a position bought days apart is not.</span>`:''}
-      <span class="spsub"><b>Proven</b> = realised profit on past launches. <b>Riding</b> = large unrealised gains on a real-market token they still hold. A confidence signal reconstructed from on-chain holdings — not a recommendation.</span></div>
-    <div class="wlist">${rows}</div></div>`;
-}
-
-function render(r){
-  EXPLORER=r.explorer||(r.links&&r.links.explorer)||null;
-  const c=band(r.risk), f=r.flags, p=r.parts||{};
-  const facs=[
-    meter("Snipers",p.snipers||0,f.snipers?`${f.snipers} wallet${f.snipers>1?'s':''} · hold ${f.sniperHeldPct}%`:"none at launch"),
-    meter("Bundles",p.bundles||0,f.bundles?`${f.bundles} group${f.bundles>1?'s':''} · ${f.bundleWallets} wallets · ${f.bundleHeldPct}%`:"none detected"),
-    meter("Coordination",p.coordination||0,(f.hiddenCoordPct>0||f.coordSellingPct>0)?`linked cluster holds ${Math.max(f.hiddenCoordPct||0,f.coordPct||0)}%${f.coordSellingPct>0?` · <b style="color:var(--coral)">selling now</b>`:""}`:"no hidden cluster"),
-    meter("Concentration",p.concentration||0,`top 10 hold ${f.top10Pct}%`),
-    meter("Dumping now",p.dumping||0,f.insiderSellersNow?`${f.insiderSellersNow} insider${f.insiderSellersNow>1?'s':''} · ${f.insiderDumpNowPct}%`:"none selling"),
-    meter("Deployer",p.deployer||0,f.creatorPct>0?`holds ${f.creatorPct}%`:"empty / distributed"),
-  ].join("");
-  const badge=r.graduated?'<span class="badge grad">graduated</span>':'<span class="badge cook">cooking</span>';
-  const prog=(!r.graduated&&r.progress!=null)?`<div class="prog"><div class="lab"><span>bonding-curve progress to graduation</span><b>${r.progress}%</b></div><div class="track"><div class="fill" style="width:${Math.min(100,r.progress)}%"></div></div></div>`:"";
-  const heat=r.momentum>3?'▲ heating':r.momentum<-3?'▼ cooling':'– flat';
-  $("#root").innerHTML=`
-    <div class="top">
-      <div class="idn">${icon(r)}<div class="who">
-        <div class="sym">${B0.esc(r.sym)} ${badge}</div>
-        ${r.name?`<div class="name">${B0.esc(r.name)}</div>`:""}
-        <div class="addr" title="click to copy" onclick="navigator.clipboard&&navigator.clipboard.writeText('${r.address}')">${r.address}</div>
-        <div class="facts">
-          <div class="fact"><div class="v" style="color:var(--cyan)">${mcT(r.mcapUsd)}</div><div class="k">market cap</div></div>
-          <div class="fact"><div class="v">${(f.holders||0).toLocaleString()}</div><div class="k">holders</div></div>
-          <div class="fact"><div class="v">${(r.wallets||0).toLocaleString()}</div><div class="k">unique buyers</div></div>
-          <div class="fact"><div class="v">${r.ageH<48?r.ageH+"h":Math.round(r.ageH/24)+"d"}</div><div class="k">age</div></div>
-          <div class="fact"><div class="v">${heat}</div><div class="k">momentum</div></div>
-        </div>
-      </div></div>
-      <div class="verdict"><div class="n" style="color:${c}">${r.risk}</div><div class="l" style="color:${c}">${r.label}</div>
-        <div class="drv">${r.topFactor?DRV[r.topFactor]:"no single dominant risk driver"}</div>
-        ${confStamp(r.confidence)}</div>
-      ${prog}
-    </div>
-
-    <h2 class="sec">What's under the hood</h2>
-    <div class="facs">${facs}</div>
-    ${deployerCard(r)}
-
-    <h2 class="sec">${r.graduated?"Status":"Where it stands vs the winners"}</h2>
-    ${placement(r)}
-
-    <h2 class="sec">Live price</h2>
-    <div class="chartwrap" id="mktwrap">
-      <div class="ch-h mkt-h">
-        <div style="font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim)">price &amp; volume · live market</div>
-        <div class="mkt-tf" id="mkttf">
-          <button data-tf="15m">15m</button><button data-tf="1h" class="on">1h</button><button data-tf="4h">4h</button><button data-tf="1d">1d</button>
-        </div>
+  const readBlock = `<section class="sec" style="border-top:0;padding-top:0">
+    <div class="readwrap">
+      <div>
+        <p class="eyebrow">What the chain shows</p>
+        <p class="read">${readSentence(d)}</p>
       </div>
-      <div class="mkt-stats" id="mktstats"></div>
-      <div class="mkt-phase" id="mktphase" hidden></div>
-      <div style="position:relative"><canvas id="cvmkt"></canvas><div class="mkt-lastpill" id="mktlast" hidden></div><div class="tip" id="tipmkt"></div></div>
-      <div class="chnote" id="mktnote" hidden></div>
-      <div class="mkt-src" id="mktsrc" hidden></div>
-    </div>
-
-    <h2 class="sec">${r.graduated?"How it tracked the winner path":"Is it on the winner path?"}</h2>
-    <div class="chartwrap">
-      <div class="ch-h">
-        <div style="font-family:var(--serif);font-style:italic;font-size:1.05rem;color:var(--dim)">winner corridor · trajectory by age</div>
-        <div class="legend"><span><span class="zswatch"></span>winner zone</span><span><i style="background:var(--cyan)"></i>this token</span></div>
-      </div>
-      <div style="position:relative"><canvas id="cvcor" style="height:340px"></canvas><div class="tip" id="tipcor"></div><div id="corbeacon"></div></div>
-      <div class="chnote" id="chnotecor" hidden></div>
-      <div class="corcap"><span id="corverdict"></span> The green cone is the <b style="color:var(--dim)">trajectory</b> score of every token that went on to close above $1M for a day (0–100 — clean distribution + real wallet adoption) as a <b style="color:var(--lime)">mean ± 1 standard deviation</b> band by age; the faint boxes behind it are the raw winner spread the cone was fitted from. Each <b style="color:var(--cyan)">gate</b> is a checkpoint — the value a winner should hit by that age — with the concrete <b style="color:var(--lime)">wallet count</b> and market cap along the bottom; the lit-up gate is where this token is <b>now</b>. Inside the cone = on the path; below it = drifting; near the floor = dying. Hover to compare at any age.</div>
-    </div>
-
-    <h2 class="sec">History — valuation &amp; score over time</h2>
-    <div class="chartwrap">
-      <div class="ch-h">
-        <div class="views" id="views">
-          <button class="view on" data-v="mcap">Market cap</button>
-          <button class="view" data-v="price">Price</button>
-          <button class="view" data-v="wallets">Unique wallets</button>
-          <button class="view" data-v="volUsd">Volume</button>
+      <div class="readside">
+        <div class="meas">
+          <div class="m"><div class="k">Traded ever</div><div class="v">${val(f.wallets, qty)}</div>
+            <div class="s">distinct wallets that ever bought</div></div>
+          <div class="m"><div class="k">Top ten</div><div class="v">${val(f.top10Pct, (v) => pct(v))}</div>
+            <div class="s">of supply, largest ten wallets</div></div>
+          <div class="m"><div class="k">Creator</div><div class="v">${val(f.creatorPct, (v) => pct(v))}</div>
+            <div class="s">of supply held by the deployer</div></div>
         </div>
-        <div class="legend"><span id="pmlabel"><i style="background:var(--cyan)"></i>market cap</span><span><i style="background:var(--lime)"></i>risk score (0–100, right)</span></div>
+        <p class="prov">Read from <code>/api/token</code>. Every clause is bound to one field and is omitted when
+          that field is unavailable${conf.level ? ` · read confidence ${esc(conf.level)}` : ""}.</p>
+        ${conf.reasons && conf.reasons.length ? `<p class="prov" style="color:var(--amber)">${esc(conf.reasons[0])}</p>` : ""}
       </div>
-      <div style="position:relative"><canvas id="cv"></canvas><div class="tip" id="tip"></div></div>
-      <div class="chnote" id="chnote" hidden></div>
-      <div class="corcap" id="pricewarn" hidden></div>
     </div>
+  </section>`;
 
-    <h2 class="sec">Bundle map — who's connected</h2>
-    <div class="bmwrap">
-      <div class="bm-h">
-        <div class="t">wallet relationships · bundles &amp; clusters</div>
-        <div class="bm-btns">
-          <button class="bm-btn on" id="bmColor" data-mode="flow">colour: buying / selling</button>
-          <button class="bm-btn" id="bmFunders">＋ scan common funders</button>
-        </div>
-      </div>
-      <div style="position:relative"><canvas id="cvbm"></canvas><div class="bmtip" id="bmtip"></div><div class="bmpanel" id="bmpanel" hidden></div></div>
-      <div class="bm-legend" id="bmlegend"></div>
+  const hazards = [
+    ["Snipers", f.snipers, has(f.sniperHeldPct) ? `holding ${pct(f.sniperHeldPct)} of supply` : "share unknown", "warn"],
+    ["Bundles", f.bundles, has(f.bundleWallets) ? `${f.bundleWallets} wallets buying in one block` : "wallets unknown", "bad"],
+    ["Linked clusters", f.coordClusters, has(f.coordPct) ? `${pct(f.coordPct)} of supply in linked wallets` : "share unknown", "warn"],
+    ["Cohort selling", f.insiderSellersNow,
+      has(f.insiderDumpNowPct) ? `${pct(f.insiderDumpNowPct, 2)} of held supply moved out` : "amount unknown", "bad"],
+  ].map(([k, v, s, cls]) => `<div class="m"><div class="k">${k}</div>
+      <div class="v ${has(v) && v > 0 ? cls : ""}">${val(v)}</div><div class="s">${s}</div></div>`).join("");
+
+  const launch = `<section class="sec">
+    <p class="eyebrow">Block zero <b>· how it began</b></p>
+    <div class="meas" style="margin-bottom:22px">${hazards}</div>
+    ${arrival(d)}
+  </section>`;
+
+  const buyers = d.buyers || [], sellers = d.sellers || [];
+  const addVol = buyers.reduce((s, r) => s + (r.net || 0), 0);
+  const redVol = Math.abs(sellers.reduce((s, r) => s + (r.net || 0), 0));
+  const span = Math.max(addVol, redVol) || 1;
+  const movers = [...buyers, ...sellers].sort((a, b) => Math.abs(b.net || 0) - Math.abs(a.net || 0)).slice(0, 12);
+
+  const flow = `<section class="sec">
+    <p class="eyebrow">Who is moving it <b>· last 30 minutes</b></p>
+    <div class="flow">
+      <div class="fl add"><div class="k">Adding</div><div class="n">${buyers.length}</div>
+        <div class="amt">+${qty(addVol) ?? "0"} tokens</div>
+        <div class="bar"><i style="width:${Math.round((addVol / span) * 100)}%"></i></div></div>
+      <div class="fl red"><div class="k">Reducing</div><div class="n">${sellers.length}</div>
+        <div class="amt">−${qty(redVol) ?? "0"} tokens</div>
+        <div class="bar"><i style="width:${Math.round((redVol / span) * 100)}%"></i></div></div>
     </div>
+    ${movers.length ? walletTable(movers, d)
+      : unavailable("Recent movement", "No wallet changed its position in the observed 30-minute window.")}
+    <p class="prov">Net position change per wallet. A wallet appears once however many transfers it made — a
+      transaction is a trade, a transfer leg is not.</p>
+  </section>`;
 
-    ${smartPanel(r.smart)}
-    <h2 class="sec">Who's in it</h2>
-    <div class="tables">
-      <div class="tbl"><h3 class="buy">Adding now <span>net 30m</span></h3><div class="wlist">${walletRows(r.buyers,"buy")}</div></div>
-      <div class="tbl"><h3 class="sell">Shedding now <span>net 30m</span></h3><div class="wlist">${walletRows(r.sellers,"sell")}</div></div>
-      <div class="tbl"><h3>Biggest bags <span>balance</span></h3><div class="wlist">${walletRows(r.topHolders,"top")}</div></div>
+  // topHolders arrives sorted by balance but still carries wallets that have exited to zero; a wallet holding
+  // nothing is not a largest holder, and listing it pads the table with rows that say nothing.
+  const held = (d.topHolders || []).filter((r) => has(r.bal) && r.bal > 0);
+  const holders = `<section class="sec"><p class="eyebrow">Largest holders</p>
+    ${walletTable(held, d, { showNet: false, showFirst: true })
+      || unavailable("Holder table", "No wallet on this token currently holds a positive balance in the observed set.")}
+    ${held.length ? `<p class="prov">Balances now, with the moment each wallet first appeared. Wallets that have
+      exited to zero are excluded.</p>` : ""}</section>`;
+
+  const dep = d.deployer || {};
+  const depBody = has(dep.launched) && dep.launched > 1
+    ? `<div class="meas">
+        <div class="m"><div class="k">Launches</div><div class="v">${dep.launched}</div><div class="s">by this deployer</div></div>
+        <div class="m"><div class="k">Reached the market</div><div class="v">${val(dep.graduated)}</div><div class="s">of those launches</div></div>
+        <div class="m"><div class="k">Faded</div><div class="v ${dep.faded > 0 ? "warn" : ""}">${val(dep.faded)}</div><div class="s">collapsed after listing</div></div>
+        <div class="m"><div class="k">Wallet</div><div class="v" style="font-size:.9rem">${dep.address ? copyable(dep.address, "wa") : UNK}</div><div class="s">deployer address</div></div>
+      </div>`
+    : unavailable("Deployer history",
+        "This is the only launch by this deployer in the launchpad metadata. A first launch is not evidence either way.");
+
+  const deployer = `<section class="sec"><p class="eyebrow">Deployer</p>${depBody}</section>`;
+
+  const price = `<section class="sec"><p class="eyebrow">Price <b>· context, not the product</b></p>
+    <div id="pricebox">${unavailable("Price history", "Loading market data…")}</div></section>`;
+
+  const another = `<section class="sec"><p class="eyebrow">Read another launch</p>
+    <form class="scan" onsubmit="return go(event)">
+      <input id="q" placeholder="0x… token address" autocomplete="off" spellcheck="false">
+      <button type="submit">Read</button></form></section>`;
+
+  const study = `<details class="hist"><summary>Historical resemblance · retrospective study</summary>
+    <div class="body">
+      <p>Block0 also compares a launch against a study of tokens that previously reached $1m. That comparison is
+      <b>retrospective</b>: it is fitted on a selected cohort of a young chain, it describes resemblance rather
+      than outcome, and it has not been shown to identify a profitable entry. It sits here, below the evidence and
+      closed by default, because it is history and not a forecast.</p>
+      ${has(d.blueprint) ? `<p style="margin-top:14px">This token's structural resemblance reads
+        <b>${d.blueprint}/100</b>${d.blueprintLabel ? ` — ${esc(String(d.blueprintLabel).toLowerCase())}` : ""}.
+        Method and every count on the <a href="/methodology">methodology page</a>.</p>` : ""}
+      <p style="margin-top:14px">A separate <a href="/setups">forward experiment</a> is now recording timestamped
+      observations and grading its own decisions, including the ones that fail.</p>
     </div>
-    <div class="chnote" id="plnote" hidden>Each wallet's <b>P&amp;L and entry</b> are reconstructed from its pool trades — realized + unrealized, marked at the last swap price. Coins that arrived by wallet-to-wallet transfer have unknown cost and are credited <b>zero</b> profit, so every number is honest-low. Wallets with no pool trades show no P&amp;L rather than a guess.</div>`;
-  loadHistory(r);
-  loadGraph(r.address);
-  loadMarket(r.address);
+  </details>`;
+
+  $("#root").innerHTML = identity + readBlock + launch + flow + holders + deployer + price + another + study;
 }
 
-/* ---------------- history chart (canvas, no deps) ---------------- */
-let SERIES=null, VIEW="mcap", CV, TIP, DPR=Math.max(1,Math.min(2,window.devicePixelRatio||1));
-// POSITION STRUCTURE — per-wallet entry cost + P&L on THIS token, from the backtest's priced-trade reconstruction
-// (pnl.mjs). The dossier already downloads that payload for the chart, so this is a free client-side join: no RPC.
-let PNL=null, PNL_PRICE=null;
-const VMETA={mcap:{lab:"market cap",fmt:mcT,col:"#35e6e0"},price:{lab:"price",fmt:pxUsd,col:"#35e6e0"},
-  wallets:{lab:"unique wallets",fmt:(x)=>Math.round(x).toLocaleString(),col:"#ff5cf0"},volUsd:{lab:"volume / bucket",fmt:mcT,col:"#ffd23d"}};
+function go(e) {
+  e.preventDefault();
+  const el = $("#q"), v = (el.value || "").trim().toLowerCase();
+  if (/^0x[0-9a-f]{40}$/.test(v)) location.href = "/token?address=" + v;
+  else { el.style.borderColor = "var(--coral)"; setTimeout(() => { el.style.borderColor = ""; }, 1200); }
+  return false;
+}
 
-async function loadHistory(r){
-  DOSSIER=r;
-  CV=$("#cv"); TIP=$("#tip");
-  const note=$("#chnote"), noteC=$("#chnotecor");
-  // immediate loading state so a slow reconstruction reads as "working", never a blank space
-  CV.style.display="none"; note.hidden=false; note.textContent="Reconstructing valuation & score history…";
-  $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="Reconstructing the winner-corridor path…";
-  const fetchBt=async()=>{ const ctrl=new AbortController(); const to=setTimeout(()=>ctrl.abort(),75000);
-    try{ return await fetch(`/api/backtest?token=${r.address}`,{signal:ctrl.signal}).then(x=>x.json()); } finally{ clearTimeout(to); } };
-  try{
-    let bt; try{ bt=await fetchBt(); }catch(e){ note.textContent="Still reconstructing… retrying"; bt=await fetchBt(); }
-    if(bt.error||!bt.series||bt.series.length<3){
-      CV.style.display="none"; note.hidden=false; note.textContent="Not enough trade history to reconstruct a timeline for this token yet.";
-      $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="Not enough history yet to plot the winner corridor.";
-      $("#corverdict").innerHTML=""; return; }
-    CV.style.display="block"; note.hidden=true; $("#cvcor").style.display="block"; noteC.hidden=true;
-    SERIES=bt.series.map(s=>({t:s.t,risk:s.risk,label:s.label,mcap:s.mcap,price:s.price,wallets:s.wallets,volUsd:s.volUsd,holders:s.holders,top10:s.top10,ageH:s.ageH,traj:s.traj,blueprint:s.blueprint}));
-    CORR=bt.corridor||[];
-    // position structure: join each holder to its reconstructed position and redraw the holder tables in place
-    PNL=new Map((bt.pnl||[]).map(p=>[String(p.a||"").toLowerCase(),p])); PNL_PRICE=bt.curPrice??null;
-    rerenderHolders();
-    // thin tokens often have no reconstructable price → mcap/price/volUsd are null. Default the chart to a view
-    // that actually has data, and dim the ones that don't, so the user never lands on an empty chart.
-    const avail=(k)=>SERIES.some(s=>s[k]!=null&&isFinite(s[k]));
-    if(!avail(VIEW)) VIEW=["mcap","price","wallets","volUsd"].find(avail)||"wallets";
-    document.querySelectorAll("#views .view").forEach(x=>{const ok=avail(x.dataset.v);x.classList.toggle("on",x.dataset.v===VIEW);x.style.opacity=ok?"":".4";x.title=ok?"":"not reconstructable for this token";});
-    { const m0=VMETA[VIEW]; $("#pmlabel").innerHTML=`<i style="background:${m0.col}"></i>${m0.lab}`; }
-    const pw=$("#pricewarn");
-    if(bt.priceRough){ pw.hidden=false; pw.innerHTML=B0.ico("warn")+' <b style="color:var(--amber)">Rough price reconstruction.</b> The level is pinned to the current market cap, but the shape over time is uncertain for this token — read valuation as approximate.'; }
-    else if(bt.priceAnchor){ pw.hidden=false; pw.innerHTML='Price &amp; market cap are swap-implied and <b style="color:var(--dim)">pinned to the live market cap</b> at the latest point; treat exact figures as estimates.'; }
-    else pw.hidden=true;
-    drawChart(); wireChart();
-    if(CORR.length){ drawCorridorChart(); wireCorridor(); setCorVerdict(); }
-    else { $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="Winner corridor model not loaded."; }
-  }catch(e){
-    CV.style.display="none"; note.hidden=false; note.textContent="History is still reconstructing — reload in a moment.";
-    $("#cvcor").style.display="none"; noteC.hidden=false; noteC.textContent="";
+/* Price loads on its own, after the forensics are already on screen — a slow market feed must never hold up
+   the read that Block0 can produce from its own data. */
+async function loadPrice() {
+  const box = () => $("#pricebox"); if (!box()) return;
+  try {
+    const m = await fetch(`/api/chart?address=${ADDR}&tf=1h`).then((x) => x.json());
+    const c = m.candles || [], s = c.length >= 3 ? sparkline(c) : null;
+    if (!box()) return;
+    box().innerHTML = s
+      ? s + `<p class="prov">${c.length} hourly candles · source ${esc(m.priceSource || m.source || "market feed")}.
+             Swap-implied and smoothed; treat exact figures as estimates.</p>`
+      : unavailable("Price history",
+          "No indexed candles for this pool yet. Young pools are frequently not carried by the market feeds, and Block0 does not invent a price to fill the gap.");
+  } catch {
+    if (box()) box().innerHTML = unavailable("Price history",
+      "The market feed did not respond. The forensic read above is unaffected.");
   }
 }
 
-/* ---------------- winner-corridor cone (the study band, drawn on the token) ---------------- */
-let CORR=null, DOSSIER=null, CVC, TIPC, GEOC=null;
-const CORCOL={ontrack:"#c8ff4d",lagging:"#ffd23d",behind:"#ffd23d",failing:"#ff3b5c",na:"#7f7f88"};
-function corBinAt(ageH){ if(!CORR||!CORR.length) return null; return CORR.find(b=>ageH>=b.lo&&ageH<b.hi)||CORR[CORR.length-1]; }
-// Status on TWO axes that must agree: the SHAPE score (trajectory vs the winners' cone) AND ADOPTION (this token's
-// absolute wallets + mcap vs where winners actually were). The shape score saturates on any clean young launch, so a
-// token can sit above the cone while its float is a fraction of the winners' — that's "lagging", not "on the path".
-function corStatus(s){ const b=corBinAt(s.ageH); if(!b||s.traj==null) return "na"; if(s.traj<35) return "failing";
-  const floor=b.band?b.band[0]:b.q1; const shapeOk=s.traj>=floor;
-  const lagging=(b.twLo&&s.wallets&&s.wallets<b.twLo*0.5)||(b.tm&&s.mcap&&s.mcap<b.tm*0.25);
-  if(shapeOk&&lagging) return "lagging";
-  return shapeOk?"ontrack":"behind"; }
-// continue the current path with a smooth line through pts (assumes the current point is pts[0]); midpoint quadratics
-function smoothFwd(g,pts){ for(let i=1;i<pts.length-1;i++){const xc=(pts[i].x+pts[i+1].x)/2,yc=(pts[i].y+pts[i+1].y)/2;g.quadraticCurveTo(pts[i].x,pts[i].y,xc,yc);} const l=pts[pts.length-1]; if(pts.length>1) g.quadraticCurveTo(l.x,l.y,l.x,l.y); }
-const ageLab=(h)=>h<1?Math.round(h*60)+"m":h<48?Math.round(h)+"h":Math.round(h/24)+"d";
-const wShort=(n)=>n==null?"—":n>=1000?(n/1000).toFixed(n>=10000?0:1)+"k":String(Math.round(n));
-function setCorVerdict(){
-  const el=$("#corverdict"); if(!el||!SERIES) return;
-  const pts=SERIES.filter(s=>s.traj!=null); if(!pts.length){el.innerHTML="";return;}
-  const st=corStatus(pts[pts.length-1]);
-  if(DOSSIER&&DOSSIER.graduated){ el.innerHTML=`<b class="pill" style="background:var(--cyan)">GRADUATED</b>`; return; }
-  // the signal barely discriminates in the first ~30 min (measured AUC ~0.55) — don't fake confidence that early
-  if((DOSSIER?.ageH??pts[pts.length-1].ageH)<0.5){ el.innerHTML=`<b class="pill" style="background:var(--mute);color:#08080b">TOO EARLY TO CALL</b>`; return; }
-  const T={ontrack:["ON THE WINNER PATH","var(--lime)"],lagging:["CLEAN SHAPE · ADOPTION LAGGING","var(--amber)"],behind:["DRIFTING BELOW THE BAND","var(--amber)"],failing:["OFF PACE — STALLING","var(--coral)"],na:["",""]};
-  const t=T[st]; el.innerHTML=t[0]?`<b class="pill" style="background:${t[1]}">${t[0]}</b>`:"";
-}
-function wireCorridor(){
-  CVC=$("#cvcor"); TIPC=$("#tipcor");
-  CVC.addEventListener("pointermove",onHoverCor);
-  CVC.addEventListener("pointerleave",()=>{TIPC.style.display="none";drawCorridorChart();});
-  addEventListener("resize",()=>drawCorridorChart());
-}
-function drawCorridorChart(hoverIdx=-1){
-  if(!CORR||!CORR.length||!SERIES) return;
-  CVC=$("#cvcor"); const W=CVC.clientWidth,H=CVC.clientHeight;
-  CVC.width=W*DPR;CVC.height=H*DPR;const g=CVC.getContext("2d");g.setTransform(DPR,0,0,DPR,0,0);g.clearRect(0,0,W,H);
-  const padL=44,padR=16,padT=22,padB=52,iw=W-padL-padR,ih=H-padT-padB;
-  const cl=(v)=>Math.max(0,Math.min(100,v));
-  const tokMax=(SERIES[SERIES.length-1].ageH)||1, AGE_LO=0.15, maxBinHi=CORR[CORR.length-1].hi;
-  const AGE_HI=Math.min(maxBinHi,Math.max(tokMax*1.4,4));
-  const lx=(a)=>Math.log10(Math.max(AGE_LO,a)), x0=lx(AGE_LO), x1=lx(AGE_HI);
-  // reserve headroom: score 100 sits 12% down from the top and 0 sits 4% up from the bottom, so a cone/trajectory
-  // that maxes out never pins to the ceiling — there's always breathing room above and below.
-  const yTop=padT+ih*0.12, yBot=padT+ih*0.96;
-  const xOf=(a)=>padL+(lx(a)-x0)/(x1-x0)*iw, yOf=(t)=>yTop+(1-cl(t)/100)*(yBot-yTop);
-  const inR=(a)=>a>=AGE_LO&&a<=AGE_HI;
-  const pts=SERIES.filter(s=>s.ageH>=AGE_LO&&s.ageH<=AGE_HI&&s.traj!=null);
-  const nowAge=(DOSSIER&&DOSSIER.ageH)||(pts.length?pts[pts.length-1].ageH:0);
-  // y grid (very subtle)
-  g.font="11px Inter,system-ui,sans-serif";g.textBaseline="middle";g.fillStyle="#6b6b73";g.strokeStyle="rgba(255,255,255,.04)";g.lineWidth=1;
-  for(let i=0;i<=4;i++){const v=100-i*25,yy=yOf(v);g.beginPath();g.moveTo(padL,yy);g.lineTo(W-padR,yy);g.stroke();g.textAlign="right";g.fillText(v+"",padL-6,yy);}
-  // 1) PROVENANCE BOXES — the raw q1–q3 winner spread per bin the cone was fitted from, kept faint behind the cone
-  for(const b of CORR){const bl=Math.max(b.lo,AGE_LO);if(bl>=AGE_HI)continue;const bh=Math.min(b.hi,AGE_HI);
-    const x=xOf(bl),xw=Math.max(2,xOf(bh)-x),yT=yOf(b.q3),yB=yOf(b.q1);
-    g.fillStyle="rgba(200,255,77,.045)";g.strokeStyle="rgba(200,255,77,.09)";g.lineWidth=1;
-    g.beginPath();g.rect(x+0.5,yT+0.5,xw-1,Math.max(1,yB-yT));g.fill();g.stroke();}
-  // 2) THE CONE — smooth mean ± 1σ band, refined thin lines
-  const cb=CORR.filter(b=>b.band&&b.mean!=null&&(b.mid??(b.lo+b.hi)/2)<=AGE_HI).map(b=>{const a=Math.max(AGE_LO,Math.min(AGE_HI,b.mid??(b.lo+b.hi)/2));return {x:xOf(a),top:yOf(b.band[1]),bot:yOf(b.band[0]),mid:yOf(b.mean)};});
-  if(cb.length>=2){
-    const top=[{x:padL,y:cb[0].top},...cb.map(p=>({x:p.x,y:p.top})),{x:W-padR,y:cb[cb.length-1].top}];
-    const bot=[{x:padL,y:cb[0].bot},...cb.map(p=>({x:p.x,y:p.bot})),{x:W-padR,y:cb[cb.length-1].bot}];
-    const mid=[{x:padL,y:cb[0].mid},...cb.map(p=>({x:p.x,y:p.mid})),{x:W-padR,y:cb[cb.length-1].mid}];
-    g.beginPath();g.moveTo(top[0].x,top[0].y);smoothFwd(g,top);const botR=bot.slice().reverse();g.lineTo(botR[0].x,botR[0].y);smoothFwd(g,botR);g.closePath();
-    const grd=g.createLinearGradient(0,padT,0,padT+ih);grd.addColorStop(0,"rgba(200,255,77,.15)");grd.addColorStop(1,"rgba(200,255,77,.045)");g.fillStyle=grd;g.fill();
-    g.strokeStyle="rgba(200,255,77,.22)";g.lineWidth=0.8;g.beginPath();g.moveTo(top[0].x,top[0].y);smoothFwd(g,top);g.stroke();g.beginPath();g.moveTo(bot[0].x,bot[0].y);smoothFwd(g,bot);g.stroke();
-    g.strokeStyle="rgba(200,255,77,.5)";g.lineWidth=1;g.setLineDash([5,5]);g.beginPath();g.moveTo(mid[0].x,mid[0].y);smoothFwd(g,mid);g.stroke();g.setLineDash([]);
+async function load() {
+  const empty = `<section class="sec" style="border-top:0"><p class="eyebrow">Read a launch</p>
+    <form class="scan" onsubmit="return go(event)">
+      <input id="q" placeholder="0x… token address" autocomplete="off" spellcheck="false">
+      <button type="submit">Read</button></form></section>`;
+  if (!/^0x[0-9a-f]{40}$/.test(ADDR)) {
+    $("#root").innerHTML = `<div class="state">Open a launch from the
+      <a href="/board" style="color:var(--lime)">board</a>, or paste a token address.</div>` + empty;
+    return;
   }
-  // 3) GATES — the checkpoints on the path to success: at each age a target band to hit, the CURRENT gate lit up
-  const curBin=CORR.find(b=>nowAge>=b.lo&&nowAge<b.hi)||null;
-  g.textAlign="center";
-  for(const b of CORR){ const gx=xOf(b.hi); if(!inR(b.hi)) { /* still label the current/last */ }
-    const isCur=b===curBin; const ga=Math.min(b.hi,AGE_HI); const gxc=xOf(ga);
-    if(inR(b.hi)&&!isCur){ g.strokeStyle="rgba(255,255,255,.05)";g.lineWidth=1;g.setLineDash([2,4]);g.beginPath();g.moveTo(gx,padT);g.lineTo(gx,padT+ih);g.stroke();g.setLineDash([]); }
-    // target-band bracket at the gate (where a winner should sit by this age)
-    if(b.band&&inR(ga)){ const yT=yOf(b.band[1]),yB=yOf(b.band[0]);
-      g.strokeStyle=isCur?"rgba(53,230,224,.9)":"rgba(200,255,77,.35)";g.lineWidth=isCur?1.6:1;
-      g.beginPath();g.moveTo(gxc,yT);g.lineTo(gxc,yB);g.stroke();
-      for(const yy of [yT,yB]){g.beginPath();g.moveTo(gxc-3,yy);g.lineTo(gxc+3,yy);g.stroke();} }
-    // bottom stage target (wallets + mcap) at each bin centre
-    const a=b.mid??(b.lo+b.hi)/2; if(inR(a)){ const cx=xOf(a);
-      g.fillStyle=isCur?"#cfe8ff":"#8b9184";g.font=(isCur?"600 ":"")+"10px Inter,system-ui,sans-serif";g.fillText("by "+ageLab(b.hi),cx,H-36);
-      if(b.twLo){ g.fillStyle=isCur?"#5ff0ea":"#c8ff4d";g.font="600 10.5px Inter,system-ui,sans-serif";g.fillText(wShort(b.twLo)+"–"+wShort(b.twHi)+" wallets",cx,H-21);
-        g.fillStyle=isCur?"#a9d9e6":"#8f9a86";g.font="10px Inter,system-ui,sans-serif";g.fillText(mcT(b.tm),cx,H-7); } }
+  try {
+    const d = await fetch(`/api/token?address=${ADDR}`).then((x) => x.json());
+    if (d.error) throw new Error(d.error);
+    document.title = (symOf(d) ? "$" + symOf(d) : "Unnamed token") + " — Block0 dossier";
+    render(d);
+    loadPrice();
+  } catch (e) {
+    $("#root").innerHTML = `<div class="state err">Could not read this token — ${esc(e.message)}</div>` + empty;
   }
-  // current gate: a "next gate" target pill at the top
-  if(curBin&&curBin.band&&inR(nowAge)){ const gx=xOf(nowAge);
-    g.fillStyle="#5ff0ea";g.font="600 10.5px Inter,system-ui,sans-serif";g.textAlign=gx>W-120?"right":"left";
-    g.fillText(`gate · hit ${curBin.band[0]}–${curBin.band[1]} by ${ageLab(curBin.hi)}`,gx+(gx>W-120?-10:10),padT+8); }
-  // 4) TOKEN TRAJECTORY — thin, soft-glow, coloured by inside / below / failing
-  g.lineWidth=1.6;g.lineJoin="round";g.lineCap="round";
-  for(let i=1;i<pts.length;i++){const col=CORCOL[corStatus(pts[i])];g.strokeStyle=col;g.shadowColor=col;g.shadowBlur=5;
-    g.beginPath();g.moveTo(xOf(pts[i-1].ageH),yOf(pts[i-1].traj));g.lineTo(xOf(pts[i].ageH),yOf(pts[i].traj));g.stroke();}
-  g.shadowBlur=0;
-  // hover crosshair
-  if(hoverIdx>=0&&hoverIdx<pts.length){const s=pts[hoverIdx],x=xOf(s.ageH);
-    g.strokeStyle="rgba(255,255,255,.2)";g.lineWidth=1;g.beginPath();g.moveTo(x,padT);g.lineTo(x,padT+ih);g.stroke();
-    g.fillStyle="#fff";g.beginPath();g.arc(x,yOf(s.traj),3,0,7);g.fill();}
-  // 5) the NOW BEACON — a blinking illuminated marker at the live position (CSS-animated overlay)
-  const bc=$("#corbeacon");
-  if(pts.length&&bc){const last=pts[pts.length-1];bc.style.left=xOf(last.ageH)+"px";bc.style.top=yOf(last.traj)+"px";bc.style.display="block";
-    bc.style.background=DOSSIER&&DOSSIER.graduated?"#5ff0ea":"#5ff0ea";}
-  else if(bc){bc.style.display="none";}
-  GEOC={padL,iw,AGE_LO,AGE_HI,x0,x1,xOf,pts};
 }
-function onHoverCor(e){
-  if(!GEOC||!GEOC.pts.length) return;
-  const rect=CVC.getBoundingClientRect(), mx=e.clientX-rect.left;
-  const frac=Math.max(0,Math.min(1,(mx-GEOC.padL)/GEOC.iw)), age=Math.pow(10,GEOC.x0+frac*(GEOC.x1-GEOC.x0));
-  let idx=0,best=1e18; for(let i=0;i<GEOC.pts.length;i++){const d=Math.abs(GEOC.pts[i].ageH-age);if(d<best){best=d;idx=i;}}
-  const s=GEOC.pts[idx]; drawCorridorChart(idx);
-  const st=corStatus(s), col=CORCOL[st], LB={ontrack:"on the winner path",lagging:"shape ahead · adoption behind",behind:"below the band",failing:"failing",na:""};
-  const b=corBinAt(s.ageH);
-  TIPC.innerHTML=`<div class="d">at ${ageLab(s.ageH)} old</div><b style="color:${col}">trajectory ${s.traj}</b> · ${LB[st]}<br>
-    <span style="color:var(--dim)">this token: ${(s.wallets||0).toLocaleString()} wallets · ${mcT(s.mcap)}</span>
-    ${b&&b.twLo?`<br><span style="color:var(--lime)">winners' gate: ${wShort(b.twLo)}–${wShort(b.twHi)} wallets · ${mcT(b.tm)}</span>`:""}`;
-  TIPC.style.display="block";
-  const x=GEOC.xOf(s.ageH), tw=TIPC.offsetWidth;
-  TIPC.style.left=Math.max(6,Math.min(CVC.clientWidth-tw-6,x-tw/2))+"px"; TIPC.style.top="12px";
-}
-function wireChart(){
-  $("#views").addEventListener("click",(e)=>{const b=e.target.closest(".view");if(!b)return;VIEW=b.dataset.v;
-    document.querySelectorAll("#views .view").forEach(x=>x.classList.toggle("on",x===b));
-    const m=VMETA[VIEW];$("#pmlabel").innerHTML=`<i style="background:${m.col}"></i>${m.lab}`;drawChart();});
-  CV.addEventListener("pointermove",onHover); CV.addEventListener("pointerleave",()=>{TIP.style.display="none";drawChart();});
-  addEventListener("resize",()=>drawChart());
-}
-let GEO=null;
-function drawChart(hoverIdx=-1){
-  if(!SERIES) return;
-  const m=VMETA[VIEW], W=CV.clientWidth, H=CV.clientHeight;
-  CV.width=W*DPR; CV.height=H*DPR; const g=CV.getContext("2d"); g.setTransform(DPR,0,0,DPR,0,0); g.clearRect(0,0,W,H);
-  const padL=64,padR=52,padT=16,padB=26, iw=W-padL-padR, ih=H-padT-padB;
-  const pts=SERIES.filter(s=>s[VIEW]!=null && isFinite(s[VIEW]));
-  if(pts.length<2){return;}
-  const t0=SERIES[0].t, t1=SERIES[SERIES.length-1].t, tspan=Math.max(1,t1-t0);
-  const xOf=(t)=>padL+(t-t0)/tspan*iw;
-  // primary axis (log for mcap/price/volume, linear for wallets)
-  const vals=pts.map(s=>s[VIEW]).filter(v=>v>0);
-  const logScale=VIEW!=="wallets";
-  let vmin=Math.min(...vals), vmax=Math.max(...vals);
-  if(!isFinite(vmin)||!isFinite(vmax)||vmin===vmax){vmin=vmin||0;vmax=(vmax||1)*1.2+1;}
-  const yOf=(v)=>{ if(logScale){const a=Math.log10(Math.max(vmin*0.85,1e-9)),b=Math.log10(vmax*1.1);return padT+ih-(Math.log10(Math.max(v,10**a))-a)/(b-a)*ih;}
-    return padT+ih-(v-0)/((vmax*1.15)-0)*ih; };
-  const yRisk=(r)=>padT+ih-(r/100)*ih;
-  // grid + primary y labels
-  g.font="11px Inter,system-ui,sans-serif"; g.textBaseline="middle";
-  g.strokeStyle="rgba(255,255,255,.06)"; g.fillStyle="#7f7f88"; g.lineWidth=1;
-  for(let i=0;i<=4;i++){const yy=padT+ih*i/4; g.beginPath();g.moveTo(padL,yy);g.lineTo(W-padR,yy);g.stroke();
-    const v= logScale? 10**(Math.log10(Math.max(vmin*0.85,1e-9))+(Math.log10(vmax*1.1)-Math.log10(Math.max(vmin*0.85,1e-9)))*(1-i/4)) : (vmax*1.15)*(1-i/4);
-    g.textAlign="right"; g.fillText(m.fmt(v),padL-8,yy);}
-  // right axis (risk 0..100)
-  g.textAlign="left"; for(let i=0;i<=4;i++){const yy=padT+ih*i/4; g.fillStyle="#7f7f88"; g.fillText((100-i*25)+"",W-padR+8,yy);}
-  // x labels (age)
-  g.textAlign="center"; g.fillStyle="#7f7f88";
-  for(let i=0;i<=4;i++){const t=t0+tspan*i/4, xx=xOf(t), ageH=(t-t0)/3600;
-    g.fillText(ageH<48?Math.round(ageH)+"h":Math.round(ageH/24)+"d",xx,H-10);}
-  // risk score — filled ribbon + line (the "score evolution"), colored by its own band via gradient segments
-  g.lineWidth=2;
-  for(let i=1;i<SERIES.length;i++){const a=SERIES[i-1],b=SERIES[i];
-    g.strokeStyle= b.risk>=66?"#ff3b5c":b.risk>=45?"#ffd23d":b.risk>=25?"#35e6e0":"#c8ff4d";
-    g.beginPath();g.moveTo(xOf(a.t),yRisk(a.risk));g.lineTo(xOf(b.t),yRisk(b.risk));g.stroke();}
-  // primary series line
-  g.strokeStyle=m.col; g.lineWidth=2.4; g.beginPath(); let started=false;
-  for(const s of SERIES){ const v=s[VIEW]; if(v==null||!isFinite(v)){continue;} const x=xOf(s.t),y=yOf(v);
-    if(!started){g.moveTo(x,y);started=true;}else g.lineTo(x,y);} g.stroke();
-  // area fill under primary
-  if(started){g.lineTo(xOf(t1),padT+ih);g.lineTo(xOf(t0),padT+ih);g.closePath();
-    const grd=g.createLinearGradient(0,padT,0,padT+ih);grd.addColorStop(0,m.col+"33");grd.addColorStop(1,m.col+"00");g.fillStyle=grd;g.fill();}
-  // hover marker
-  if(hoverIdx>=0&&hoverIdx<SERIES.length){const s=SERIES[hoverIdx],x=xOf(s.t);
-    g.strokeStyle="rgba(255,255,255,.22)";g.lineWidth=1;g.beginPath();g.moveTo(x,padT);g.lineTo(x,padT+ih);g.stroke();
-    if(s[VIEW]!=null){g.fillStyle=m.col;g.beginPath();g.arc(x,yOf(s[VIEW]),4,0,7);g.fill();}
-    g.fillStyle="#fff";g.beginPath();g.arc(x,yRisk(s.risk),3.5,0,7);g.fill();}
-  GEO={padL,padR,padT,padB,iw,ih,t0,t1,tspan,xOf};
-}
-function onHover(e){
-  if(!SERIES||!GEO) return;
-  const rect=CV.getBoundingClientRect(), mx=e.clientX-rect.left;
-  const t=GEO.t0+Math.max(0,Math.min(1,(mx-GEO.padL)/GEO.iw))*GEO.tspan;
-  let idx=0,best=1e18; for(let i=0;i<SERIES.length;i++){const d=Math.abs(SERIES[i].t-t);if(d<best){best=d;idx=i;}}
-  const s=SERIES[idx]; drawChart(idx);
-  const m=VMETA[VIEW], ageH=(s.t-GEO.t0)/3600;
-  const rc=s.risk>=66?"var(--coral)":s.risk>=45?"var(--amber)":s.risk>=25?"var(--cyan)":"var(--lime)";
-  TIP.innerHTML=`<div class="d">${ageH<48?ageH.toFixed(1)+"h old":Math.round(ageH/24)+"d old"}</div>
-    <b style="color:${m.col}">${m.fmt(s[VIEW]??0)}</b> ${m.lab}<br>
-    <b style="color:${rc}">risk ${s.risk}</b> ${s.label}<br>
-    <span style="color:var(--mute)">${(s.wallets||0).toLocaleString()} wallets · top10 ${s.top10}% · ${s.holders} holders</span>`;
-  TIP.style.display="block";
-  const x=GEO.xOf(s.t), tw=TIP.offsetWidth;
-  TIP.style.left=Math.max(6,Math.min(CV.clientWidth-tw-6,x-tw/2))+"px"; TIP.style.top="14px";
-}
-
-/* ---------------- bubble map (force-directed, canvas, no deps) ---------------- */
-let GRAPH=null, GNODES=[], GBM, BMTIP, BMDPR=Math.max(1,Math.min(2,window.devicePixelRatio||1)), BMFUNDERS=false, BMMODE="flow", BMADDR=null;
-const FLOWCOL={buy:"#c8ff4d",sell:"#ff3b5c",flat:"#7f7f88"};
-const ROLECOL={bundle:"#ff5cf0",sniper:"#ffd23d",holder:"#35e6e0"};
-const nodeCol=(n)=>BMMODE==="flow"?FLOWCOL[n.flow||"flat"]:ROLECOL[n.role||"holder"];
-async function loadGraph(address){
-  BMADDR=address; const leg=$("#bmlegend");
-  GBM=$("#cvbm"); BMTIP=$("#bmtip");
-  GBM.style.display="none"; leg.innerHTML='<span style="color:var(--mute)">Mapping wallet relationships…</span>';
-  try{
-    const url=`/api/graph?address=${address}&n=90`+(BMFUNDERS?"&funders=1":"");
-    const g=await fetch(url).then(x=>x.json());
-    GRAPH=g;
-    if(!g.nodes||g.nodes.length<2){ leg.innerHTML='<span style="color:var(--mute)">Not enough holders yet to map relationships.</span>'; GBM.style.display="none"; return; }
-    GBM.style.display="block";
-    BMFOCUS=null; hidePanel(); layoutGraph(); wireBM(); startBM();
-    const nb=g.stats||{}; const fl=g.clusters?g.clusters.filter(c=>c.flag).length:0;
-    leg.innerHTML=`<span><i style="background:#c8ff4d"></i>accumulating</span><span><i style="background:#ff3b5c"></i>distributing</span>`+
-      `<span style="color:var(--magenta)">◯ ringed = flagged cluster</span>`+
-      `<span style="margin-left:auto">${g.nodes.length} wallets · ${g.clusters?g.clusters.length:0} clusters${fl?` · <b style="color:var(--amber)">${fl} to watch</b>`:""}${g.funders?` · ${g.funders.funderGroups} funder groups`:""}</span>`;
-  }catch(e){ leg.innerHTML='<span style="color:var(--mute)">Bubble map unavailable.</span>'; GBM.style.display="none"; }
-}
-let BMDRAG=-1, BMHOVER=-1, BMFOCUS=null, bmMoved=false, bmStart={x:0,y:0}, bmProj={s:1,ox:0,oy:0}, bmRAF=0, bmIdle=0, bmSizeDirty=true;
-const hx2=(c)=>{const h=(c||"#888").replace("#","");const n=parseInt(h.length===3?h.split("").map(x=>x+x).join(""):h,16);return [(n>>16)&255,(n>>8)&255,n&255];};
-const lit=(a,t)=>a.map(v=>Math.round(v+(255-v)*t)), drk=(a,t)=>a.map(v=>Math.round(v*(1-t)));
-
-function layoutGraph(){
-  const g=GRAPH;
-  const id2i=new Map(); g.nodes.forEach((nd,i)=>id2i.set(nd.a,i));
-  const maxPct=Math.max(...g.nodes.map(nd=>nd.pct||0),0.01);
-  GNODES=g.nodes.map((nd)=>({...nd, r:6+Math.sqrt((nd.pct||0)/maxPct)*24, x:(Math.random()-0.5)*300, y:(Math.random()-0.5)*300, vx:0, vy:0, fx:null, fy:null}));
-  const edges=(g.edges||[]).map(e=>({a:id2i.get(e.a),b:id2i.get(e.b),kind:e.kind})).filter(e=>e.a!=null&&e.b!=null);
-  const cl=new Map(); GNODES.forEach((nd)=>{ if(nd.cluster){ if(!cl.has(nd.cluster))cl.set(nd.cluster,[]); cl.get(nd.cluster).push(nd);} });
-  GRAPH._edges=edges; GRAPH._cl=cl; GRAPH._id2i=id2i;
-  for(let it=0;it<150;it++) stepPhysics(1-it/150); // warm start; the live sim keeps it drag-able after
-}
-// one physics step — repulsion + edge springs + cluster cohesion + gentle centering. Pinned (dragged) nodes hold.
-function stepPhysics(k){
-  k=k==null?0.2:Math.max(0.05,k); const n=GNODES.length; let ke=0;
-  for(let i=0;i<n;i++){for(let j=i+1;j<n;j++){const a=GNODES[i],b=GNODES[j];let dx=a.x-b.x,dy=a.y-b.y;let d2=dx*dx+dy*dy||0.01;const d=Math.sqrt(d2);
-    const rep=(a.r+b.r+40)*(a.r+b.r+40)/d2; const fx=dx/d*rep, fy=dy/d*rep; a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}}
-  for(const e of (GRAPH._edges||[])){const a=GNODES[e.a],b=GNODES[e.b];let dx=b.x-a.x,dy=b.y-a.y;const d=Math.sqrt(dx*dx+dy*dy)||0.01;
-    const ideal=a.r+b.r+34, f=(d-ideal)*0.06; const fx=dx/d*f, fy=dy/d*f; a.vx+=fx;a.vy+=fy;b.vx-=fx;b.vy-=fy;}
-  for(const [,members] of (GRAPH._cl||[])){let cx=0,cy=0;for(const m of members){cx+=m.x;cy+=m.y;}cx/=members.length;cy/=members.length;
-    for(const m of members){m.vx+=(cx-m.x)*0.02;m.vy+=(cy-m.y)*0.02;}}
-  for(const nd of GNODES){ if(nd.fx!=null){ nd.x=nd.fx; nd.y=nd.fy; nd.vx=0; nd.vy=0; continue; }
-    nd.vx+=(-nd.x)*0.008;nd.vy+=(-nd.y)*0.008; nd.x+=nd.vx*(0.4+0.6*k);nd.y+=nd.vy*(0.4+0.6*k); nd.vx*=0.82;nd.vy*=0.82; ke+=nd.vx*nd.vx+nd.vy*nd.vy; }
-  return ke;
-}
-function ensureBMSize(){ const W=GBM.clientWidth,H=GBM.clientHeight; if(!bmSizeDirty && GBM.width===Math.round(W*BMDPR))return; bmSizeDirty=false; GBM.width=Math.round(W*BMDPR);GBM.height=Math.round(H*BMDPR); }
-// a shaded sphere → depth
-function bubble(g,px,py,pr,col,dim){
-  const rgb=hx2(col), a=dim?0.42:1;
-  g.save();
-  if(!dim){ g.shadowColor="rgba(0,0,0,.55)"; g.shadowBlur=Math.max(6,pr*0.5); g.shadowOffsetY=Math.max(2,pr*0.18); }
-  const grd=g.createRadialGradient(px-pr*0.38,py-pr*0.42,pr*0.15, px,py,pr);
-  grd.addColorStop(0,`rgba(${lit(rgb,0.55).join(",")},${a})`);
-  grd.addColorStop(0.55,`rgba(${rgb.join(",")},${a})`);
-  grd.addColorStop(1,`rgba(${drk(rgb,0.5).join(",")},${a})`);
-  g.beginPath();g.arc(px,py,pr,0,7);g.fillStyle=grd;g.fill();
-  g.restore();
-  g.beginPath();g.arc(px,py,pr,0,7);g.lineWidth=1;g.strokeStyle=`rgba(${lit(rgb,0.2).join(",")},${dim?0.3:0.7})`;g.stroke();
-  // gloss
-  g.beginPath();g.ellipse(px-pr*0.3,py-pr*0.4,pr*0.42,pr*0.24,-0.5,0,7);g.fillStyle=`rgba(255,255,255,${dim?0.05:0.18})`;g.fill();
-}
-function drawBM(hoverI=-1){
-  if(!GNODES.length) return;
-  ensureBMSize();
-  const W=GBM.clientWidth,H=GBM.clientHeight;
-  const g=GBM.getContext("2d"); g.setTransform(BMDPR,0,0,BMDPR,0,0); g.clearRect(0,0,W,H);
-  let minX=1e9,maxX=-1e9,minY=1e9,maxY=-1e9;
-  for(const nd of GNODES){minX=Math.min(minX,nd.x-nd.r);maxX=Math.max(maxX,nd.x+nd.r);minY=Math.min(minY,nd.y-nd.r);maxY=Math.max(maxY,nd.y+nd.r);}
-  const pad=26, sx=(W-pad*2)/Math.max(1,maxX-minX), sy=(H-pad*2)/Math.max(1,maxY-minY), s=Math.min(sx,sy,2.4);
-  const ox=pad-minX*s+(W-pad*2-(maxX-minX)*s)/2, oy=pad-minY*s+(H-pad*2-(maxY-minY)*s)/2;
-  bmProj={s,ox,oy}; const X=(x)=>x*s+ox, Y=(y)=>y*s+oy;
-  const inFocus=(nd)=>!BMFOCUS||nd.cluster===BMFOCUS;
-  // cluster rings
-  for(const c of (GRAPH.clusters||[])){
-    const ms=c.wallets.map(a=>GNODES.find(nd=>nd.a===a)).filter(Boolean); if(ms.length<2) continue;
-    const isF=BMFOCUS&&ms[0].cluster===BMFOCUS;
-    let cx=0,cy=0;for(const m of ms){cx+=m.x;cy+=m.y;}cx/=ms.length;cy/=ms.length;
-    let rad=0;for(const m of ms){rad=Math.max(rad,Math.hypot(m.x-cx,m.y-cy)+m.r);}
-    const col=FLOWCOL[c.flow||"flat"]; const px=X(cx),py=Y(cy),pr=rad*s+10;
-    const fade=BMFOCUS&&!isF?0.25:1;
-    g.beginPath();g.arc(px,py,pr,0,7); g.fillStyle=col+(isF?"22":"0e"); g.globalAlpha=fade; g.fill();
-    if(c.flag||isF){ g.setLineDash(isF?[]:[5,4]); g.strokeStyle=(c.hasFunder?"#ff5cf0":col)+(isF?"":"cc"); g.lineWidth=isF?2.4:1.5; if(isF){g.shadowColor=col;g.shadowBlur=16;} g.stroke(); g.shadowBlur=0; g.setLineDash([]); }
-    g.globalAlpha=1;
-  }
-  // edges
-  for(const e of (GRAPH._edges||[])){const a=GNODES[e.a],b=GNODES[e.b]; const ef=inFocus(a)&&inFocus(b);
-    g.globalAlpha=BMFOCUS&&!ef?0.12:1;
-    g.strokeStyle=e.kind==="funder"?"rgba(255,92,240,.5)":e.kind==="bundle"?"rgba(200,255,77,.4)":"rgba(255,255,255,.10)";
-    g.lineWidth=e.kind==="transfer"?1:1.5; g.beginPath();g.moveTo(X(a.x),Y(a.y));g.lineTo(X(b.x),Y(b.y));g.stroke();}
-  g.globalAlpha=1;
-  // nodes (3D bubbles)
-  GNODES.forEach((nd,i)=>{const c=nodeCol(nd),px=X(nd.x),py=Y(nd.y),pr=nd.r*Math.min(s,1.4); const dim=BMFOCUS&&!inFocus(nd);
-    bubble(g,px,py,pr,c,dim);
-    if(i===hoverI||(BMFOCUS&&nd.cluster===BMFOCUS&&nd.pct===Math.max(...GNODES.filter(x=>x.cluster===BMFOCUS).map(x=>x.pct)))){
-      g.beginPath();g.arc(px,py,pr+4,0,7);g.strokeStyle="#fff";g.lineWidth=i===hoverI?2:1.4;g.globalAlpha=i===hoverI?1:0.6;g.stroke();g.globalAlpha=1; }
-  });
-}
-function startBM(){ wakeBM(); }
-function wakeBM(){ bmIdle=0; if(!bmRAF) bmRAF=requestAnimationFrame(loopBM); }
-function loopBM(){
-  const ke=stepPhysics(0.2); drawBM(BMHOVER);
-  if(BMDRAG<0 && ke<0.4) bmIdle++; else bmIdle=0;
-  if(bmIdle>45){ bmRAF=0; drawBM(BMHOVER); return; }   // settled → stop the loop
-  bmRAF=requestAnimationFrame(loopBM);
-}
-function bmHit(e){const rect=GBM.getBoundingClientRect(),mx=e.clientX-rect.left,my=e.clientY-rect.top,p=bmProj;
-  let hit=-1,best=1e9;GNODES.forEach((nd,i)=>{const dx=(nd.x*p.s+p.ox)-mx,dy=(nd.y*p.s+p.oy)-my,d=Math.hypot(dx,dy);const rr=nd.r*Math.min(p.s,1.4)+4;if(d<rr&&d<best){best=d;hit=i;}});return hit;}
-function toGraph(e){const rect=GBM.getBoundingClientRect();return {x:(e.clientX-rect.left-bmProj.ox)/bmProj.s, y:(e.clientY-rect.top-bmProj.oy)/bmProj.s};}
-function hidePanel(){ const p=$("#bmpanel"); if(p){p.hidden=true;p.innerHTML="";} }
-function clearFocus(){ BMFOCUS=null; hidePanel(); wakeBM(); }
-function selectNode(i){
-  const nd=GNODES[i];
-  const c=(GRAPH.clusters||[]).find(x=>x.wallets&&x.wallets.includes(nd.a));
-  const p=$("#bmpanel");
-  if(c && c.wallets.length>1){
-    BMFOCUS=nd.cluster;
-    const mems=c.wallets.map(a=>GNODES.find(g=>g.a===a)).filter(Boolean).sort((x,y)=>(y.pct||0)-(x.pct||0));
-    const pctSum=mems.reduce((s,m)=>s+(m.pct||0),0), flow=c.flow||"flat";
-    p.innerHTML=`<div class="bmp-head"><div><b>${c.flag?"⚠ ":""}Bundle · ${mems.length} wallets</b>`+
-      `<span class="bmp-sub">${pctSum.toFixed(1)}% of supply · ${flow==='sell'?'distributing':flow==='buy'?'accumulating':'flat'}${c.hasFunder?' · shared funder':''}</span></div>`+
-      `<button class="bmp-x" id="bmpx" title="close">✕</button></div>`+
-      `<div class="bmp-list">${mems.map(m=>`<a class="bmp-row" href="/wallet?a=${m.a}" target="_blank" rel="noopener"><span class="bmp-dot" style="background:${FLOWCOL[m.flow||'flat']}"></span><span class="bmp-nm">${B0.codename(m.a)}</span><span class="bmp-pct">${(m.pct||0).toFixed(2)}%</span></a>`).join("")}</div>`+
-      `<div class="bmp-foot">These wallets are linked by same-block buys or fund/drain transfers. Click any → its full reconstructed PnL.</div>`;
-  } else {
-    BMFOCUS=null;
-    p.innerHTML=`<div class="bmp-head"><div><b>${B0.codename(nd.a)}</b><span class="bmp-sub">${(nd.pct||0).toFixed(2)}% of supply · ${nd.role}${nd.flow&&nd.flow!=='flat'?' · '+(nd.flow==='buy'?'accumulating':'distributing'):''}</span></div><button class="bmp-x" id="bmpx" title="close">✕</button></div>`+
-      `<div class="bmp-foot">Not part of a detected bundle.</div><a class="bmp-row" href="/wallet?a=${nd.a}" target="_blank" rel="noopener" style="margin-top:8px;border:1px solid var(--line)"><span class="bmp-dot" style="background:${FLOWCOL[nd.flow||'flat']}"></span><span class="bmp-nm">Open full PnL</span><span class="bmp-pct">↗</span></a>`;
-  }
-  p.hidden=false; const x=$("#bmpx"); if(x)x.onclick=clearFocus;
-  wakeBM();
-}
-function wireBM(){
-  if(GBM._wired) return; GBM._wired=true;
-  GBM.addEventListener("pointerdown",(e)=>{ try{GBM.setPointerCapture(e.pointerId);}catch(_){}
-    bmStart={x:e.clientX,y:e.clientY}; bmMoved=false; const i=bmHit(e);
-    if(i>=0){ BMDRAG=i; const nd=GNODES[i]; nd.fx=nd.x; nd.fy=nd.y; } else BMDRAG=-2; wakeBM(); });
-  GBM.addEventListener("pointermove",(e)=>{
-    if(BMDRAG>=0){ if(Math.hypot(e.clientX-bmStart.x,e.clientY-bmStart.y)>4)bmMoved=true; const gpt=toGraph(e); const nd=GNODES[BMDRAG]; nd.fx=gpt.x; nd.fy=gpt.y; BMTIP.style.display="none"; wakeBM(); return; }
-    const i=bmHit(e); BMHOVER=i; if(!bmRAF)drawBM(i);
-    if(i<0){BMTIP.style.display="none";return;} const nd=GNODES[i];
-    BMTIP.innerHTML=`<b>${B0.codename(nd.a)}</b><br><span style="color:var(--mute)">${nd.pct}% of supply · ${nd.role}</span><br><span style="color:${FLOWCOL[nd.flow||'flat']}">${nd.flow==='buy'?'accumulating':nd.flow==='sell'?'distributing':'flat'}</span>${nd.cluster?` · in a bundle — click to open`:''}`;
-    BMTIP.style.display="block"; const rect=GBM.getBoundingClientRect(); const x=e.clientX-rect.left; const tw=BMTIP.offsetWidth;
-    BMTIP.style.left=Math.max(6,Math.min(GBM.clientWidth-tw-6,x-tw/2))+"px"; BMTIP.style.top=Math.max(6,(e.clientY-rect.top)-58)+"px";});
-  GBM.addEventListener("pointerup",(e)=>{
-    if(BMDRAG>=0){ const nd=GNODES[BMDRAG]; const wasDrag=bmMoved; nd.fx=null; nd.fy=null; const idx=BMDRAG; BMDRAG=-1; if(!wasDrag) selectNode(idx); else wakeBM(); return; }
-    if(BMDRAG===-2){ BMDRAG=-1; if(!bmMoved) clearFocus(); }
-  });
-  GBM.addEventListener("pointerleave",()=>{BMHOVER=-1;BMTIP.style.display="none";if(!bmRAF)drawBM();});
-  addEventListener("resize",()=>{bmSizeDirty=true;wakeBM();});
-  $("#bmColor").addEventListener("click",()=>{BMMODE=BMMODE==="flow"?"role":"flow";
-    $("#bmColor").textContent=BMMODE==="flow"?"colour: buying / selling":"colour: wallet role"; wakeBM();});
-  $("#bmFunders").addEventListener("click",()=>{ if(BMFUNDERS)return; BMFUNDERS=true;
-    const b=$("#bmFunders"); b.textContent="scanning funders…"; b.classList.add("on");
-    loadGraph(BMADDR).then(()=>{b.textContent="✓ common funders"; }).catch(()=>{b.textContent="＋ scan common funders";b.classList.remove("on");BMFUNDERS=false;}); });
-}
-
-async function boot(){
-  if(!/^0x[0-9a-f]{40}$/.test(ADDR)){ $("#root").innerHTML='<div class="state err">No token address in the URL. Open a token from the board.</div>'; return; }
-  try{
-    const r=await fetch(`/api/token?address=${ADDR}`).then(x=>x.json());
-    if(r.error){ $("#root").innerHTML=`<div class="state err">${r.error}</div>`; return; }
-    document.title=`${r.sym} — Block0 dossier`;
-    try{ if(window.B0T) window.B0T("token_view",{path:"/token/"+((r.sym||"").replace(/[^A-Za-z0-9]/g,"").slice(0,16)||ADDR.slice(0,10))}); }catch(e){}
-    render(r);
-  }catch(e){ $("#root").innerHTML=`<div class="state err">Couldn't load this token: ${e.message}. The scanner may still be warming up — reload in a moment.</div>`; }
-}
-B0GATE.mount({gated:false}); // the single-token lookup is the FREE surface — everything beyond it is token-gated
-
-/* ---------------- live price: our own candlesticks (sourced OHLCV, Block0 palette) ---------------- */
-let MKT=null, MTF="1h", MADDR=null, mktBusy=false;
-const UP="#c8ff4d", DOWN="#ff3b5c";                                   // lime up / coral down — the brand, not TradingView green/red
-const fmtVol=(n)=>n==null?"—":n>=1e6?"$"+(n/1e6).toFixed(1)+"M":n>=1e3?"$"+Math.round(n/1e3)+"K":"$"+Math.round(n||0);
-const fmtChg=(p)=>p==null?"—":Math.abs(p)>=1000?(p>0?"new":"—"):(p>0?"+":"")+p.toFixed(1)+"%";   // a <24h token's 24h% is meaningless → "new"
-function pxFmt(v){ if(v==null)return"—"; if(v>=1)return"$"+v.toFixed(3); const s=v.toExponential(2); return "$"+v.toFixed(v<1e-4?8:6); }
-async function loadMarket(address){
-  MADDR=address; const wrap=$("#mktwrap"); if(!wrap)return;
-  $("#mkttf").querySelectorAll("button").forEach(b=>b.onclick=()=>{ if(b.dataset.tf===MTF)return; MTF=b.dataset.tf; $("#mkttf").querySelectorAll("button").forEach(x=>x.classList.toggle("on",x===b)); fetchMarket(); });
-  fetchMarket();
-}
-// "Where is it in its run" — the honest, descriptive version of "stop buying green candles". States the fact and lets
-// you decide; never says buy/sell. Chasing (near a fresh high) reads amber; a pullback reads neutral-cyan; bled reads coral.
-function renderPhase(ph){
-  const el=$("#mktphase"); if(!el) return;
-  if(!ph||!ph.phase){ el.hidden=true; el.innerHTML=""; return; }
-  const M={quiet:["–","var(--mute)","quiet"],running:["▲","var(--amber)","running now"],peaked:["▲","var(--amber)","at the high"],pullback:["◆","var(--cyan)","pulled back"],bled:["▼","var(--coral)","bled out"]};
-  const [ico,col,tag]=M[ph.phase]||M.quiet;
-  const hint=ph.chasing?"you'd be entering near the high — the green candle everyone already saw"
-    :ph.phase==="pullback"?"off its high — a dip, not a chase. Still your call, and only if the coin's still alive."
-    :ph.phase==="bled"?"far below its high and still weak — past a dip, not a pullback"
-    :"no recent run to chase or fade";
-  el.hidden=false;
-  el.innerHTML=`<span class="phw" style="color:${col}"><span class="phi">${ico}</span> ${String(ph.label||"").replace(/[<>&]/g,"")}</span>
-    <span class="phh">${hint}</span>`;
-}
-async function fetchMarket(){
-  if(mktBusy)return; mktBusy=true;
-  const note=$("#mktnote"), stats=$("#mktstats"), cv=$("#cvmkt"), src=$("#mktsrc");
-  try{
-    const m=await fetch(`/api/chart?address=${MADDR}&tf=${MTF}`).then(x=>x.json()); MKT=m;
-    if(!m.hasMarket||!m.candles||!m.candles.length){
-      cv.style.display="none"; stats.innerHTML=""; src.hidden=true; { const pill=$("#mktlast"); if(pill) pill.hidden=true; }
-      note.hidden=false; note.textContent=m.note||"No live market for this token yet.";
-      return;
-    }
-    cv.style.display="block"; note.hidden=true;
-    const mk=m.market||{};
-    const chgC=mk.change24>0?"g":mk.change24<0?"c":"";
-    stats.innerHTML=[
-      `<div class="st"><b>${pxFmt(mk.priceUsd)}</b><i>price</i></div>`,
-      `<div class="st"><b class="${chgC}">${fmtChg(mk.change24)}</b><i>24h</i></div>`,
-      `<div class="st"><b>${fmtVol(mk.liqUsd)}</b><i>liquidity</i></div>`,
-      `<div class="st"><b>${fmtVol(mk.vol24)}</b><i>24h volume</i></div>`,
-      (mk.buys24!=null?`<div class="st"><b><span style="color:${UP}">${mk.buys24}</span> / <span style="color:${DOWN}">${mk.sells24}</span></b><i>24h buys / sells</i></div>`:""),
-    ].join("");
-    src.hidden=false; { const pill=$("#mktlast"); if(pill) pill.hidden=false; }
-    src.innerHTML=`Candles via GeckoTerminal · liquidity &amp; volume via DexScreener${mk.url?` · <a href="${mk.url}" target="_blank" rel="noopener">open on DexScreener ↗</a>`:""}. Price is market data, shown next to the analysis — not part of the verdict.`;
-    renderPhase(m.phase);
-    drawCandles();
-  }catch(e){ note.hidden=false; note.textContent="Couldn't load the price chart — retry in a moment."; }
-  finally{ mktBusy=false; }
-}
-function drawCandles(hoverIdx=-1){
-  const cv=$("#cvmkt"); if(!cv||!MKT||!MKT.candles.length)return;
-  const g=cv.getContext("2d"), dpr=Math.min(2,devicePixelRatio||1);
-  const W=cv.clientWidth, H=cv.clientHeight; cv.width=W*dpr; cv.height=H*dpr; g.setTransform(dpr,0,0,dpr,0,0);
-  g.clearRect(0,0,W,H);
-  const C=MKT.candles, PL=10,PR=66,PT=14,PB=20;
-  const VOLH=Math.round((H-PT-PB)*0.16), ph=H-PT-PB-VOLH-6, pw=W-PL-PR;   // price panel + a slim volume strip beneath
-  const yTop=PT, yBot=PT+ph, volTop=yBot+6, volBot=H-PB;
-  let lo=Infinity,hi=-Infinity,vhi=0; for(const k of C){ if(k.l<lo)lo=k.l; if(k.h>hi)hi=k.h; if(k.v>vhi)vhi=k.v; }
-  if(!(hi>lo)){ hi=lo*1.001+1e-9; lo=lo*0.999; }
-  const pad=(hi-lo)*0.10; lo-=pad; hi+=pad;
-  const X=(i)=>PL+(C.length<=1?pw/2:i/(C.length-1)*pw), Y=(v)=>yTop+(1-(v-lo)/(hi-lo))*ph;
-  const up0=C[0].c, upN=C[C.length-1].c, rising=upN>=up0, ACC=rising?UP:DOWN;
-
-  // faint horizontal grid + right-edge price ladder (mono, muted)
-  g.font="11px ui-monospace,Menlo,monospace"; g.textAlign="left"; g.textBaseline="middle";
-  for(let i=0;i<=4;i++){ const v=lo+(hi-lo)*i/4, y=Y(v);
-    g.strokeStyle="rgba(255,255,255,.045)"; g.lineWidth=1; g.beginPath();g.moveTo(PL,y);g.lineTo(PL+pw,y);g.stroke();
-    g.fillStyle="#6d6d77"; g.fillText(pxFmt(v).replace("$",""),PL+pw+8,y); }
-
-  // area sheen under the close-path — the "sleek" depth cue, tinted to the trend, behind the candles
-  const clineY=(i)=>Y(C[i].c);
-  g.beginPath(); g.moveTo(X(0),clineY(0));
-  for(let i=1;i<C.length;i++) g.lineTo(X(i),clineY(i));
-  g.lineTo(X(C.length-1),yBot); g.lineTo(X(0),yBot); g.closePath();
-  const grad=g.createLinearGradient(0,yTop,0,yBot);
-  grad.addColorStop(0, rising?"rgba(200,255,77,.16)":"rgba(255,59,92,.15)");
-  grad.addColorStop(1, "rgba(200,255,77,0)");
-  g.fillStyle=grad; g.fill();
-  // the close line itself, soft-glowing
-  g.beginPath(); for(let i=0;i<C.length;i++){ const x=X(i),y=clineY(i); i?g.lineTo(x,y):g.moveTo(x,y); }
-  g.strokeStyle=rising?"rgba(200,255,77,.35)":"rgba(255,59,92,.32)"; g.lineWidth=1.25;
-  g.save(); g.shadowColor=g.strokeStyle; g.shadowBlur=8; g.stroke(); g.restore();
-
-  // volume strip (thin bars tinted by candle direction)
-  C.forEach((k,i)=>{ const x=X(i), vh=vhi>0?Math.max(1,(k.v/vhi)*(volBot-volTop)):1, up=k.c>=k.o;
-    g.fillStyle=up?"rgba(200,255,77,.28)":"rgba(255,59,92,.26)";
-    g.fillRect(x-Math.max(1,Math.min(10,pw/C.length*0.5))/2, volBot-vh, Math.max(1,Math.min(10,pw/C.length*0.5)), vh); });
-
-  // candles — rounded bodies, crisp wicks, a glow on the most recent
-  const cw=Math.max(2,Math.min(13,pw/C.length*0.64));
-  const rr=(x,y,w,h,r)=>{ r=Math.min(r,w/2,h/2); g.beginPath(); if(g.roundRect){g.roundRect(x,y,w,h,r);} else {g.rect(x,y,w,h);} };
-  C.forEach((k,i)=>{ const x=X(i), up=k.c>=k.o, col=up?UP:DOWN, live=(i===C.length-1);
-    g.strokeStyle=col; g.lineWidth=1.4; g.globalAlpha=up?1:.92;
-    g.beginPath(); g.moveTo(x,Y(k.h)); g.lineTo(x,Y(k.l)); g.stroke();                 // wick
-    const yo=Y(k.o),yc=Y(k.c),top=Math.min(yo,yc),bh=Math.max(1.5,Math.abs(yc-yo));
-    g.fillStyle=col;
-    if(live){ g.save(); g.shadowColor=col; g.shadowBlur=12; }
-    rr(x-cw/2,top,cw,bh,2.2); g.fill();
-    if(live) g.restore();
-    g.globalAlpha=1;
-    if(i===hoverIdx){ g.strokeStyle="rgba(255,255,255,.55)"; g.lineWidth=1; rr(x-cw/2-1.5,Y(k.h)-1.5,cw+3,Y(k.l)-Y(k.h)+3,3); g.stroke(); }
-  });
-
-  // last-price marker: a dashed guide + a floating coloured pill on the right axis
-  const last=C[C.length-1], ly=Y(last.c), lc=last.c>=last.o?UP:DOWN;
-  g.strokeStyle=lc==UP?"rgba(200,255,77,.4)":"rgba(255,59,92,.4)"; g.setLineDash([2,4]); g.lineWidth=1;
-  g.beginPath();g.moveTo(PL,ly);g.lineTo(PL+pw,ly);g.stroke(); g.setLineDash([]);
-  const pill=$("#mktlast");
-  if(pill){ pill.textContent=pxFmt(last.c).replace("$",""); pill.style.top=ly+"px";
-    pill.style.background=lc; pill.style.color="#0a0a0e"; pill.style.boxShadow="0 0 12px "+(lc==UP?"rgba(200,255,77,.5)":"rgba(255,59,92,.45)"); }
-  cv._geom={X,Y,PL,pw,C,cw};
-}
-(function wireCandleHover(){
-  const cv=$("#cvmkt"); if(!cv)return;
-  const tip=$("#tipmkt");
-  cv.addEventListener("pointermove",(e)=>{ if(!MKT||!cv._geom)return; const g=cv._geom;
-    const rx=e.clientX-cv.getBoundingClientRect().left; let bi=0,bd=1e9;
-    g.C.forEach((_,i)=>{const d=Math.abs(g.X(i)-rx);if(d<bd){bd=d;bi=i;}});
-    const k=g.C[bi]; drawCandles(bi);
-    tip.style.display="block"; tip.style.left=Math.min(g.X(bi)+10,cv.clientWidth-150)+"px"; tip.style.top="10px";
-    const d=new Date(k.t*1000), up=k.c>=k.o;
-    tip.innerHTML=`<b>${d.toLocaleString([], {month:"short",day:"numeric",hour:"2-digit",minute:"2-digit"})}</b><br>O ${pxFmt(k.o)} · C <span style="color:${up?UP:DOWN}">${pxFmt(k.c)}</span><br>H ${pxFmt(k.h)} · L ${pxFmt(k.l)}<br>vol ${fmtVol(k.v)}`;
-  });
-  cv.addEventListener("pointerleave",()=>{ tip.style.display="none"; drawCandles(); });
-  addEventListener("resize",()=>{ if(MKT)drawCandles(); });
-})();
-
-boot();
+load();
 </script>
 </body>
 </html>
