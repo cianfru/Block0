@@ -1,3 +1,7 @@
+## Forward experiment implementation — September 8, 2026
+
+Current measurement uses `observations.mjs`, `features.mjs`, `setups.mjs`, `decisions.mjs`, `evaluation.mjs` and `experiment.mjs`. Read `docs/forward-experiment.md` before changing it. New data lives under `experiment:v1:*`; old `track-record` is preserved as an archive and is no longer ingested by the board. One collector replica only. Research writes are strict. Do not mix retrospective study profiles with forward data, treat graduation as post-decision success, or publish indicative scenario returns as executable PnL. The LLM no longer selects or writes production picks. This section supersedes older claims below about ranking proof and forward tracking.
+
 # Block0 — project notes
 
 Block0 is a transparent, real-time "should I ape?" launch scanner for the **Robinhood Chain** (Uniswap-v4 based).

@@ -49,12 +49,12 @@ test("buildPicks with no LLM falls back to the deterministic pick", async () => 
   assert.ok(traction.pick.why.length > 10);
 });
 
-test("buildPicks uses a valid LLM pick when the model returns one", async () => {
+test("buildPicks keeps selection and explanations deterministic even when an LLM is supplied", async () => {
   const chat = async () => ({ text: JSON.stringify({ pick: "0xclean", why: "Best fingerprint: 400 holders, top-10 only 32%, 2 smart-money wallets, no bundles.", runnerUp: "" }), model: "free/x" });
   const p = await buildPicks([clean, trap], chat);
-  assert.equal(p.llmUsed, true);
+  assert.equal(p.llmUsed, false);
   const traction = p.brackets.find((b) => b.key === "traction");
-  assert.equal(traction.pick.viaLlm, true);
+  assert.equal(traction.pick.viaLlm, false);
   assert.match(traction.pick.why, /holders/);
 });
 

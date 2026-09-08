@@ -20,18 +20,20 @@ function norm(t) {
   };
 }
 
-async function j(url) { const r = await fetch(url, { headers: HDR }); if (!r.ok) throw new Error("pons " + r.status); return r.json(); }
+async function j(url, fetchImpl = fetch) { const r = await fetchImpl(url, { headers: HDR, signal: AbortSignal.timeout(15000) }); if (!r.ok) throw new Error("pons " + r.status); return r.json(); }
 
 // active (pre-graduation) universe. sort: marketCap | newest | oldest | volume | recentBuys ; age: all|24h|7d
-export async function fetchActive({ sort = "marketCap", age = "all", pageSize = 40 } = {}) {
-  const u = `${BASE}/api/pons-launches?explore=1&sort=${sort}&age=${age}&page=1&pageSize=${pageSize}&includeGraduated=0&v=22`;
-  const d = await j(u);
-  return { items: (d.active?.items || []).map(norm), total: d.activeTotal ?? d.active?.total ?? 0, launchTotal: d.launchTotal || 0 };
+export async function fetchActive({ sort = "marketCap", age = "all", pageSize = 40, page = 1, fetch: fetchImpl = fetch } = {}) {
+  const u = `${BASE}/api/pons-launches?explore=1&sort=${encodeURIComponent(sort)}&age=${encodeURIComponent(age)}&page=${Math.max(1, Math.floor(page))}&pageSize=${Math.max(1, Math.min(100, Math.floor(pageSize)))}&includeGraduated=0&v=22`;
+  const d = await j(u, fetchImpl);
+  if (!Array.isArray(d.active?.items)) throw new Error("pons active catalog schema changed");
+  return { items: d.active.items.map(norm), total: d.activeTotal ?? d.active?.total ?? 0, launchTotal: d.launchTotal || 0, observedAt: Date.now() };
 }
 
 // graduated universe (the ~510 that completed the bonding curve) — lean catalog endpoint
-export async function fetchGraduated() {
-  const d = await j(`${BASE}/api/pons-launches/graduations?catalog=1&v=12`);
+export async function fetchGraduated({ fetch: fetchImpl = fetch } = {}) {
+  const d = await j(`${BASE}/api/pons-launches/graduations?catalog=1&v=12`, fetchImpl);
+  if (!Array.isArray(d) && !Array.isArray(d.items) && !Array.isArray(d.graduated?.items)) throw new Error("pons graduated catalog schema changed");
   const arr = Array.isArray(d) ? d : (d.items || d.graduated?.items || []);
-  return { items: arr.map(norm), total: arr.length };
+  return { items: arr.map(norm), total: arr.length, observedAt: Date.now() };
 }

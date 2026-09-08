@@ -28,11 +28,11 @@ function fadeCard(v) {
   return {
     id: "fade", kind: "ring", accent: A.coral,
     eyebrow: `THE FADE REALITY · ${tot} STUDIED`,
-    hero: faded + "%", heroSub: "faded within hours",
-    title: "Most launches die on arrival",
-    lines: [`${c.losers} of ${tot} studied launches faded`, `only ${c.winners} became real markets`, "every one reconstructed from public chain data"],
+    hero: faded + "%", heroSub: "did not meet the study threshold",
+    title: "Historical study coverage",
+    lines: [`${c.losers} of ${tot} graded tokens did not meet the threshold`, `${c.winners} met the study threshold`, "every one reconstructed from public chain data"],
     viz: { type: "ring", pct: faded, color: A.coral },
-    tweet: `${faded}% of new tokens on the Robinhood Chain die on arrival.\n\nWe studied ${tot}: ${c.losers} faded within hours, only ${c.winners} became real markets. Block0 grades every launch from public chain data — before you ape.\n\nSignal, not proof.`,
+    tweet: `In a selected historical cohort of ${tot} tokens, ${c.winners} met the study threshold and ${c.losers} did not. This is retrospective context, not a fresh-launch success rate or proven trading edge. Signal, not proof.`,
   };
 }
 
@@ -64,6 +64,7 @@ function pulseCard(board) {
 // FORWARD TRACK RECORD — out-of-sample. Shows the real rate once enough calls mature; otherwise the honest
 // "accruing in the open" state (which is itself on-brand — we grade ourselves in public).
 function trackCard(t) {
+  if (t?.schema === 2) return null; // legacy win-rate card must never reinterpret indicative v2 returns
   if (!t || !(t.predicted > 0)) return null;
   if (t.ready && t.promising && t.promising.winRate != null) {
     const wr = pct(t.promising.winRate), base = t.baseRate != null ? pct(t.baseRate) : null;

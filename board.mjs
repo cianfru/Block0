@@ -52,6 +52,7 @@ async function verdict(meta) {
   r.corridor = corridorStatus(ageH, r.trajectory, { wallets: r.flags.wallets ?? r.flags.holders, mcap: r.mcapUsd });
   const known = FIRST_SEEN.has(r.address); if (!known) FIRST_SEEN.set(r.address, Date.now());
   r.firstSeenAt = FIRST_SEEN.get(r.address); r.isNew = BOOTED && !known;
+  r.observedAt = Date.now(); // when this forensic read became available, not the board publication time
   return r;
 }
 

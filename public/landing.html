@@ -6,8 +6,8 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<title>Block0 — The path to millions starts at block zero</title>
-<meta name="description" content="4.2M tokens have launched on the Robinhood Chain. Block0 reconstructed the history of every one that mattered, mapped the path the winners took, and scores every new launch against it — live.">
+<title>Block0 — read the history behind any Robinhood Chain launch</title>
+<meta name="description" content="Explore token structure, changing participation and experimental setups on Robinhood Chain. Forward observations and transparent limitations.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
@@ -148,7 +148,7 @@
 <header class="hd">
   <div class="hd-in">
     <a href="/" class="wordmark">block<b>0</b></a>
-    <nav class="nav">
+    <nav class="nav"><a href="/setups">Setups · experiment</a>
       <a href="/board">Board</a>
       <a href="/leaderboard">Leaderboard</a>
       <a href="/token">Scan a token</a>
@@ -168,7 +168,7 @@
     <div class="herowrap">
       <div class="hpitch rise">
         <p class="micro eye">launch scanner · robinhood chain</p>
-        <h1>The path to millions<br>starts at <em>block zero.</em></h1>
+        <h1>Every launch has a<br>history. <em>Read it.</em></h1>
         <div class="funnel" id="funnel" aria-label="the launch funnel, live">
           <span class="fs"><b class="fn" id="fTotal">—</b><i>launched</i></span>
           <span class="farr">→</span>
@@ -178,20 +178,20 @@
           <span class="farr" id="fSusArr" hidden>→</span>
           <span class="fs" id="fSusWrap" hidden><b class="fn limen" id="fSus">—</b><i>held it a week+</i></span>
         </div>
-        <p class="sub">Most new coins are traps. Paste any one — Block0 checks the wallets behind it and tells you, free, if it's <b style="color:var(--lime)">clean</b> or a <b style="color:var(--coral)">trap</b>. Then it shows you the one launch actually worth watching right now.</p>
+        <p class="sub">Paste any token on the Robinhood Chain. Block0 reconstructs it from its own transfer history — who bought first, who is connected to whom, how concentrated it is, who is adding and who is reducing right now. Free, and it shows its working. <b style="color:var(--tx)">It does not predict price.</b></p>
         <form class="scan" onsubmit="return scan(event)">
           <input id="addr" placeholder="Paste any token address — the verdict is free" autocomplete="off">
           <button class="go" type="submit">Scan</button>
         </form>
         <div class="proofline" id="proofline"><span>Scanning the Robinhood Chain live…</span></div>
         <div class="herochips">
-          <a class="chip" href="/board">Find the next runner →</a>
-          <a class="chip" href="/leaderboard">See who's making money →</a>
+          <a class="chip" href="/board">See what's launching now →</a>
+          <a class="chip" href="/setups">The forward experiment →</a>
         </div>
       </div>
       <div class="hdemo">
         <div class="hcard" id="herocard"><div class="state" style="padding:60px 0">Pulling a live launch…</div></div>
-        <p class="hcap" id="hcap">a real launch on the board right now — graded automatically</p>
+        <p class="hcap" id="hcap">a real launch on the board right now — reconstructed from its own transfers</p>
         <div class="hdots" id="hdots"></div>
       </div>
     </div>
@@ -200,7 +200,7 @@
 
   <!-- THE WINNER CORRIDOR — lateral profile, price threading the gates -->
   <section class="sec">
-    <div class="stitle"><p class="micro eye">winners vs traps</p><h2>Most coins die in the first hour. A few keep climbing.</h2><p class="sub">The winners all move the same way — real people buy and hold, so the coin keeps rising. Traps fall apart fast. Block0 watches every new launch and flags the ones still moving like the winners did.</p></div>
+    <div class="stitle"><p class="micro eye">winners vs traps</p><h2>Watch how participation changes.</h2><p class="sub">The historical corridor illustrates resemblance within a selected study. It does not establish a profitable entry. Our forward experiment records changing conditions and every resulting setup.</p></div>
     <div class="wincorridor">
       <canvas id="corr" aria-label="A price line threading the winner corridor's stage gates while weaker launches fall out"></canvas>
       <div class="corr-legend">
@@ -212,18 +212,18 @@
 
   <!-- PROOF: the winners the model caught (free, retrospective) — the LIVE best shot is gated below -->
   <section class="sec" id="shotsec" hidden>
-    <div class="stitle"><p class="micro eye">the funnel · real numbers</p><h2>The launches that closed above $1M — and which ones held it</h2><p class="sub" id="proofSub">Every launch on the chain, graded by what it actually did. Loading the numbers…</p></div>
+    <div class="stitle"><p class="micro eye">the funnel · real numbers</p><h2>The launches that closed above $1M — and which ones held it</h2><p class="sub" id="proofSub">A selected historical cohort, graded by observed outcomes. Loading the numbers…</p></div>
     <div class="wins" id="wins"></div>
     <p class="sub" style="margin-top:14px;font-size:.82rem">A clean read is the green light to <b style="color:var(--tx)">look closer</b> — not a promise. A dirty launch almost never wins; some clean ones still fade. That honest limit is <a href="/methodology">measured, not hidden</a>.</p>
-    <a class="shotlock" href="/board" id="shotlock">
-      <span class="sl-l"><b><span class="sl-lock">🔒</span>Today's best shot is live on the board</b><span class="sl-sub">the launch reading most like these did — ranked at every stage, updated each block. Unlock with BLOCK0.</span></span>
+    <a class="shotlock" href="/setups" id="shotlock">
+      <span class="sl-l"><b>Explore the forward setup experiment</b><span class="sl-sub">See what changed, what remains unknown and when an experimental setup deteriorates.</span></span>
       <span class="sl-cta">Unlock →</span>
     </a>
   </section>
 
   <!-- WHAT IT CHECKS -->
   <section class="sec">
-    <div class="stitle"><p class="micro eye">what it reads</p><h2>Every launch, x-rayed in seconds</h2><p class="sub">The same on-chain tells that separate a real launch from a bot trap — read off public data, no insider access, no guessing.</p></div>
+    <div class="stitle"><p class="micro eye">what it reads</p><h2>Inspect the structure behind a launch</h2><p class="sub">Observed wallet patterns, concentration and distribution, with the limitations of the available data. These are risk indicators, not proof of safety.</p></div>
     <div class="signals" id="signals"></div>
   </section>
 
@@ -236,13 +236,13 @@
 
   <!-- PROOF -->
   <section class="sec">
-    <div class="stitle"><p class="micro eye">does it actually work?</p><h2>Judge it on the numbers</h2><p class="sub">The model's whole job is one question — is this launch tracking like past winners did? Here's how well that call holds up, measured on launches it had never seen.</p></div>
+    <div class="stitle"><p class="micro eye">does it actually work?</p><h2>Judge it on the numbers</h2><p class="sub">These are retrospective study statistics. Selected cohorts and reconstructed observations limit their use; the new forward record is measured separately.</p></div>
     <div class="proof" id="proof">
-      <div class="pc"><div class="pn c" id="p1n">—</div><div class="pl" id="p1l">of studied launches faded or died</div><div class="ps" id="p1s">the problem we're built for</div></div>
-      <div class="pc"><div class="pn g" id="p2n">—</div><div class="pl" id="p2l">of eventual winners flagged early</div><div class="ps" id="p2s">before they ran</div></div>
+      <div class="pc"><div class="pn c" id="p1n">—</div><div class="pl" id="p1l">of graded tokens did not reach the study threshold or died</div><div class="ps" id="p1s">the problem we're built for</div></div>
+      <div class="pc"><div class="pn g" id="p2n">—</div><div class="pl" id="p2l">historical checkpoint catch rate</div><div class="ps" id="p2s">not an early-entry success rate</div></div>
       <div class="pc"><div class="pn" id="p3n">—</div><div class="pl" id="p3l">launches scanned</div><div class="ps" id="p3s">every one reconstructed from the chain</div></div>
     </div>
-    <p class="caveat">Winners are scored on a model rebuilt without them; losers were never part of it. Full method and every count on the <a href="/methodology">how-it-works page</a>; every forward call we've made, with its outcome, on the <a href="/track-record">track record</a>. Signal, not proof — never a buy recommendation.</p>
+    <p class="caveat">Winners are scored on a model rebuilt without them; losers were never part of it. Full method and every count on the <a href="/methodology">how-it-works page</a>; the new forward experiment, with its outcomes, on the <a href="/track-record">track record</a>. Signal, not proof — never a buy recommendation.</p>
   </section>
 
   <!-- ACCESS -->
@@ -250,7 +250,7 @@
     <div class="panel access">
       <p class="micro eye">access</p>
       <h2>One free lookup for everyone. The rest runs on the token.</h2>
-      <p>Paste any token and get its full verdict, free — that never changes. Holding BLOCK0 unlocks the working product: the graded board, the best shots at every stage of the path, live alerts and the smart-money leaderboard. Connect is a read-only balance check — no signing, no transactions, no custody. And the honest stuff stays public either way: the <a href="/methodology">method</a> and <a href="/track-record">every call we've made, graded</a>.</p>
+      <p>Paste any token and get its full verdict, free — that never changes. Holding BLOCK0 unlocks the rest: the live board, the structural comparisons by stage, alerts and the proven-wallet leaderboard. Connect is a read-only balance check — no signing, no transactions, no custody. And the honest stuff stays public either way: the <a href="/methodology">method</a> and <a href="/track-record">every call we've made, graded</a>.</p>
       <div class="btns"><a class="btn-lime" href="/board">Unlock the board</a><a class="btn-ghost" href="/token">Free token lookup</a></div>
     </div>
   </section>
@@ -428,9 +428,9 @@ async function loadProof(){
   // proofline in hero
   try{ const [v,b]=await Promise.all([fetch("/api/validation").then(r=>r.json()),fetch("/api/board").then(r=>r.json())]);
     const parts=[];
-    if(v.cohort&&v.cohort.losers!=null&&v.cohort.winners!=null){const tot=v.cohort.winners+v.cohort.losers; if(tot>0)parts.push(`<span class="red">${Math.round(v.cohort.losers/tot*100)}%</span> of studied launches faded`);}
+    if(v.cohort&&v.cohort.losers!=null&&v.cohort.winners!=null){const tot=v.cohort.winners+v.cohort.losers; if(tot>0)parts.push(`<span class="red">${Math.round(v.cohort.losers/tot*100)}%</span> of graded tokens did not reach the study threshold`);}
     const scanned=(b.stats&&(b.stats.launchTotal||b.stats.graduatedTotal))||0;
-    if(scanned)parts.push(`<b>${scanned.toLocaleString()}</b> scanned`);
+    if(scanned)parts.push(`<b>${scanned.toLocaleString()}</b> launches reported by the source`);
     if(parts.length)$("#proofline").innerHTML=parts.map(p=>`<span>${p}</span>`).join("");
   }catch(e){}
 }
@@ -462,7 +462,7 @@ async function loadWins(){
     const f=v.funnel||(v.cohort&&v.cohort.funnel)||{}, p=v.progress||{};
     const done=f.launched||p.cached||p.backtested||0, reached=f.reached||roll.length, sus=f.sustained||0;
     // the honest funnel, in plain words — never one scary tier
-    let sub=done?`We checked ${done.toLocaleString()} launches. ${reached} closed above $1M for a full day — about 1 in ${Math.max(2,Math.round(done/Math.max(1,reached)))}.`:`${reached} launches closed above $1M for a full day.`;
+    let sub=done?`In a selected study of ${done.toLocaleString()} launches, ${reached} closed above $1M for a full day — about 1 in ${Math.max(2,Math.round(done/Math.max(1,reached)))}.`:`${reached} launches closed above $1M for a full day.`;
     if(sus) sub+=` ${sus} of those held it a week or more. The biggest are below, with what happened next.`;
     $("#proofSub").textContent=sub;
     // fate = the Q2 answer, per token: held it / faded after / still too young to call
