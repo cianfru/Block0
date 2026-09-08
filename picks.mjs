@@ -1,16 +1,6 @@
-// "MOST PROMISING BY PRICE BRACKET" — an LLM-assisted read over the board, on honest rails.
-//
-// What it does: group every live launch into a market-cap BRACKET (fresh <$500k, $500k–$1M, …), then within each
-// bracket surface the launch whose ON-CHAIN FINGERPRINT looks most like a real one — clean risk, a float that isn't
-// stuck in a few hands, real holder adoption, proven wallets showing up. We pre-rank the candidates deterministically
-// (that ranking is also the fallback), and the LLM's ONLY job is to pick among those candidates and say WHY in plain
-// language, using ONLY the facts we hand it.
-//
-// Honesty rails, enforced in code (validatePick), not just prompted:
-//   • the pick MUST be one of the candidates we computed — the model can't name a token or a number we didn't give it;
-//   • the "why" is a READ of on-chain structure, never a price call — buy/sell/moon/guarantee language is rejected;
-//   • no LLM key, or every model failing, degrades to the deterministic pick + a templated reason. Never a hard error.
-// This is signal, not proof — never a buy recommendation.
+// Deterministic structural ranking within market-cap brackets.
+// Historical resemblance is unvalidated; no LLM participates in selection or explanation.
+// Legacy validation helpers remain exported for compatibility.
 
 import { blueprintMatch } from "./intel.mjs";
 
@@ -28,7 +18,7 @@ export const bracketOf = (mcap) => BRACKETS.find((b) => mcap >= b.min && mcap < 
 const clamp = (v, a, b) => (v < a ? a : v > b ? b : v);
 
 // Deterministic "promise" score — how much a launch's on-chain fingerprint resembles a real one. Interpretable on
-// purpose (each term is a named signal), and it IS the fallback ranking when the LLM is unavailable. Higher = cleaner.
+// purpose (each term is a named signal), higher values indicate a cleaner structural profile, not a calibrated success probability.
 export function promiseScore(t) {
   const f = t.flags || {};
   const bp = blueprintMatch({ bundles: f.bundles || 0, top10Pct: f.top10Pct ?? 100, holders: f.holders || 0, risk: t.risk ?? 100 });
@@ -101,12 +91,12 @@ export function templatedWhy(c) {
   const bits = [];
   if (c.risk != null) bits.push(c.risk < 25 ? "reads clean" : c.risk < 45 ? "risk is settled" : "risk is mixed but");
   if (c.holders) bits.push(`${c.holders.toLocaleString()} holders`);
-  if (c.blueprint >= 55) bits.push(`a ${c.blueprint >= 75 ? "strong" : "partial"} winner-fingerprint fit`);
+  if (c.blueprint >= 55) bits.push(`a ${c.blueprint >= 75 ? "strong" : "partial"} historical resemblance`);
   if (c.top10Pct != null && c.top10Pct < 60) bits.push(`top-10 hold ${c.top10Pct}% (float isn't stuck)`);
   if (c.smartMoney) bits.push(`${c.smartMoney} proven wallet${c.smartMoney > 1 ? "s" : ""} holding`);
-  if (!c.snipers && !c.bundles) bits.push("no snipers or bundles");
+  if (!c.snipers && !c.bundles) bits.push("no early-wallet flags observed");
   const body = bits.slice(0, 3).join(", ");
-  return `Cleanest fingerprint in its bracket — ${body || "the least red on-chain"}.`;
+  return `Structural comparison in this bracket — ${body || "the least red on-chain"}.`;
 }
 
 // The LLM message pair for one bracket. System = the rails; user = the honest candidate facts.
@@ -137,21 +127,12 @@ export async function buildPicks(tokens, chat, opts = {}) {
   for (const b of brackets) {
     const top = b.candidates[0];
     let pick = top.address, why = templatedWhy(top), runnerUp = b.candidates[1]?.address || null, viaLlm = false;
-    if (chat && b.candidates.length >= 2) {
-      try {
-        const res = await chat(promptFor(b), { json: true, maxTokens: 400, temperature: 0.3 });
-        model = res.model || model;
-        let parsed = null; try { parsed = JSON.parse(res.text); } catch { parsed = null; }
-        const v = validatePick(parsed, b.candidates);
-        if (v) { pick = v.pick; why = v.why; runnerUp = v.runnerUp || runnerUp; viaLlm = true; llmUsed = true; }
-        else llmError = llmError || (parsed ? "rejected:" + (String(res.text || "").slice(0, 80)) : "parse");   // model answered but failed the honesty rails
-      } catch (e) { llmError = (e && e.code) || (e && e.message) || "error"; /* no key / all models failed → deterministic pick */ }
-    }
+    // Decisions and numeric explanations are deterministic. Legacy LLM responses cannot reorder or fabricate facts.
     const pc = b.candidates.find((c) => c.address === pick) || top;
     out.push({ key: b.key, label: b.label, tier: b.tier,
       pick: { ...pc, why, viaLlm }, runnerUp,
       candidateCount: b.candidates.length, candidates: b.candidates });
   }
-  return { updated: Date.now(), llmUsed, model, llmError, hasKey: !!chat, brackets: out,
-    note: "Ranks each launch's on-chain fingerprint within its market-cap bracket. Signal, not proof — never a buy recommendation." };
+  return { methodology: "structure-v2", updated: Date.now(), llmUsed, model, llmError, hasKey: !!chat, brackets: out,
+    note: "Structural comparison within market-cap brackets. This score has no demonstrated predictive edge. See /setups for the forward experiment." };
 }

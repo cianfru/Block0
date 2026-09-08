@@ -4,9 +4,9 @@
 //                    over a raw socket (store/redis-tcp.mjs). This is what Railway's managed Redis gives you.
 //   • file         — a JSON file under DATA_DIR (default ./data). Zero-config; durable only within a deploy (or
 //                    across redeploys if DATA_DIR is a mounted volume). Dev / single persistent container.
-// Everything degrades safely: a store error never throws into the caller (reads return null/[], writes best-effort),
+// Legacy APIs degrade safely; the explicit Strict APIs throw on failure. a store error never throws into the caller (reads return null/[], writes best-effort),
 // so the scanner runs even if the store is down. Precedence: REST > TCP > file.
-import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, renameSync } from "node:fs";
 import { join } from "node:path";
 import { redisCmd, HAS_REDIS_URL } from "./redis-tcp.mjs";
 
@@ -21,7 +21,30 @@ async function rcmd(...args) {
   const r = await fetch(R_URL, { method: "POST", headers: { authorization: `Bearer ${R_TOK}`, "content-type": "application/json" }, body: JSON.stringify(args) });
   if (!r.ok) throw new Error("kv " + r.status);
   const j = await r.json();
+  if (j.error) throw new Error("kv command failed: " + j.error);
   return j.result;
+}
+
+// Research cannot interpret a failed read as an empty experiment or publish an unpersisted decision.
+// The file backend atomically replaces the document; deploy it on a persistent volume. Single writer only.
+export async function getJSONStrict(key) {
+  if (KV_BACKEND === "redis") { const v = await rcmd("GET", key); return v == null ? null : JSON.parse(v); }
+  if (!strictLoaded) {
+    let disk;
+    try { disk = JSON.parse(readFileSync(FILE, "utf8")); }
+    catch (e) { if (e.code !== "ENOENT") throw e; disk = {}; }
+    mem = { ...disk, ...(mem || {}) }; strictLoaded = true;
+  }
+  return structuredClone(mem[key] ?? null);
+}
+export async function setJSONStrict(key, val) {
+  if (KV_BACKEND === "redis") { await rcmd("SET", key, JSON.stringify(val)); return; }
+  await getJSONStrict(key);
+  const next = { ...mem, [key]: val };
+  mkdirSync(DIR, { recursive: true });
+  const temp = FILE + ".research.tmp";
+  writeFileSync(temp, JSON.stringify(next)); renameSync(temp, FILE);
+  mem = next;
 }
 
 // Live connectivity check — did the app ACTUALLY connect, or is it silently on the file backend? Used by /api/status.
@@ -34,14 +57,14 @@ export async function kvPing() {
 // ---- file backend: one JSON doc mirrored in memory, debounced to disk ----
 const DIR = process.env.DATA_DIR || "./data";
 const FILE = join(DIR, "kv.json");
-let mem = null, wt = null;
+let mem = null, wt = null, strictLoaded = false;
 function load() {
   if (mem) return mem;
   try { mem = JSON.parse(readFileSync(FILE, "utf8")); } catch { mem = {}; }
   return mem;
 }
 function flush() {
-  if (wt) return; wt = setTimeout(() => { wt = null; try { mkdirSync(DIR, { recursive: true }); writeFileSync(FILE, JSON.stringify(mem)); } catch { /* best-effort */ } }, 200);
+  if (wt) return; wt = setTimeout(() => { wt = null; try { mkdirSync(DIR, { recursive: true }); writeFileSync(FILE + ".flush.tmp", JSON.stringify(mem)); renameSync(FILE + ".flush.tmp", FILE); } catch { /* best-effort */ } }, 200);
 }
 
 // ---- public API (all soft-failing) ----

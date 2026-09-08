@@ -1,6 +1,6 @@
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { earlyCall, ingest, resolve, report } from "../track-record.mjs";
+import { earlyCall, ingest, resolve, report } from "../track-record-legacy.mjs";
 
 const H = 3600000;
 

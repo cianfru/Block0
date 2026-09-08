@@ -14,10 +14,11 @@ import { watchLogs, WS_ENABLED } from "./ws.mjs";
 import { refreshBoard, refreshDex, getBoard, ensureFresh, setSmartMoney } from "./board.mjs";
 import { smartMoneyFrom, convergence } from "./smart-money.mjs";
 import { coverageReport } from "./coverage.mjs";
-import { tick as trackTick, trackRecord, trackCalls } from "./track-record.mjs";
+import { trackRecord, trackCalls, legacyTrackRecord } from "./track-record.mjs";
 import { backtest } from "./backtest.mjs";
 import { tokenDossier } from "./dossier.mjs";
 import { tokenMarket } from "./market.mjs";
+import { experiment, startExperiment } from "./experiment-runtime.mjs";
 import { startAlerts, runAlertScan, getCalls, ALERTS_ON, sendTelegram, PUBLIC_URL } from "./alerts.mjs";
 import { detectEvents, formatEvent } from "./alert-events.mjs";
 import { KV_BACKEND, getJSON, setJSON, kvPing, lPush, lRange } from "./store/kv.mjs";
@@ -37,6 +38,7 @@ import { track, readIntel } from "./analytics.mjs";
 import { buildPicks } from "./picks.mjs";
 import { chat as llmChat, hasKey as llmHasKey } from "./llm.mjs";
 import { makeLimiter, makeCoalescer, makeSemaphore, clientIp } from "./ratelimit.mjs";
+const BACKGROUND_ON = process.env.BACKGROUND_ON !== "0";
 
 // ── ABUSE GUARDS for the public API (the free native RPC is the resource being protected) ──────────────────────
 // HEAVY endpoints trigger real RPC work per request; LIGHT ones are cached reads. Per-IP token buckets on both, a
@@ -136,7 +138,7 @@ const BOARD_REFRESH_MS = Number(process.env.BOARD_REFRESH_MS || 180000);
 // after each board refresh, feed the FORWARD track record: freeze a young call per token, resolve matured outcomes.
 async function boardCycle() {
   await refreshBoard({ n: Number(process.env.BOARD_TOKENS || 18) }).catch(() => {});
-  try { const b = getBoard(); await trackTick([...(b.cooking || []), ...(b.dex || []), ...(b.graduated || [])]); } catch { /* tracker never blocks the board */ }
+  // Forward measurement runs independently of this valuation-ranked board.
   try { await alertTick(); } catch { /* alerts never block the board */ }
 }
 
@@ -161,15 +163,14 @@ async function alertTick() {
   }
   if (events.length) console.log(`[alerts] ${events.length} event(s): ${events.map((e) => e.kind + " " + e.sym).join(", ")}`);
 }
-boardCycle();
-setInterval(boardCycle, BOARD_REFRESH_MS);
+if (BACKGROUND_ON) { startExperiment(); boardCycle(); setInterval(boardCycle, BOARD_REFRESH_MS); }
 
 // launch alert push (Telegram) — dormant unless TELEGRAM_BOT_TOKEN + TELEGRAM_CHAT_ID are set
-startAlerts();
+if (BACKGROUND_ON) startAlerts();
 
 // DEX discovery on its own interval (decoupled from the Pons board; first run staggered ~45s after boot)
 const DEX_REFRESH_MS = Number(process.env.DEX_REFRESH_MS || 300000);
-if (Number(process.env.BOARD_DEX ?? 10) > 0) {
+if (BACKGROUND_ON && Number(process.env.BOARD_DEX ?? 10) > 0) {
   setTimeout(() => { refreshDex().catch(() => {}); setInterval(() => refreshDex().catch(() => {}), DEX_REFRESH_MS); }, 45000);
 }
 
@@ -218,7 +219,7 @@ async function refreshLeaderboard() {
   } catch (e) { _lbHealth = { ..._lbHealth, updated: Date.now(), buildMs: Date.now() - t0, ok: false, error: String(e && e.message || e).slice(0, 120) }; }
   finally { _lbRunning = false; _lbHealth = { ..._lbHealth, building: false }; }
 }
-if (Number(process.env.LEADERBOARD_ON ?? 1) > 0) {
+if (BACKGROUND_ON && Number(process.env.LEADERBOARD_ON ?? 1) > 0) {
   getJSON("leaderboard").then((v) => { if (v) _leaderboard = v; }).catch(() => {});
   setTimeout(() => { refreshLeaderboard(); setInterval(refreshLeaderboard, LB_REFRESH_MS); }, 90000);
 }
@@ -240,8 +241,8 @@ async function refreshPicks() {
   } catch { /* keep last good picks */ }
   finally { _picksRunning = false; }
 }
-if (Number(process.env.PICKS_ON ?? 1) > 0) {
-  getJSON("picks").then((v) => { if (v) _picks = v; }).catch(() => {});
+if (BACKGROUND_ON && Number(process.env.PICKS_ON ?? 1) > 0) {
+  getJSON("picks").then((v) => { if (v?.methodology === "structure-v2") _picks = v; }).catch(() => {});
   setTimeout(() => { refreshPicks(); setInterval(refreshPicks, PICKS_REFRESH_MS); }, 120000);
 }
 
@@ -280,10 +281,11 @@ async function poll() {
     } catch (e) { /* transient RPC hiccup — next tick retries */ }
   }
 }
-if (!WS_ENABLED) setInterval(poll, POLL_MS);
+if (BACKGROUND_ON && !WS_ENABLED) setInterval(poll, POLL_MS);
 
 async function serveStatic(res, urlPath) {
   const route = urlPath === "/" ? "landing.html"
+    : (urlPath === "/setups" || urlPath === "/setups.html") ? "setups.html"
     : (urlPath === "/board" || urlPath === "/board.html") ? "board.html"
     : (urlPath === "/leaderboard" || urlPath === "/leaderboard.html") ? "leaderboard.html"
     : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
@@ -302,7 +304,7 @@ async function serveStatic(res, urlPath) {
   } catch { res.writeHead(404); res.end("not found"); }
 }
 
-createServer(async (req, res) => {
+const server = createServer(async (req, res) => {
   const u = new URL(req.url, "http://x");
   // The read-only JSON API is public and consumed cross-origin by the Lovable-designed front end (its own domain),
   // so every response carries permissive CORS. A preflight (OPTIONS) is answered immediately, before any routing.
@@ -431,6 +433,23 @@ createServer(async (req, res) => {
         rpc: { provider: PROVIDER }, alerts: { on: ALERTS_ON },
         storage: { backend: store.backend || KV_BACKEND, mode: store.mode || null, connected: !!store.ok, error: store.error || null },
       }));
+    }
+
+    if (u.pathname === "/api/setups") {
+      const s = await experiment.snapshot();
+      const state = u.searchParams.get("state");
+      const n = Math.min(200, Math.max(1, Number(u.searchParams.get("n")) || 100));
+      const address = (u.searchParams.get("address") || "").toLowerCase();
+      const order = { triggered: 0, building: 1, deteriorating: 2, invalidated: 3, expired: 4, observing: 5, unavailable: 6 };
+      const rows = s.rows.filter(r => (!state || r.displayState === state) && (!address || r.address === address))
+        .sort((a,b) => (order[a.displayState] ?? 9) - (order[b.displayState] ?? 9) || b.sampledAt - a.sampledAt);
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      const { calls, ...rest } = s;
+      return res.end(JSON.stringify({ ...rest, total: rows.length, rows: rows.slice(0,n) }));
+    }
+    if (u.pathname === "/api/track-record/legacy") {
+      res.writeHead(200, { "content-type": "application/json", "cache-control": "no-store" });
+      return res.end(JSON.stringify(await legacyTrackRecord()));
     }
 
     if (u.pathname === "/api/track-record") { // forward, out-of-sample hit-rate — accrues live as launches mature
@@ -714,4 +733,4 @@ createServer(async (req, res) => {
     res.writeHead(500, { "content-type": "application/json" });
     res.end(JSON.stringify({ error: String(e.message || e) }));
   }
-}).listen(PORT, () => console.log(`block0 on :${PORT} (RPC ${process.env.RPC_URL ? "custom" : "public drpc"}, live tail: ${WS_ENABLED ? "websocket (eth_subscribe)" : "poll " + POLL_MS + "ms"})`));
+}).listen(PORT, () => console.log(`block0 on :${server.address().port} (background ${BACKGROUND_ON ? "on" : "off"}, live tail: ${WS_ENABLED ? "websocket (eth_subscribe)" : "poll " + POLL_MS + "ms"})`));
