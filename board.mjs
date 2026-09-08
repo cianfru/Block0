@@ -14,6 +14,7 @@ import { keep, storeStats } from "./store.mjs";
 import { pathPosition, liveTrajectory, corridorStatus } from "./model.mjs";
 import { getCurrentSmartMoney } from "./smart-money.mjs";
 import { deployerReputation, compactRep } from "./deployer.mjs";
+export const getLaunchMetadata = () => ALL_META;
 let ALL_META = [];   // the full launchpad list from the last refresh — the deployer-reputation universe
 
 export const PONS_FACTORIES = ["0x0c37a24f5d23a486fa692d1500881d698b1f77a4", "0xa5aab3f0c6eeadf30ef1d3eb997108e976351feb"];

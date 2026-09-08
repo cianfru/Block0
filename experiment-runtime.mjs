@@ -1,8 +1,11 @@
+import { fetchLiveMarkets } from "./pons.mjs";
 import { createExperiment } from "./experiment.mjs";
-import { getBoard } from "./board.mjs";
+import { getBoard, getLaunchMetadata } from "./board.mjs";
 import { fetchPair, marketSnapshot } from "./market.mjs";
 const bounded = (key, fallback, max) => { const n = Number(process.env[key] ?? fallback); return Number.isFinite(n) ? Math.max(1, Math.min(max, Math.floor(n))) : fallback; };
 export const experiment = createExperiment({ enabled: process.env.EXPERIMENT_ON !== "0",
+  live: fetchLiveMarkets, admissionRequiresForensics: true, admissionCandidates: getLaunchMetadata,
+  cohortSize: bounded("EXPERIMENT_COHORT_SIZE", 8, 80),
   maxTokens: bounded("EXPERIMENT_MAX_TOKENS", 5000, 20000), sampleBudget: bounded("EXPERIMENT_SAMPLE_BUDGET", 80, 500),
   marketBudget: bounded("EXPERIMENT_MARKET_BUDGET", 4, 20),
   board: () => { const b = getBoard(); return [...b.cooking, ...b.graduated]; },

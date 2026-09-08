@@ -9,7 +9,8 @@ import { evaluateDecision, summarize } from "./evaluation.mjs";
 export const EXPERIMENT_KEY = "experiment:v1:index";
 export const recordKey = (address) => `experiment:v1:token:${address}`;
 export const callKey = (address) => `experiment:v1:calls:${address}`;
-const INDEX_FIELDS = ["address", "sym", "firstSeenAt", "sampledAt", "status", "pending", "lastSeenAt", "launchedAt", "graduated", "setupState", "observationAt", "decisionAt", "everEligible"];
+export const archiveKey = address => `experiment:v1:archive:${address.slice(2,4)}`;
+const INDEX_FIELDS = ["pool", "trackedAt", "trackUntil", "marketCheckedAt", "address", "sym", "firstSeenAt", "sampledAt", "status", "pending", "lastSeenAt", "launchedAt", "graduated", "setupState", "observationAt", "decisionAt", "everEligible"];
 const compact = (r) => Object.fromEntries(INDEX_FIELDS.filter(k => r[k] !== undefined).map(k => [k, r[k]]));
 const MIN = 60000;
 const emptyIndex = () => ({ schema: 1, startedAt: null, updated: 0, registry: {}, nextPage: 2,
@@ -36,8 +37,8 @@ export function advanceRecord(record, next, sym) {
 // Serial collector for one service replica. Strict persistence errors stop publishing new decisions.
 // No chain reconstruction here. Forensics reuse timestamped board reads; unknown coverage stays unknown.
 export function createExperiment({ read = getJSONStrict, write = setJSONStrict, active = fetchActive, graduated = fetchGraduated,
-  board = () => [], market = async () => null, clock = Date.now, enabled = true,
-  maxTokens = 5000, sampleBudget = 80, marketBudget = 4 } = {}) {
+  board = () => [], market = async () => null, live = null, admissionCandidates = () => [], admissionRequiresForensics = false, clock = Date.now, enabled = true,
+  maxTokens = 5000, sampleBudget = 80, marketBudget = 4, cohortSize = Math.min(12, sampleBudget), trackingMs = 6 * 60 * MIN } = {}) {
   let index = null, running = false, error = null, initializing = null;
   const initialize = async () => {
     if (index) return;
@@ -83,32 +84,89 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
       try { catalog = await graduated(); for (const m of catalog.items) metas.set(m.address, { ...m, availableAt: clock() }); }
       catch (e) { failures.push("graduated: " + e.message); }
       const now = clock();
+      const boardRows = board();
+      const forensic = new Map((Array.isArray(boardRows) ? boardRows : []).map(t => [addressOf(t.address), t]));
+      const freshForensic = address => { const t = forensic.get(address)?.observedAt; return t && t <= now && now - t <= 10 * MIN; };
       let omitted = 0;
       for (const [a, m] of metas) {
         const address = addressOf(a); if (!address) continue;
         if (!next.registry[address] && Object.keys(next.registry).length >= maxTokens) { omitted++; continue; }
         const item = next.registry[address] ||= { address, firstSeenAt: now, sampledAt: 0, status: "discovered" };
         item.lastSeenAt = now; item.sym = String(m.sym || "?").slice(0, 80); item.graduated = !!m.graduated;
-        item.launchedAt = m.launchedAt || null;
+        item.launchedAt = m.launchedAt || null; item.pool = m.pool || item.pool;
       }
-      next.coverage = { complete: false, scope: emptyIndex().coverage.scope, activeTotal: latest?.total ?? null,
-        graduatedTotal: catalog?.total ?? null, activePagesThisCycle: latest ? [1, ...(latest.total > 100 ? [page] : [])] : [],
+      // Reserve a stable cohort; page membership is discovery, not follow-up. Pending decisions
+      // retain their slots through evaluation even if the six-hour admission lease expires.
+      const inCohort = r => r.pending || r.trackUntil > now;
+      const capacity = Math.min(cohortSize, sampleBudget);
+      let slots = Math.max(0, capacity - Object.values(next.registry).filter(inCohort).length);
+      // Cached board catalog metadata is usable for identity/admission only. Prices for these
+      // candidates still require the explicit live refresh below.
+      const admissions = new Map([...admissionCandidates(), ...metas.values()].map(m => [m.address, m]));
+      const candidates = [...admissions.values()].filter(m => addressOf(m.address) &&
+        (!admissionRequiresForensics || freshForensic(m.address)) &&
+        !inCohort(next.registry[m.address] || {}) &&
+        !(next.registry[m.address]?.trackedAt > now - 24 * 60 * MIN))
+        .sort((a,b) => Number(!!freshForensic(b.address)) - Number(!!freshForensic(a.address)) ||
+          Number(!!a.graduated) - Number(!!b.graduated) || a.address.localeCompare(b.address));
+      for (const m of candidates) {
+        if (!slots) break;
+        if (!next.registry[m.address] && Object.keys(next.registry).length >= maxTokens) {
+          // Retire only unprotected, absent discoveries. Keep record contents and an archival
+          // address manifest, so making room never erases observations or hides a decision.
+          const victim = Object.values(next.registry).filter(r => !inCohort(r) && !r.decisionAt && !r.everEligible && !metas.has(r.address))
+            .sort((a,b) => (a.lastSeenAt || 0) - (b.lastSeenAt || 0) || a.address.localeCompare(b.address))[0];
+          if (!victim) continue;
+          const key = archiveKey(victim.address), archive = await read(key) || {};
+          archive[victim.address] = { ...victim, retiredAt: now };
+          await write(key, archive); // archive first; retries may leave a duplicate, never a lost address
+          delete next.registry[victim.address]; next.retiredEntries = (next.retiredEntries || 0) + 1;
+        }
+        const item = next.registry[m.address] ||= { address: m.address, sym: String(m.sym || "?").slice(0,80),
+          firstSeenAt: now, sampledAt: 0, status: "discovered", launchedAt: m.launchedAt, graduated: !!m.graduated, lastSeenAt: now };
+        item.pool = m.pool || item.pool; item.trackedAt = now; item.trackUntil = now + trackingMs; slots--;
+      }
+      const tracked = Object.values(next.registry).filter(inCohort);
+      let followupMissing = 0;
+      if (live && tracked.length) {
+        // Bounded batches keep URLs and request duration small. No stale catalog fallback for
+        // a tracked token when its explicit refresh fails or omits it.
+        for (let i = 0; i < tracked.length; i += 20) {
+          const batch = tracked.slice(i, i + 20);
+          const requested = batch.map(r => ({ ...r, ...(metas.get(r.address) || {}) }));
+          for (const r of batch) metas.delete(r.address);
+          try {
+            const result = await live(requested);
+            for (const m of result.items) if (batch.some(r => r.address === m.address)) metas.set(m.address, { ...m, availableAt: clock() });
+          } catch (e) { failures.push("tracked markets: " + e.message); }
+          followupMissing += batch.filter(r => !metas.has(r.address)).length;
+        }
+      }
+      next.coverage = { complete: false, scope: emptyIndex().coverage.scope, collectorVersion: "tracked-cohort-v2",
+        activeTotal: latest?.total ?? null, graduatedTotal: catalog?.total ?? null,
+        activePagesThisCycle: latest ? [1, ...(latest.total > 100 ? [page] : [])] : [],
         registrySize: Object.keys(next.registry).length, registryCap: maxTokens, omittedThisCycle: omitted,
-        sourceFailures: failures, note: "Missing/delisted launches are retained as unavailable, never inferred dead. Offset pagination can miss rapidly changing launches." };
-      // Persist addresses before their records, so a mid-cycle crash cannot orphan a newly discovered token.
+        retiredEntries: next.retiredEntries || 0, cohortSize: tracked.length, cohortCapacity: capacity,
+        followupMissing, sourceFailures: failures,
+        admissionPolicy: "Six-hour cohort, runtime requires fresh board forensics, pre-graduation first, address tie-break; no re-admission within 24 hours. Pending decisions retain slots.",
+        note: "Discovery is partial. Retired unprotected registry entries remain archived. Missing quotes are never inferred dead." };
       await write(EXPERIMENT_KEY, next);
       index = structuredClone(next);
-      const boardRows = board();
-      const rows = Array.isArray(boardRows) ? boardRows : [];
-      const forensic = new Map(rows.map((t) => [addressOf(t.address), t]));
-      const young = (r) => r.launchedAt && now - Date.parse(r.launchedAt) < 24 * 60 * MIN;
-      const due = Object.values(next.registry).filter((r) => {
-        const age = r.launchedAt ? (now - Date.parse(r.launchedAt)) : Infinity;
-        const interval = r.pending ? MIN : age < 24 * 60 * MIN ? MIN : 15 * MIN;
-        return now - r.sampledAt >= interval;
-      }).sort((a, b) => Number(!!b.pending) - Number(!!a.pending) || Number(!!young(b)) - Number(!!young(a)) || a.sampledAt - b.sampledAt || a.address.localeCompare(b.address));
+      const due = Object.values(next.registry).filter(r =>
+        (metas.has(r.address) || r.pending) && now - r.sampledAt >= (inCohort(r) ? MIN : 15 * MIN))
+        .sort((a,b) => Number(!!b.pending) - Number(!!a.pending) || Number(inCohort(b)) - Number(inCohort(a)) ||
+          a.sampledAt - b.sampledAt || a.address.localeCompare(b.address));
+      // A failed tracked quote is reported, but does not consume observation budget. Pending
+      // outcomes still age through their deadlines independently of source availability.
+      for (const r of tracked) if (!metas.has(r.address)) r.status = "unavailable";
+      const observationWork = due.filter(r => metas.has(r.address)).slice(0, sampleBudget);
+      const maintenance = due.filter(r => !metas.has(r.address) && r.pending);
+      const marketOrder = observationWork.filter(r => metas.has(r.address) && freshForensic(r.address))
+        .sort((a,b) => Number(inCohort(b)) - Number(inCohort(a)) || (a.marketCheckedAt || 0) - (b.marketCheckedAt || 0) || a.address.localeCompare(b.address))
+        .slice(0, marketBudget);
+      const marketTargets = new Set(marketOrder.map(r => r.address));
       let markets = 0, sampled = 0;
-      for (const item of due.slice(0, sampleBudget)) {
+      for (const item of [...maintenance, ...observationWork]) {
         const record = await read(recordKey(item.address));
         const meta = metas.get(item.address);
         if (!meta) {
@@ -124,15 +182,16 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
           item.sampledAt = now;
           continue;
         }
-        let quote = null;
+        let quote = record?.latestMarket || null;
         const f = forensic.get(item.address);
-        if (f?.observedAt && now - f.observedAt <= 10 * MIN && markets < marketBudget) {
-          markets++;
+        if (marketTargets.has(item.address)) {
+          markets++; item.marketCheckedAt = clock();
           try { quote = await market(item.address); if (quote) quote = { ...quote, observedAt: clock() }; }
-          catch { /* liquidity remains explicitly unavailable */ }
+          catch { /* The original quote timestamp is retained; observation() rejects stale values. */ }
         }
         const o = observation(meta, { now: clock(), forensic: f, market: quote });
         const advanced = advanceRecord(record, o, meta.sym);
+        advanced.latestMarket = quote;
         await write(recordKey(item.address), advanced); // persist before exposing any new decision
         if (advanced.decisions.length) await write(callKey(item.address), advanced.decisions);
         item.sampledAt = o.observedAt; item.observationAt = o.observedAt; item.status = "observed";
@@ -140,7 +199,9 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
         item.everEligible = !!(item.everEligible || advanced.everEligible);
         item.pending = advanced.decisions.some((d) => d.outcome?.status === "pending"); sampled++;
       }
-      next.coverage.sampledThisCycle = sampled; next.coverage.dueRemaining = Math.max(0, due.length - sampleBudget);
+      next.coverage.trackedObservedThisCycle = tracked.filter(r => r.observationAt >= start).length;
+      next.coverage.availableThisCycle = Object.values(next.registry).filter(r => metas.has(r.address)).length;
+      next.coverage.sampledThisCycle = sampled; next.coverage.dueRemaining = Math.max(0, due.filter(r => metas.has(r.address)).length - observationWork.length);
       next.updated = clock();
       await write(EXPERIMENT_KEY, next);
       index = next; error = failures.length ? failures.join("; ") : null;
