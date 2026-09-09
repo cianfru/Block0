@@ -1,5 +1,5 @@
 // All research/replay/live setup decisions call this exact causal function. Every timestamp is milliseconds.
-export const FEATURE_VERSION = "forward-features-v1";
+export const FEATURE_VERSION = "forward-features-v2";
 const MIN = 60000;
 const ratio = (a, b) => a != null && b > 0 ? a / b - 1 : null;
 export function featuresAt(history, at) {
@@ -17,6 +17,8 @@ export function featuresAt(history, at) {
   const holderRows = rows.filter((o) => o.holders != null && o.forensicAt != null && o.observedAt <= at - 15 * MIN);
   const hr = holderRows.at(-1);
   const reasons = [];
+  const stage = last.graduated === true ? "post-graduation" : last.graduated === false ? "pre-graduation" : "unknown";
+  if (stage !== "post-graduation") reasons.push("research only: pre-graduation liquidity and sell execution are not validated");
   if (!(last.priceUsd > 0)) reasons.push("current price unavailable");
   if (at - last.observedAt > 5 * MIN) reasons.push("latest observation is stale");
   if (priced.length < 6 || !ref || at - ref.observedAt > 30 * MIN || at - priced[0].observedAt < 30 * MIN) reasons.push("need at least 30 minutes of forward price observations");
@@ -27,6 +29,7 @@ export function featuresAt(history, at) {
   const maxGapMs = rows.length > 1 ? Math.max(...rows.slice(1).map((o, i) => o.observedAt - rows[i].observedAt)) : 0;
   if (maxGapMs > 15 * MIN) reasons.push("observation coverage has a gap over 15 minutes");
   return { version: FEATURE_VERSION, at, observationId: last.id, ready: reasons.length === 0, reasons,
+    stage, historyReady: priced.length >= 6 && !!ref && at - ref.observedAt <= 30 * MIN && at - priced[0].observedAt >= 30 * MIN && maxGapMs <= 15 * MIN,
     priceUsd: last.priceUsd, liquidityUsd: last.liquidityUsd, risk: last.risk, insiderSellers: last.insiderSellers,
     holderGrowth: hr && last.forensicAt !== hr.forensicAt ? ratio(last.holders, hr.holders) : null,
     momentum15m: ref ? ratio(last.priceUsd, ref.priceUsd) : null,

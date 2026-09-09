@@ -13,6 +13,7 @@
     const outcome = row.outcome || { status: "pending" }, f = row.features || {};
     const state = isRecord ? outcome.status : row.displayState, c = el("article", null, "card " + (states.has(state) ? state : "observing"));
     const h = el("h2"); h.append(link(row.address,row.sym),el("span",state,"badge")); c.append(h);
+    if (!isRecord) c.append(el("p", f.stage === "post-graduation" ? "Post-graduation · DEX assessment" : "Pre-graduation · research only; sell liquidity unverified"));
     if (isRecord) {
       c.append(el("p", row.strategy + " · " + when(row.at)));
       c.append(fields([["Outcome",outcome.reason || outcome.status],["Cost-scenario return",pct(outcome.scenarioReturn)],["Entry observation",when(outcome.entryAt)],["Exit observation",when(outcome.exitAt)]]));
@@ -40,6 +41,10 @@
       const r = await response.json(), coverage = r.coverage || {};
       const status = $("#status"); status.className = "status" + (r.error ? " error" : "");
       status.textContent = (r.enabled === false ? "Collection disabled. " : "") + (r.error ? "Collection issue: " + r.error + ". " : "") + "Ever eligible: " + (coverage.eligibleTokens || 0) + " of " + (coverage.registrySize || 0) + " registered tokens (budget-dependent" + (coverage.eligibilityLowerBound ? "; lower bound" : "") + "). Tracking " + (coverage.cohortSize || 0) + " tokens; " + (coverage.trackedObservedThisCycle || 0) + " refreshed in the last cycle. Last cycle: " + when(r.updated) + ". Scope: Pons API-visible catalogs; coverage is partial. " + (coverage.dueRemaining ? coverage.dueRemaining + " observations awaiting budget." : "");
+      const ev = coverage.evidence;
+      if (ev) status.textContent += " Evidence: " + ev.freshPrices + "/" + ev.tracked + " fresh prices, " + ev.freshForensics + " fresh forensics, " + ev.usableLiquidity + " usable post-graduation liquidity, " + ev.sufficientHistory + " sufficient history, " + ev.conditionsMet + " matching setups.";
+      const v = r.validation;
+      if (v) status.textContent += " 24h collection validation: " + v.status + ", " + pct(v.observationRate) + " scheduled observations recorded (target 95%); " + pct(v.forensicFreshnessRate) + " of recorded observations have fresh forensics.";
       $("#metrics").replaceChildren(...(isRecord ? [metric(r.predicted || 0,"frozen decisions"),metric(r.resolved || 0,"resolved indicative outcomes"),metric(r.unknown || 0,"unknown outcomes")] : [metric(coverage.registrySize || 0,"tokens registered"),metric(coverage.sampledThisCycle || 0,"observed in latest cycle"),metric(coverage.omittedThisCycle || 0,"omitted by registry cap this cycle")]));
       const rows = isRecord ? r.calls || [] : r.rows || [];
       $("#count").textContent = "Showing " + rows.length + (isRecord ? " most recent decisions" : " of " + (r.total || 0) + " matching tokens");

@@ -1,5 +1,5 @@
 // Forward observations only. No backtest imports, interpolation, retrospective anchoring or missing-to-zero defaults.
-export const OBSERVATION_VERSION = "forward-observation-v1";
+export const OBSERVATION_VERSION = "forward-observation-v2";
 export const addressOf = (a) => /^0x[0-9a-f]{40}$/i.test(a || "") ? a.toLowerCase() : null;
 export const finite = (x) => x !== null && x !== undefined && x !== "" && Number.isFinite(Number(x)) ? Number(x) : null;
 const positive = (x) => finite(x) > 0 ? Number(x) : null;
@@ -25,9 +25,11 @@ export function observation(meta, { now, forensic = null, market = null, maxFore
     priceSource: meta.priceSource || "pons-catalog", priceAsOf: null, executable: false,
     forensicAt: fresh ? forensicAt : null, holders: finite(flags.holders), risk: fresh ? finite(forensic.risk) : null,
     top10Pct: finite(flags.top10Pct), insiderSellers: finite(flags.insiderSellersNow),
-    liquidityUsd: marketFresh ? positive(market.liqUsd) : null,
+    stage: meta.graduated === true ? "post-graduation" : "pre-graduation",
+    curve: { reportedPairedPrincipalEth: finite(meta.pairedPrincipalEth), reportedGraduationThresholdEth: finite(meta.graduationThresholdEth), sellQuoteVerified: false },
+    liquidityUsd: meta.graduated === true && marketFresh ? positive(market.liqUsd) : null,
     marketAt: marketFresh ? marketAt : null, marketSource: marketFresh ? "dexscreener" : null,
-    quality: [!price && "price unavailable", !fresh && "forensics unavailable or stale",
+    quality: [meta.graduated !== true && "pre-graduation research only; curve principal is not DEX liquidity or a verified sell quote", !price && "price unavailable", !fresh && "forensics unavailable or stale",
       !marketFresh && "liquidity unavailable or stale", "indicative catalog price; execution unverified"].filter(Boolean),
   };
 }

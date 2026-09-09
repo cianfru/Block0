@@ -5,7 +5,7 @@ import { report as legacyReport, callsList as legacyCalls } from "./track-record
 export async function trackRecord() {
   const s = await experiment.snapshot({ limit: 0 });
   return { schema: 2, methodology: "forward-indicative-6h-v1", updated: s.updated, enabled: s.enabled,
-    error: s.error, coverage: s.coverage, strategies: s.strategies, predicted: s.calls.length,
+    error: s.error, validation: s.validation, coverage: s.coverage, strategies: s.strategies, predicted: s.calls.length,
     resolved: s.calls.filter(d => d.outcome?.status === "resolved").length,
     unknown: s.calls.filter(d => d.outcome?.status === "unknown").length,
     pending: s.calls.filter(d => !d.outcome || d.outcome.status === "pending").length,
