@@ -1,3 +1,4 @@
+import { evidenceAt, accountValidation, validationReport } from "./cohort-evidence.mjs";
 import { getJSONStrict, setJSONStrict } from "./store/kv.mjs";
 import { fetchActive, fetchGraduated } from "./pons.mjs";
 import { addressOf, observation, appendObservation } from "./observations.mjs";
@@ -24,7 +25,7 @@ export function advanceRecord(record, next, sym) {
   if (r.observations.length >= 2048) r.droppedObservations++;
   r.observations = appendObservation(r.observations, next);
   const features = featuresAt(r.observations, next.observedAt);
-  const setup = nextSetup(r.setup, features);
+  const setup = nextSetup(r.setup?.version && r.setup.version !== SETUP_VERSION ? null : r.setup, features);
   if (setup.state !== r.setup?.state) r.transitions = [...r.transitions, { at: next.observedAt, from: r.setup?.state || null, to: setup.state, reasons: setup.reasons }].slice(-100);
   if (setup.state === "triggered" && !r.decisions.some((d) => d.strategy === SETUP_VERSION)) {
     r.decisions.push(freezeDecision(next.address, features, SETUP_VERSION, { sym: r.sym, venue: next.venue }));
@@ -37,8 +38,8 @@ export function advanceRecord(record, next, sym) {
 // Serial collector for one service replica. Strict persistence errors stop publishing new decisions.
 // No chain reconstruction here. Forensics reuse timestamped board reads; unknown coverage stays unknown.
 export function createExperiment({ read = getJSONStrict, write = setJSONStrict, active = fetchActive, graduated = fetchGraduated,
-  board = () => [], market = async () => null, live = null, admissionCandidates = () => [], admissionRequiresForensics = false, clock = Date.now, enabled = true,
-  maxTokens = 5000, sampleBudget = 80, marketBudget = 4, cohortSize = Math.min(12, sampleBudget), trackingMs = 6 * 60 * MIN } = {}) {
+  board = () => [], market = async () => null, live = null, admissionCandidates = () => [], admissionRequiresForensics = false, balancedStages = false, clock = Date.now, enabled = true,
+  maxTokens = 5000, sampleBudget = 80, marketBudget = 4, cohortSize = Math.min(12, sampleBudget), trackingMs = 6 * 60 * MIN, intervalMs = MIN } = {}) {
   let index = null, running = false, error = null, initializing = null;
   const initialize = async () => {
     if (index) return;
@@ -66,6 +67,7 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
     try {
       await initialize();
       const next = structuredClone(index), start = clock();
+      const priorTracked = Object.values(next.registry).filter(r => r.pending || r.trackUntil > (next.updated || start));
       next.startedAt ??= start;
       const metas = new Map(), failures = [];
       let latest = null, catalog = null, page = next.nextPage;
@@ -111,6 +113,11 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
           Number(!!a.graduated) - Number(!!b.graduated) || a.address.localeCompare(b.address));
       for (const m of candidates) {
         if (!slots) break;
+        if (balancedStages) {
+          const stageCount = Object.values(next.registry).filter(r => inCohort(r) && !!r.graduated === !!m.graduated).length;
+          const stageCapacity = m.graduated ? Math.floor(capacity / 2) : Math.ceil(capacity / 2);
+          if (stageCount >= stageCapacity) continue;
+        }
         if (!next.registry[m.address] && Object.keys(next.registry).length >= maxTokens) {
           // Retire only unprotected, absent discoveries. Keep record contents and an archival
           // address manifest, so making room never erases observations or hides a decision.
@@ -142,18 +149,18 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
           followupMissing += batch.filter(r => !metas.has(r.address)).length;
         }
       }
-      next.coverage = { complete: false, scope: emptyIndex().coverage.scope, collectorVersion: "tracked-cohort-v2",
+      next.coverage = { complete: false, scope: emptyIndex().coverage.scope, collectorVersion: "cohort-evidence-v3",
         activeTotal: latest?.total ?? null, graduatedTotal: catalog?.total ?? null,
         activePagesThisCycle: latest ? [1, ...(latest.total > 100 ? [page] : [])] : [],
         registrySize: Object.keys(next.registry).length, registryCap: maxTokens, omittedThisCycle: omitted,
         retiredEntries: next.retiredEntries || 0, cohortSize: tracked.length, cohortCapacity: capacity,
         followupMissing, sourceFailures: failures,
-        admissionPolicy: "Six-hour cohort, runtime requires fresh board forensics, pre-graduation first, address tie-break; no re-admission within 24 hours. Pending decisions retain slots.",
+        admissionPolicy: "Six-hour cohort, runtime requires fresh board forensics, runtime reserves half the slots per launch stage, address tie-break; no re-admission within 24 hours. Pending decisions retain slots.",
         note: "Discovery is partial. Retired unprotected registry entries remain archived. Missing quotes are never inferred dead." };
       await write(EXPERIMENT_KEY, next);
       index = structuredClone(next);
       const due = Object.values(next.registry).filter(r =>
-        (metas.has(r.address) || r.pending) && now - r.sampledAt >= (inCohort(r) ? MIN : 15 * MIN))
+        (metas.has(r.address) || r.pending) && (inCohort(r) ? now > r.sampledAt : now - r.sampledAt >= 15 * MIN))
         .sort((a,b) => Number(!!b.pending) - Number(!!a.pending) || Number(inCohort(b)) - Number(inCohort(a)) ||
           a.sampledAt - b.sampledAt || a.address.localeCompare(b.address));
       // A failed tracked quote is reported, but does not consume observation budget. Pending
@@ -166,6 +173,7 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
         .slice(0, marketBudget);
       const marketTargets = new Set(marketOrder.map(r => r.address));
       let markets = 0, sampled = 0;
+      const evidenceSamples = new Map();
       for (const item of [...maintenance, ...observationWork]) {
         const record = await read(recordKey(item.address));
         const meta = metas.get(item.address);
@@ -192,13 +200,26 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
         const o = observation(meta, { now: clock(), forensic: f, market: quote });
         const advanced = advanceRecord(record, o, meta.sym);
         advanced.latestMarket = quote;
+        item.graduated = o.graduated;
         await write(recordKey(item.address), advanced); // persist before exposing any new decision
+        evidenceSamples.set(item.address, { observedAt: o.observedAt, evidence: evidenceAt(o, advanced.features, o.observedAt), reasons: advanced.features.reasons, state: advanced.setup.state });
         if (advanced.decisions.length) await write(callKey(item.address), advanced.decisions);
         item.sampledAt = o.observedAt; item.observationAt = o.observedAt; item.status = "observed";
         item.setupState = advanced.setup.state; item.decisionAt = advanced.decisions.at(-1)?.at;
         item.everEligible = !!(item.everEligible || advanced.everEligible);
         item.pending = advanced.decisions.some((d) => d.outcome?.status === "pending"); sampled++;
       }
+      const cohortSamples = tracked.map(r => evidenceSamples.get(r.address));
+      next.coverage.evidence = { tracked: tracked.length, freshPrices: cohortSamples.filter(s => s?.evidence.price).length,
+        freshForensics: cohortSamples.filter(s => s?.evidence.forensics).length,
+        usableLiquidity: cohortSamples.filter(s => s?.evidence.liquidity).length,
+        sufficientHistory: cohortSamples.filter(s => s?.evidence.history).length,
+        assessmentReady: cohortSamples.filter(s => s?.evidence.ready).length,
+        conditionsMet: cohortSamples.filter(s => s?.state === "triggered").length,
+        preGraduation: tracked.filter(r => !r.graduated).length, postGraduation: tracked.filter(r => r.graduated).length,
+        missing: tracked.map(r => ({ address: r.address, reasons: evidenceSamples.get(r.address)?.reasons || ["no fresh observation recorded this cycle"] })) };
+      const validationMembers = [...new Map([...priorTracked, ...tracked].map(r => [r.address, r])).values()];
+      next.validation = accountValidation(next.validation, validationMembers, evidenceSamples, clock(), intervalMs);
       next.coverage.trackedObservedThisCycle = tracked.filter(r => r.observationAt >= start).length;
       next.coverage.availableThisCycle = Object.values(next.registry).filter(r => metas.has(r.address)).length;
       next.coverage.sampledThisCycle = sampled; next.coverage.dueRemaining = Math.max(0, due.filter(r => metas.has(r.address)).length - observationWork.length);
@@ -240,9 +261,10 @@ export function createExperiment({ read = getJSONStrict, write = setJSONStrict, 
       eligibilityLowerBound: !!index?.eligibilityLowerBound,
       eligibilityDefinition: "Distinct tokens ever observed with features.ready; eligibility depends on sampling and forensic budgets." };
     return { schema: 1, enabled, running, error: snapshotError, startedAt: index?.startedAt ?? null, updated: index?.updated || 0,
-      coverage, total: matching.length, rows, calls,
+      coverage, validation: validationReport(index?.validation, now), total: matching.length, rows, calls,
       strategies: summarize(calls).map(s => ({ ...s, eligibleTokens })),
       note: "Forward experiment. Budget-conditioned eligible universe. Indicative prices, not verified fills. Reflex is not connected." };
   }
-  return { cycle, snapshot };
+  const trackedMetadata = () => Object.values(index?.registry || {}).filter(r => r.pending || r.trackUntil > clock()).map(r => ({ ...r }));
+  return { cycle, snapshot, trackedMetadata };
 }

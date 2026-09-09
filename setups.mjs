@@ -1,4 +1,4 @@
-export const SETUP_VERSION = "pullback-participation-v1";
+export const SETUP_VERSION = "pullback-participation-postgrad-v2";
 // Frozen experiment parameters, deliberately separate from the legacy promise score. Not fitted to outcomes.
 export const SETUP_RULES = Object.freeze({ maxRisk: 45, minLiquidityUsd: 10000, minHolderGrowth: 0.02,
   minMomentum: 0.03, minPullback: 0.1, maxPullback: 0.5, minRecovery: 0.03, expiresMs: 6 * 3600000 });

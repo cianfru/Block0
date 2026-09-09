@@ -1,3 +1,4 @@
+import { boardTargets } from "./cohort-evidence.mjs";
 // The DISCOVER BOARD: the Robinhood-Chain / Pons launch universe, verdicted. Discovery, market caps, logos,
 // graduation status and progress all come from the Pons API (source of truth); the FORENSIC verdict
 // (snipers / bundles / concentration / live dumping) is our on-chain layer computed per token on top.
@@ -14,6 +15,8 @@ import { keep, storeStats } from "./store.mjs";
 import { pathPosition, liveTrajectory, corridorStatus } from "./model.mjs";
 import { getCurrentSmartMoney } from "./smart-money.mjs";
 import { deployerReputation, compactRep } from "./deployer.mjs";
+let forensicTargets = () => [];
+export const setForensicTargets = fn => { forensicTargets = fn; };
 export const getLaunchMetadata = () => ALL_META;
 let ALL_META = [];   // the full launchpad list from the last refresh — the deployer-reputation universe
 
@@ -61,23 +64,31 @@ export async function refreshBoard() {
   if (CACHE.scanning) return CACHE;
   CACHE = { ...CACHE, scanning: true };
   try {
-    const [active, grad] = await Promise.all([fetchActive({ sort: "marketCap", pageSize: N_ACTIVE * 2 }), fetchGraduated()]);
+    const sources = await Promise.allSettled([fetchActive({ sort: "marketCap", pageSize: N_ACTIVE * 2 }), fetchGraduated()]);
+    const active = sources[0].status === "fulfilled" ? sources[0].value : { items: ALL_META.filter(m => !m.graduated), total: CACHE.stats?.activeTotal };
+    const grad = sources[1].status === "fulfilled" ? sources[1].value : { items: ALL_META.filter(m => m.graduated), total: CACHE.stats?.graduatedTotal };
+    // Cached identities may select scans during a discovery outage; every forensic timestamp
+    // still requires a new successful verdict. Quote collection remains independent.
+    const sourceErrors = sources.filter(r => r.status === "rejected").map(r => String(r.reason?.message || r.reason));
     ALL_META = [...(active.items || []), ...(grad.items || [])];
     const activePick = active.items.filter((t) => t.address && t.mcapUsd > 0).slice(0, N_ACTIVE);
     const gradPick = grad.items.filter((t) => t.address).sort((a, b) => b.mcapUsd - a.mcapUsd).slice(0, N_GRAD);
+    const targets = boardTargets(activePick, gradPick, forensicTargets(), N_ACTIVE + N_GRAD);
     const cooking = [], graduated = [];
     // publish progressively as each token is verdicted, so a slow/throttled scan surfaces data immediately instead
     // of showing nothing until all 40 finish (which under Alchemy pressure could be minutes).
     const publish = () => { CACHE = { ...CACHE, scanning: true, updated: Date.now(), cooking: cooking.slice(), graduated: graduated.slice(), dex: CACHE.dex || [] }; };
-    for (const m of activePick) { try { cooking.push(await verdict(m)); publish(); } catch { /* skip */ } }
-    for (const m of gradPick) { try { graduated.push(await verdict(m)); publish(); } catch { /* skip */ } }
+    for (const m of targets) {
+      try { const row = await verdict(m); (m.graduated ? graduated : cooking).push(row); publish(); }
+      catch { /* Old forensic timestamps are not refreshed on failure. */ }
+    }
     cooking.sort((a, b) => (b.progress || 0) - (a.progress || 0) || a.risk - b.risk);
     graduated.sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0));
     keep([...cooking, ...graduated, ...(CACHE.dex || [])].map((r) => r.address)); // bound store memory to the live board
     PONS_ADDRS = new Set([...(active.items || []), ...(grad.items || [])].map((t) => (t.address || "").toLowerCase()));
     BOOTED = true;
     CACHE = { updated: Date.now(), scanning: false, cooking, graduated, dex: CACHE.dex || [],
-      stats: { launchTotal: active.launchTotal, activeTotal: active.total, graduatedTotal: grad.total, dexTotal: (CACHE.dex || []).length, store: storeStats() } };
+      stats: { sourceErrors, launchTotal: active.launchTotal, activeTotal: active.total, graduatedTotal: grad.total, dexTotal: (CACHE.dex || []).length, store: storeStats() } };
   } finally { CACHE = { ...CACHE, scanning: false }; }
   return CACHE;
 }

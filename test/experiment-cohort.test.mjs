@@ -24,7 +24,7 @@ test('a cohort follows moving discovery pages for 40 minutes and across restart'
   let step=0;const requested=[];
   const h=harness({cohortSize:2,sampleBudget:2,marketBudget:2,
     active:async()=>({items:[meta(100+step),meta(200+step)],total:2}),
-    live:async ts=>{requested.push(ts.map(t=>t.address));return {items:ts.map(t=>({...t,priceUsd:1+step/100}))};},
+    live:async ts=>{requested.push(ts.map(t=>t.address));return {items:ts.map(t=>({...t,graduated:true,priceUsd:1+step/100}))};},
     board:()=>[100,200].map(i=>({address:address(i),observedAt:T+step*MIN,risk:20,flags:{holders:100+step,insiderSellersNow:0}})),
     market:async()=>({liqUsd:20000})});
   let service=h.service;

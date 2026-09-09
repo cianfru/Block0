@@ -52,6 +52,7 @@ export async function fetchLiveMarkets(tokens, { fetch: fetchImpl = fetch } = {}
     const old = requested.get(t.token.toLowerCase());
     return { ...old, address: old.address, priceUsd: t.priceUsd ?? null, mcapUsd: t.marketCapUsd ?? null,
       graduated: t.graduated ?? old.graduated, pool: t.pool?.toLowerCase() || old.pool,
+      pairedPrincipalEth: t.pairedPrincipalEth ?? null, graduationThresholdEth: t.graduationThresholdEth ?? null,
       latestBuyAt: t.latestBuyAt || null, availableAt: observedAt, priceSource: "pons-live-markets" };
   }) };
 }

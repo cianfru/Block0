@@ -136,7 +136,7 @@ test("a missing current price invalidates readiness even with sufficient history
 
 test("eligibility survives deterioration and restart without mirrored evidence in the index", async () => {
   let current;
-  const h = harness({ active: async () => ({ items: [{ ...meta(), priceUsd: current.priceUsd }], total: 1 }),
+  const h = harness({ active: async () => ({ items: [{ ...meta(), graduated: true, priceUsd: current.priceUsd }], total: 1 }),
     board: () => [{ address: A, observedAt: current.observedAt, risk: current.risk,
       flags: { holders: current.holders, insiderSellersNow: 0 } }], market: async () => ({ liqUsd: 20000 }) });
   for (current of path()) { h.setTime(current.observedAt); await h.service.cycle(); }
@@ -189,7 +189,7 @@ test("migration preserves legacy mirrored calls but removes their payload from t
 
 test("failed call-value persistence cannot publish a decision and a retry recovers it", async () => {
   let current;
-  const h = harness({ active: async () => ({ items: [{ ...meta(), priceUsd: current.priceUsd }], total: 1 }),
+  const h = harness({ active: async () => ({ items: [{ ...meta(), graduated: true, priceUsd: current.priceUsd }], total: 1 }),
     board: () => [{ address: A, observedAt: current.observedAt, risk: 20, flags: { holders: current.holders, insiderSellersNow: 0 } }],
     market: async () => ({ liqUsd: 20000 }) });
   const service = createExperiment({ ...h.options, write: async (key,v) => {
