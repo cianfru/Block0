@@ -38,7 +38,10 @@ import { track, readIntel } from "./analytics.mjs";
 import { buildPicks } from "./picks.mjs";
 import { chat as llmChat, hasKey as llmHasKey } from "./llm.mjs";
 import { makeLimiter, makeCoalescer, makeSemaphore, clientIp } from "./ratelimit.mjs";
-const BACKGROUND_ON = process.env.BACKGROUND_ON !== "0";
+// STANDBY (2026-09-10): every recurring loop is OPT-IN now — board, DEX discovery, leaderboard, picks, alerts,
+// the live-tail poll and the forward experiment. The service still answers requests from cache and still reads a
+// single token on demand; it just never does anything on a timer. Set BACKGROUND_ON=1 to bring the project back.
+const BACKGROUND_ON = process.env.BACKGROUND_ON === "1";
 
 // ── ABUSE GUARDS for the public API (the free native RPC is the resource being protected) ──────────────────────
 // HEAVY endpoints trigger real RPC work per request; LIGHT ones are cached reads. Per-IP token buckets on both, a

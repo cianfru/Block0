@@ -27,6 +27,12 @@ const N_DEX = Number(process.env.BOARD_DEX || 24);       // non-Pons DEX-listed 
 const DEX_MIN_HOLDERS = Number(process.env.DEX_MIN_HOLDERS || 5); // spam floor for a discovered DEX token
 const NEW_MS = 150000;
 
+// ── STANDBY ───────────────────────────────────────────────────────────────────────────────────────────────
+// The project is parked (2026-09-10). Nothing scans on a timer, and nothing rescans because a visitor arrived
+// either — ensureFresh is the quiet one, it fires a full 40-token chain scan the moment the cache goes stale.
+// In standby the board serves whatever is cached and performs no chain reads at all. BACKGROUND_ON=1 revives it.
+export const STANDBY = process.env.BACKGROUND_ON !== "1";
+
 let CACHE = { updated: 0, scanning: false, cooking: [], graduated: [], stats: {} };
 const FIRST_SEEN = new Map(); let BOOTED = false;
 
@@ -60,7 +66,8 @@ async function verdict(meta) {
   return r;
 }
 
-export async function refreshBoard() {
+export async function refreshBoard({ force = false } = {}) {
+  if (STANDBY && !force) return CACHE;
   if (CACHE.scanning) return CACHE;
   CACHE = { ...CACHE, scanning: true };
   try {
@@ -97,7 +104,8 @@ export async function refreshBoard() {
 // the core board. Discovers recent non-Pons v4 listings, dedupes against the Pons universe, verdicts a bounded set,
 // keeps ones above the spam floor, and merges into CACHE.dex.
 let DEX_SCANNING = false, PONS_ADDRS = new Set();
-export async function refreshDex() {
+export async function refreshDex({ force = false } = {}) {
+  if (STANDBY && !force) return CACHE;
   if (DEX_SCANNING || N_DEX <= 0) return CACHE;
   DEX_SCANNING = true;
   try {
@@ -119,10 +127,10 @@ export async function refreshDex() {
 }
 
 export function getBoard() { return CACHE; }
-export function ensureFresh(maxAgeMs = 90000) { if (!CACHE.scanning && Date.now() - CACHE.updated > maxAgeMs) refreshBoard().catch(() => {}); return CACHE; }
+export function ensureFresh(maxAgeMs = 90000) { if (!STANDBY && !CACHE.scanning && Date.now() - CACHE.updated > maxAgeMs) refreshBoard().catch(() => {}); return CACHE; }
 
 if (import.meta.url === `file://${process.argv[1]}`) {
-  const b = await refreshBoard();
+  const b = await refreshBoard({ force: true });   // the CLI is an explicit human action, never standby
   const $ = (x) => x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1e3 ? "$" + Math.round(x / 1e3) + "k" : "$" + Math.round(x || 0);
   console.log(`\nBOARD · ${b.stats.launchTotal?.toLocaleString()} total launches · ${b.stats.activeTotal} active · ${b.stats.graduatedTotal} graduated\n`);
   console.log("── COOKING (about to graduate) ──");
