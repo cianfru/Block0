@@ -1,3 +1,4 @@
+import "./_isolate.mjs";   // a fresh DATA_DIR per run — must precede every store import
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";

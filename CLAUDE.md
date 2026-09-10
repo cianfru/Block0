@@ -52,9 +52,8 @@ intact and reachable. Restore the cron by uncommenting two lines in `rebuild-mod
   structurally zero — it was **conditional on market-cap board residency**. Forensics came only from the public
   board (top 16 active + top 24 graduated by mcap), so a cohort token was read once at admission and never again;
   only tokens that happened to stay on the leaderboard stayed measurable. **Any forward result computed over that
-  subsample would have been measuring the selection, and it would have looked like a finding.** The fix (board
-  also verdicts the tracked cohort, plus `cohortBlocking` coverage so a zero says *why*) is written and tested on
-  the branch, unmerged. **If this is ever restarted, that is the thing to understand first.**
+  subsample would have been measuring the selection, and it would have looked like a finding.** **PR #4 fixes this on `main`** by folding the tracked cohort into the board's own verdict budget. The finding
+  still matters: **if this is ever restarted, understand the selection effect before trusting any number it produces.**
 - **Two limits that remain even with that fixed:** the pair index has no entry for some pre-graduation tokens, so
   liquidity can be unknown while forensics are fresh; and the liquidity gate is `> 0`, which **$4.22 of depth
   satisfies** — measurable is not meaningful. Do not widen a gate after seeing what it admits.
@@ -62,16 +61,26 @@ intact and reachable. Restore the cron by uncommenting two lines in `rebuild-mod
   dumping) works and is honest; RC7 price attribution is proven from raw logs (bad bars 22.9% → 0.0%); the entity
   clustering, the dossier UI, and ~219 tests that have repeatedly caught real regressions.
 
-## 🔀 UNMERGED WORK — branch `claude/pepe-coin-data-layer-7gyxy4`, PR #3
-Three commits, 219 tests passing, none of it deployed:
-1. **Cohort forensics** — the selection fix above, plus `cohortForensicFresh` / `cohortReady` / `cohortBlocking`.
-2. **Free-node default** — the cost guard, the head-only-node repairs, `computeMcap` caching.
-3. **Standby** — this section, the switches, `test/standby.test.mjs`.
-**If reviving: merge 2 and 3 first (they cost nothing and make everything cheaper), and treat 1 as a separate
-decision about whether the experiment is worth running at all.**
+## 🔀 WHAT LANDED, AND WHAT WAS DROPPED
+This standby branch carries **two** commits on top of `main`:
+1. **Free-node default** — the cost guard, the head-only-node repairs, `computeMcap` caching, plus test isolation
+   (`test/_isolate.mjs`: two suites write to the real file-backed store under `./data`, so a set-valued assertion
+   passed on a clean checkout and failed on every rerun — CI never saw it because CI is always clean).
+2. **Standby** — this section and the switches.
 
-**⚠ CI DOES NOT RUN ON PULL REQUESTS.** `rebuild-model.yml` is the only workflow and it never had `pull_request`
-as a trigger — which is why a broken PR merged clean and only surfaced on the next nightly run. If this project
+**⚠ A third commit was dropped as superseded.** I had written a cohort-forensics fix that appended up to 8 extra
+verdicts per board refresh. **PR #4 (`800a6cd`, Codex) landed the same fix better**: `boardTargets()` in
+`cohort-evidence.mjs` merges the tracked cohort INTO the board's existing 40-verdict budget, so it costs nothing
+extra — decisive once the bill was the issue. The trade-off is that #4 puts cohort tokens on the PUBLIC board
+(`cooking`/`graduated`), where mine kept them in a separate `tracked` array so `/api/board` was unchanged. If the
+public board ever looks odd, that is why. The dropped work is on `backup-pre-rebase-*` if it is ever wanted.
+
+**⚠ TWO PEOPLE / AGENTS WERE SHIPPING TO THIS REPO AT ONCE.** PR #2 and PR #4 are Codex-authored and landed
+between my branches. Before restarting anything, check what `main` already does — I nearly shipped a duplicate
+of #4.
+
+**⚠ CI DOES NOT RUN ON PULL REQUESTS.** `rebuild-model.yml` is the only workflow and never had `pull_request` as
+a trigger — which is why a broken PR merged clean and only surfaced on the next nightly run. If this project
 restarts, adding a PR test gate is the cheapest reliability win available.
 
 ## Forward experiment implementation — September 8, 2026
