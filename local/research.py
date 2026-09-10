@@ -104,7 +104,7 @@ def report(db):
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--db',default='data/local-research.sqlite')
-    parser.add_argument('--max-mb',type=int,default=50,choices=range(1,101),metavar='1..100')
+    parser.add_argument('--max-mb',type=int,default=50,choices=range(1,1025),metavar='1..1024')
     sub=parser.add_subparsers(dest='command',required=True)
     c=sub.add_parser('collect');c.add_argument('--minutes',type=int,default=30,choices=range(1,61),metavar='1..60');c.add_argument('--requests',type=int,default=31,choices=range(2,61),metavar='2..60');c.add_argument('--tokens',type=int,default=4,choices=range(1,21),metavar='1..20');c.add_argument('--interval',type=int,default=60,choices=range(60,3601),metavar='60..3600')
     sub.add_parser('import').add_argument('file')

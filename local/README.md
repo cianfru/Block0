@@ -16,7 +16,7 @@ python3 local/research.py collect
 python3 local/research.py report --out local-report.html
 
 # Import a full forward export, preserving observations and frozen decisions.
-python3 local/research.py import /absolute/path/to/forward-export.json
+python3 local/research.py --max-mb 512 import /absolute/path/to/forward-export.json
 
 # Verification, entirely offline.
 python3 -m unittest discover -s local -p 'test_*.py'
@@ -26,7 +26,7 @@ No npm install is required. `npm run local` and `npm run local:collect` are conv
 
 Limits: four tokens by default (maximum 20); one-minute minimum interval; 30-minute default session (maximum 60); 31 requests by default (maximum 60, failures included); 2 MB maximum response; 15-second maximum request timeout. Both deadline and request budget terminate collection. Redirects and environment proxies are disabled. Only two exact public Pons endpoint paths on www.ponsfamily.com are allowed. Missing quotes are saved as missing, with no inferred zero price or paid fallback. Throttling/schema errors stop the session.
 
-SQLite defaults to `data/local-research.sqlite` with a 50 MiB database cap (configurable 1–100 MiB using --max-mb before the command). SQLite can use additional temporary rollback-journal space during a write. Full-disk/size errors stop collection; nothing is automatically deleted. Preserve this file and imported exports in your normal local backups. The dashboard shows at most 200 latest token rows; all stored observations and original imported records remain in SQLite. This initial report does not calculate a trading strategy, reconstruct missing history, or re-evaluate imported decisions.
+SQLite defaults to `data/local-research.sqlite` with a 50 MiB database cap (configurable 1–1024 MiB using --max-mb before the command). SQLite can use additional temporary rollback-journal space during a write. Full-disk/size errors stop collection; nothing is automatically deleted. Preserve this file and imported exports in your normal local backups. The dashboard shows at most 200 latest token rows; all stored observations and original imported records remain in SQLite. This initial report does not calculate a trading strategy, reconstruct missing history, or re-evaluate imported decisions.
 
 The service-cost target excludes your existing hardware, electricity and internet. Public endpoint access has no availability guarantee; if it stops working, collection stops. There is no always-on hosting or Alchemy-dependent forensics in this mode.
 
