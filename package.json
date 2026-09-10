@@ -3,11 +3,13 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "description": "Block0 — from block zero. Paste a token, watch who's holding and who's dumping, live.",
+  "description": "Block0 \u2014 from block zero. Paste a token, watch who's holding and who's dumping, live.",
   "scripts": {
     "start": "node server.mjs",
     "scan": "node cli.mjs",
-    "test": "node --test test/*.test.mjs"
+    "test": "node --test test/*.test.mjs",
+    "local": "python3 local/research.py serve",
+    "local:collect": "python3 local/research.py collect"
   },
   "dependencies": {
     "ws": "^8.21.3"
