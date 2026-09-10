@@ -1,6 +1,7 @@
 // The pilot's measurements have to survive contact with a browser: reloads, retries and hostile query strings.
 // These pin the two questions the pilot exists to answer — DEPTH (distinct tokens) and RETURN (distinct days) —
 // and the sanitisation that keeps an address or a cohort code from becoming an injection surface.
+import "./_isolate.mjs";   // a fresh DATA_DIR per run — must precede every store import
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { track } from "../analytics.mjs";

@@ -1,3 +1,88 @@
+## 🛑 PROJECT PARKED — 2026-09-10 (owner: "kill the whole thing… this project is going nowhere")
+
+**Everything recurring is OFF. Read this section before touching anything else in this file; most of what follows
+describes work that is now stopped.**
+
+### What "parked" means, in code
+- **`BACKGROUND_ON` is now OPT-IN (`=== "1"`, was `!== "0"`).** A fresh deploy starts nothing: no board cycle, no
+  DEX discovery, no leaderboard, no picks, no alerts, no live-tail poll, no forward experiment.
+- **`board.mjs` exports `STANDBY`** and guards `refreshBoard` / `refreshDex` / **`ensureFresh`**. That last one is
+  the quiet one — it fires a full 40-token chain scan the moment the cache goes stale, so without it a single
+  visitor hitting `/api/board` would restart the whole machine. `refreshBoard({ force: true })` is for the CLI /
+  a deliberate human run only.
+- **`rebuild-model.yml` schedule is commented out.** `workflow_dispatch` only. It ran up to 170 min/night.
+- **Metered RPC is opt-in** (see below). The service runs on the free native node or not at all.
+- Pinned by `test/standby.test.mjs` — the parked case is probed against a dead RPC endpoint, so "returns
+  immediately with an empty board" can only mean no read was attempted.
+
+### ⚠ TO ACTUALLY BE PARKED, TWO THINGS MUST HAPPEN OUTSIDE THE CODE
+1. **The daily cron is still live on `main`** until the standby branch is merged. Until then it fires at 06:17 UTC.
+   Disable `rebuild-model` in the Actions tab, or merge.
+2. **Railway still runs whatever is deployed.** Merge + deploy, or set `BACKGROUND_ON=0` there now. The only
+   remaining recurring cost after that is Railway hosting itself — pause the service to take it to zero.
+
+### To bring it back
+`BACKGROUND_ON=1`. That is the whole switch. Nothing was deleted: every loop, test, tool and research module is
+intact and reachable. Restore the cron by uncommenting two lines in `rebuild-model.yml`.
+
+## 💸 WHY IT WAS PARKED — the Alchemy bill, and what it taught us
+- **111,112,268 compute units for 3–10 Sep 2026 = $50.00** (~15.9M CU/day) on a project with no validated result.
+  Full forensic breakdown in **`docs/rpc-cost.md`** — read it before re-enabling anything.
+- **⚠ THE LESSON THAT MATTERS: this file's north star already said "prefer the native RH RPC — it's FREE", and we
+  still spent $50 in a week.** A stated intention is not a control. `RPC_URL` was one string, and every subsystem
+  routed through it. **The fix was to make the cheap path the DEFAULT and the expensive one require an explicit
+  second switch** (`ALLOW_BILLABLE_RPC=1`), not to write another rule down. Apply that shape to any future cost.
+- **The real defect:** `refreshDex` built its verdict without `mcapUsd`, so `computeMcap` — supply call + transfer
+  lookup + **a receipt per swap, up to 14 calls** — re-priced every DEX token from scratch every 5 minutes,
+  forever. The Pons board never paid it because Pons supplies the market cap. ~⅓ of the bill from one omission.
+  Now cached (`MCAP_TTL_MS`, 15 min) and callers pass the supply they already read for free during discovery.
+- **⚠ THE NATIVE NODE IS HEAD-ONLY — IT KEEPS NO ARCHIVE STATE.** `eth_getCode` below the head returns
+  `metadata is not found`, so `findDeployBlock`'s binary search **cannot work there at all**. This is why "just
+  unset `RPC_URL`" was never a drop-in: without a launch timestamp it threw and took down every DEX verdict. It
+  now returns null instead of throwing and remembers the node is head-only (one probe, not ~23 per token), and
+  callers pass an anchor they already hold — DEX discovery knows the pool-creation block, Pons knows the launch
+  time. `deployerOf` no longer needs an Alchemy-only method. **Verified live with no key:** deployer resolved,
+  full `computeIntel` in ~1s, `computeMcap` priced BUN at $49.5M vs Pons's own $43.9M.
+
+## 📍 WHERE THE RESEARCH ACTUALLY LANDED — read this before restarting any of it
+- **No hypothesis produced a validated predictive edge.** Pick replay: no economic edge. Structural states: MARKUP
+  persistence reversed sign out of sample (5v2 discovery → 3v6 validation) and the pre-committed stop condition was
+  honoured. Smart money: set up, never answered. The forward experiment: see below.
+- **⭐ THE FORWARD EXPERIMENT'S REAL PROBLEM WAS NOT THROUGHPUT, IT WAS SELECTION.** Eligibility was never
+  structurally zero — it was **conditional on market-cap board residency**. Forensics came only from the public
+  board (top 16 active + top 24 graduated by mcap), so a cohort token was read once at admission and never again;
+  only tokens that happened to stay on the leaderboard stayed measurable. **Any forward result computed over that
+  subsample would have been measuring the selection, and it would have looked like a finding.** **PR #4 fixes this on `main`** by folding the tracked cohort into the board's own verdict budget. The finding
+  still matters: **if this is ever restarted, understand the selection effect before trusting any number it produces.**
+- **Two limits that remain even with that fixed:** the pair index has no entry for some pre-graduation tokens, so
+  liquidity can be unknown while forensics are fresh; and the liquidity gate is `> 0`, which **$4.22 of depth
+  satisfies** — measurable is not meaningful. Do not widen a gate after seeing what it admits.
+- **What is genuinely good here and worth keeping:** the forensic engine (snipers/bundles/concentration/live
+  dumping) works and is honest; RC7 price attribution is proven from raw logs (bad bars 22.9% → 0.0%); the entity
+  clustering, the dossier UI, and ~219 tests that have repeatedly caught real regressions.
+
+## 🔀 WHAT LANDED, AND WHAT WAS DROPPED
+This standby branch carries **two** commits on top of `main`:
+1. **Free-node default** — the cost guard, the head-only-node repairs, `computeMcap` caching, plus test isolation
+   (`test/_isolate.mjs`: two suites write to the real file-backed store under `./data`, so a set-valued assertion
+   passed on a clean checkout and failed on every rerun — CI never saw it because CI is always clean).
+2. **Standby** — this section and the switches.
+
+**⚠ A third commit was dropped as superseded.** I had written a cohort-forensics fix that appended up to 8 extra
+verdicts per board refresh. **PR #4 (`800a6cd`, Codex) landed the same fix better**: `boardTargets()` in
+`cohort-evidence.mjs` merges the tracked cohort INTO the board's existing 40-verdict budget, so it costs nothing
+extra — decisive once the bill was the issue. The trade-off is that #4 puts cohort tokens on the PUBLIC board
+(`cooking`/`graduated`), where mine kept them in a separate `tracked` array so `/api/board` was unchanged. If the
+public board ever looks odd, that is why. The dropped work is on `backup-pre-rebase-*` if it is ever wanted.
+
+**⚠ TWO PEOPLE / AGENTS WERE SHIPPING TO THIS REPO AT ONCE.** PR #2 and PR #4 are Codex-authored and landed
+between my branches. Before restarting anything, check what `main` already does — I nearly shipped a duplicate
+of #4.
+
+**⚠ CI DOES NOT RUN ON PULL REQUESTS.** `rebuild-model.yml` is the only workflow and never had `pull_request` as
+a trigger — which is why a broken PR merged clean and only surfaced on the next nightly run. If this project
+restarts, adding a PR test gate is the cheapest reliability win available.
+
 ## Forward experiment implementation — September 8, 2026
 
 Current measurement uses `observations.mjs`, `features.mjs`, `setups.mjs`, `decisions.mjs`, `evaluation.mjs` and `experiment.mjs`. Read `docs/forward-experiment.md` before changing it. New data lives under `experiment:v1:*`; old `track-record` is preserved as an archive and is no longer ingested by the board. One collector replica only. Research writes are strict. Do not mix retrospective study profiles with forward data, treat graduation as post-decision success, or publish indicative scenario returns as executable PnL. The LLM no longer selects or writes production picks. This section supersedes older claims below about ranking proof and forward tracking.

@@ -64,6 +64,9 @@ async function fillTimestamps(ev, latest) {
 // Return the token's full transfer history, pulling only what's new since last call.
 // opts.pool (from Pons) seeds the market so we never guess it; opts.decimals defaults to 18.
 // → { ev, pool, deployBlock, latest, fresh, newN }  (fresh = there were new transfers this call)
+// With no anchor and no archive, history has to start somewhere. A bounded window is honest and recoverable;
+// refusing to read the token at all is not. Widen it with STORE_FALLBACK_BLOCKS if a token reads too young.
+const FALLBACK_SPAN = Number(process.env.STORE_FALLBACK_BLOCKS || 400000);
 export async function getTransfers(addr, decimals = 18, opts = {}) {
   addr = addr.toLowerCase();
   const latest = await sharedLatest();
@@ -77,8 +80,12 @@ export async function getTransfers(addr, decimals = 18, opts = {}) {
     let deployBlock;
     if (PROVIDER === "alchemy") deployBlock = 0;
     else {
+      // Cheapest anchor first: a block the caller already knows (DEX discovery hands us the pool-creation
+      // block), then the launch timestamp, then the archive search — which is null on a head-only node.
       const ts = parseTs(opts.launchedAt);
-      deployBlock = ts != null ? await estimateBlockAt(ts, latest) : await findDeployBlock(addr, latest);
+      deployBlock = opts.fromBlock != null ? Math.max(0, Number(opts.fromBlock) - 1)
+        : ts != null ? await estimateBlockAt(ts, latest)
+        : (await findDeployBlock(addr, latest) ?? Math.max(0, latest - FALLBACK_SPAN));
     }
     const ev = await fillTimestamps(await pullTransfers(addr, deployBlock, latest, decimals), latest);
     s = { ev, lastBlock: latest, deployBlock, pool: ((opts.pool || "").toLowerCase() || detectPool(ev) || ""), newN: ev.length };
