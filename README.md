@@ -1,3 +1,7 @@
+## Zero-cost local research
+
+For suspended-cloud operation, see [local/README.md](local/README.md). The independent Python/SQLite mode uses no cloud credentials and starts no background collection. The legacy Node service remains separate.
+
 > **Forward experiment update:** `/setups` and the v2 `/track-record` now collect and evaluate causal observations separately from the historical study. Structural picks are deterministic; the legacy graduation-based record is archived. See [the implementation, limits, configuration and evaluation protocol](docs/forward-experiment.md). The historical sections below describe the older model and do not establish a tradable edge.
 
 # Block0 — the launch scanner for the Robinhood Chain
