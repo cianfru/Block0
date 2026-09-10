@@ -38,7 +38,7 @@ const apeScore = (r) => Math.round((100 - r.risk) + Math.max(-30, Math.min(30, r
 
 async function verdict(meta) {
   const SMART = getCurrentSmartMoney();
-  const r = await computeIntel(meta.address, meta.sym, { pool: meta.pool, mcapUsd: meta.mcapUsd, graduated: meta.graduated, launchedAt: meta.launchedAt, whales: false, smartSet: SMART.set, smartMeta: SMART.meta });
+  const r = await computeIntel(meta.address, meta.sym, { pool: meta.pool, mcapUsd: meta.mcapUsd, supply: meta.supply, fromBlock: meta.fromBlock, graduated: meta.graduated, launchedAt: meta.launchedAt, whales: false, smartSet: SMART.set, smartMeta: SMART.meta });
   r.name = meta.name; r.logo = meta.logo; r.progress = meta.progress; r.graduated = meta.graduated;
   r.launchedAt = meta.launchedAt; r.mcapUsd = Math.round(meta.mcapUsd || r.mcapUsd || 0);
   r.deployerRep = compactRep(deployerReputation(ALL_META, meta));   // serial-operator signal (launchpad data, no RPC)
@@ -108,8 +108,8 @@ export async function refreshDex() {
     const dnew = [];
     for (const m of picks) {
       try {
-        if (await isTokenizedStock(m.address)) continue; // exclude tokenized equities/ETFs (structural 99% concentration, not a rug)
-        const v = await verdict({ address: m.address, sym: m.symbol, name: m.name || null, pool: null, graduated: false, launchedAt: null });
+        if (await isTokenizedStock(m.address, { fromBlock: m.block })) continue; // exclude tokenized equities/ETFs (structural 99% concentration, not a rug)
+        const v = await verdict({ address: m.address, sym: m.symbol, name: m.name || null, pool: null, supply: m.supply, fromBlock: m.block, graduated: false, launchedAt: null });
         if ((v.flags?.holders || 0) >= DEX_MIN_HOLDERS) { v.venue = m.venue; v.factory = m.factory; v.venues = m.venues; v.dexBlock = m.block; dnew.push(v); }
       } catch { /* skip */ }
     }

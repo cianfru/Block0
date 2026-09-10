@@ -1,8 +1,8 @@
 // Actionable launch intel for a token — the verdict engine + whale-entry map data. Exported so the
 // discover-board worker can call it per token; also runnable as a CLI (node intel.mjs --addr=0x… --sym=X).
-import { rpc } from "./rpc.mjs";
+import { rpc, PROVIDER, latestBlock, findDeployBlock, getTransferLogs, LOGS_RANGE } from "./rpc.mjs";
 import { detectPool, ROUTERS } from "./engine.mjs";
-import { getTransfers } from "./store.mjs";
+import { getTransfers, estimateBlockAt, parseTs } from "./store.mjs";
 import { smartHolders } from "./smart-money.mjs";
 import { coordinationSignal } from "./graph.mjs";
 
@@ -17,17 +17,35 @@ const big = (h) => BigInt(h || "0x0");
 // rug — so we exclude this deployer from the launch board. Extend if more issuers surface.
 export const STOCK_ISSUERS = new Set(["0x2b94105fff37630f98e1f24811dad588fc5c3a87"]);
 const _deployer = new Map(); // addr -> deployer EOA (immutable, cached)
-export async function deployerOf(addr) {
+export async function deployerOf(addr, opts = {}) {
   addr = addr.toLowerCase(); if (_deployer.has(addr)) return _deployer.get(addr);
   let dep = null;
   try {
-    const at = await rpc("alchemy_getAssetTransfers", [{ fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "asc", maxCount: "0xa", withMetadata: true }]);
-    const mint = (at?.transfers || []).find((x) => (x.from || "").toLowerCase() === ZERO) || at?.transfers?.[0];
-    if (mint?.hash) { const tx = await rpc("eth_getTransactionByHash", [mint.hash]); dep = (tx?.from || "").toLowerCase() || null; }
-  } catch { /* */ }
+    let hash = null;
+    if (PROVIDER === "alchemy") {
+      const at = await rpc("alchemy_getAssetTransfers", [{ fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "asc", maxCount: "0xa", withMetadata: true }]);
+      hash = ((at?.transfers || []).find((x) => (x.from || "").toLowerCase() === ZERO) || at?.transfers?.[0])?.hash || null;
+    } else {
+      // Same fact from a plain node: the mint is the token's first Transfer out of the zero address. Binary-search
+      // the deploy block, then read one log window forward from it. Result is cached for the process either way.
+      const latest = await latestBlock();
+      // An anchor the caller already holds beats any lookup: DEX discovery knows the pool-creation block, Pons
+      // knows the launch time. Only without either do we ask for the archive search, which a head-only node
+      // cannot answer — and then we return null rather than reading from an invented starting block.
+      const ts = parseTs(opts.launchedAt);
+      const deploy = opts.fromBlock != null ? Math.max(0, Number(opts.fromBlock) - 1)
+        : ts != null ? await estimateBlockAt(ts, latest)
+        : await findDeployBlock(addr, latest);
+      if (deploy == null) return null;   // not cached: a missing anchor is not evidence about the deployer
+      const logs = await getTransferLogs(addr, deploy, Math.min(latest, deploy + LOGS_RANGE));
+      const mint = logs.find((l) => "0x" + (l.topics?.[1] || "").slice(26).toLowerCase() === ZERO) || logs[0];
+      hash = mint?.transactionHash || null;
+    }
+    if (hash) { const tx = await rpc("eth_getTransactionByHash", [hash]); dep = (tx?.from || "").toLowerCase() || null; }
+  } catch { /* an unreadable deployer stays null — never guessed */ }
   _deployer.set(addr, dep); return dep;
 }
-export async function isTokenizedStock(addr) { return STOCK_ISSUERS.has(await deployerOf(addr)); }
+export async function isTokenizedStock(addr, opts = {}) { return STOCK_ISSUERS.has(await deployerOf(addr, opts)); }
 
 // The risk model, extracted so the live board AND the historical backtest score identically. Inputs are held
 // SUPPLY shares (of the real distributed float) + counts; graduation flips the weights. THREE disqualifying floors
@@ -67,14 +85,51 @@ export function computeRisk({ f_snipe = 0, f_bundle = 0, f_top10 = 0, f_creator 
 
 // market cap = supply × price, where price = median USD paid per token across recent swaps (from tx receipts).
 // The AMM here is a singleton, so per-pair reserves aren't readable — the honest price is what swaps actually paid.
-export async function computeMcap(addr, wethUsd = 3000) {
+// Recent transaction hashes that moved this token, newest first. Alchemy answers in one enhanced call; a plain
+// node answers with eth_getLogs over a recent window, widened only until enough swaps are in hand — a dead token
+// costs three narrow reads rather than a walk back to genesis.
+export async function recentTxHashes(addr, want = 12, _rpc = rpc) {
+  if (PROVIDER === "alchemy") {
+    const at = await _rpc("alchemy_getAssetTransfers", [{ fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "desc", maxCount: "0x14", withMetadata: true }]);
+    return [...new Set((at?.transfers || []).map((t) => t.hash).filter(Boolean))].slice(0, want);
+  }
+  const latest = await latestBlock();
+  for (const span of [LOGS_RANGE, LOGS_RANGE * 8, LOGS_RANGE * 40]) {
+    const logs = await getTransferLogs(addr, Math.max(0, latest - span), latest).catch(() => []);
+    if (logs.length >= want || span === LOGS_RANGE * 40) {
+      const seen = [];
+      for (let i = logs.length - 1; i >= 0 && seen.length < want; i--) { const h = logs[i].transactionHash; if (h && !seen.includes(h)) seen.push(h); }
+      if (seen.length) return seen;
+    }
+  }
+  return [];
+}
+
+// Market cap = supply × price, where price = median USD paid per token across recent swaps (from tx receipts).
+// The AMM here is a singleton, so per-pair reserves aren't readable — the honest price is what swaps actually paid.
+//
+// This is the most expensive read in the system: a supply call, a transfer lookup, then a receipt per swap. It used
+// to run uncached on every DEX token on every board pass, which is roughly a third of an Alchemy bill. Callers that
+// already know the supply pass it, and the result is cached — a market cap minutes old is not a lie, and pricing a
+// token twelve receipts at a time every five minutes was never worth what it cost.
+const MCAP_TTL = Number(process.env.MCAP_TTL_MS || 15 * 60 * 1000);
+const _mcap = new Map();
+export const _resetMcapCache = () => _mcap.clear();   // tests only
+export async function computeMcap(addr, wethUsd = 3000, { supply: knownSupply = null, ttlMs = MCAP_TTL, _rpc = rpc, _recent = recentTxHashes } = {}) {
+  addr = addr.toLowerCase();
+  const hit = _mcap.get(addr);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.v;
+  const v = await _computeMcap(addr, wethUsd, knownSupply, _rpc, _recent);
+  if (v.samples > 0) { _mcap.set(addr, { at: Date.now(), v }); if (_mcap.size > 600) _mcap.delete(_mcap.keys().next().value); }
+  return v;   // a failed read is not cached, so it retries rather than freezing a zero for the whole TTL
+}
+async function _computeMcap(addr, wethUsd, knownSupply, _rpc, _recent) {
   try {
-    const supHex = (await rpc("eth_call", [{ to: addr, data: "0x18160ddd" }, "latest"]));
-    const supply = Number(big(supHex)) / 1e18;
-    const at = await rpc("alchemy_getAssetTransfers", [{ fromBlock: "0x0", toBlock: "latest", contractAddresses: [addr], category: ["erc20"], order: "desc", maxCount: "0x14", withMetadata: true }]);
+    const supply = knownSupply != null && knownSupply > 0 ? knownSupply
+      : Number(big(await _rpc("eth_call", [{ to: addr, data: "0x18160ddd" }, "latest"]))) / 1e18;
     const prices = [];
-    for (const t of (at?.transfers || []).slice(0, 12)) {
-      const rc = await rpc("eth_getTransactionReceipt", [t.hash]); const logs = rc?.logs || [];
+    for (const hash of await _recent(addr, 12, _rpc)) {
+      const rc = await _rpc("eth_getTransactionReceipt", [hash]); const logs = rc?.logs || [];
       let tok = 0, usd = 0;
       for (const l of logs) { if ((l.topics?.[0] || "") !== TRANSFER) continue; const a = l.address.toLowerCase(); const v = Number(big(l.data));
         if (a === addr) tok = Math.max(tok, v / 1e18);
@@ -118,7 +173,7 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   addr = addr.toLowerCase();
   const t0ms = Date.now();
   // Incremental store: pulls only the delta since last call and caches the deploy block (free on Alchemy).
-  const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool, launchedAt: opts.launchedAt });
+  const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool, launchedAt: opts.launchedAt, fromBlock: opts.fromBlock });
   const ponsPool = (opts.pool || "").toLowerCase();
   const detected = detectPool(ev); // highest-degree address = the bonding curve / trading contract
   const pool = ponsPool || poolStore || detected; // the venue we report
@@ -178,7 +233,7 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
       coordPct: coord.coordPct, hiddenCoordPct: coord.hiddenPct, coordSellingPct: coord.coordSellPct, coordClusters: coord.nClusters,
       buysRecent: buys, sellsRecent: sells } };
   if (opts.mcapUsd != null) { out.mcapUsd = Math.round(opts.mcapUsd); out.bucket = bucketOf(opts.mcapUsd); } // from Pons API — accurate, no receipts
-  else if (opts.mcap !== false) { const m = await computeMcap(addr); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
+  else if (opts.mcap !== false) { const m = await computeMcap(addr, 3000, { supply: opts.supply ?? null }); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
   if (opts.whales !== false) {
     out.bundles = bundles.slice(0, 10);
     out.whales = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 60).map((w) => ({ a: w.a, bal: +w.bal.toFixed(0), first: w.first, bought: +w.bought.toFixed(0), sold: +w.sold.toFixed(0), net: +(w.recvRecent - w.sentRecent).toFixed(0), sniper: w.sniper }));
