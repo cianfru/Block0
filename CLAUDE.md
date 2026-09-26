@@ -25,6 +25,19 @@ describes work that is now stopped.**
 `BACKGROUND_ON=1`. That is the whole switch. Nothing was deleted: every loop, test, tool and research module is
 intact and reachable. Restore the cron by uncommenting two lines in `rebuild-model.yml`.
 
+## 🔴 THE "AVOID LOSERS" TEST ALSO FAILED — 2026-09-26 (`tools/replay-safety.mjs`, zero RPC)
+- Question: even without alpha, do the forensic flags (bundles, top10 ≥60%, sniperHeld ≥10%, risk ≥50, serial deployer)
+  at 6h/24h predict a **wipeout** (current mcap < 10% of the check-time mcap)? Thresholds + pass rule (RR ≥1.5, CI > 1,
+  both time halves) were written in the script header BEFORE any outcome was computed. n=627 eligible.
+- **No flag passes.** Bundles: RR ~1.1–1.3, CI spans 1. Concentration/risk look *protective* (12% vs 25% wipeout) — but
+  stratified by entry mcap that is a SIZE confound (flagged tokens are small at 6h, and a small graduated token has no
+  room to lose 90%); within bands there is no consistent effect. Entry mcap alone dominates (≈1% wipeout <$30k,
+  ≈56–61% >$300k). Serial-deployer flag: only 2 cases — the profiled cohort has almost no repeat deployers.
+- **Scope caveat:** the cohort is ~all GRADUATED Pons tokens. Pre-graduation rugs are not in it, so this does NOT test
+  whether the flags catch those — that would need a new, unbiased sample (free native node, logs only).
+- Consequence: the forensic layer is DESCRIPTIVE (it shows facts about a token's holders), not demonstrated to be
+  PREDICTIVE of outcomes, even negatively. Never market it as "avoid rugs with X% accuracy" on this evidence.
+
 ## 💸 WHY IT WAS PARKED — the Alchemy bill, and what it taught us
 - **111,112,268 compute units for 3–10 Sep 2026 = $50.00** (~15.9M CU/day) on a project with no validated result.
   Full forensic breakdown in **`docs/rpc-cost.md`** — read it before re-enabling anything.
