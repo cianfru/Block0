@@ -10,6 +10,11 @@ export const STUDY_DIR = process.env.STUDY_DIR || "study";
 export const PROFILES_DIR = join(STUDY_DIR, "profiles");
 export const INDEX_PATH = join(STUDY_DIR, "cohort.json");
 export const SKIPS_PATH = join(STUDY_DIR, "skips.json");
+// wallet → "contract" | "eoa" | "delegated" (EIP-7702 EOA: a person, code is only a 0xef0100 pointer). Written by
+// tools/scan-wallet-kinds.mjs on the free node; contracts are excluded from every smart-money ledger.
+export const WALLET_KINDS_PATH = join(STUDY_DIR, "wallet-kinds.json");
+export function loadWalletKinds() { try { return JSON.parse(readFileSync(WALLET_KINDS_PATH, "utf8")); } catch { return {}; } }
+export function contractSet(kinds = loadWalletKinds()) { return new Set(Object.keys(kinds).filter((a) => kinds[a] === "contract")); }
 
 // the series fields the builders read — everything else a backtest returns (per-wallet PnL, corridor echo…) is dropped
 const SERIES_FIELDS = ["t", "risk", "top10", "sniperHeld", "holders", "wallets", "bundles", "mcap", "price", "volUsd", "ageH", "blueprint", "traj"];
