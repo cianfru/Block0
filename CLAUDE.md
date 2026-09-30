@@ -44,8 +44,11 @@ flag launches where they converge. Keep it at $0. What exists now:
 - **Forward test = `tools/radar-log.mjs`** (pre-registered in its header): logs every new convergence with the market
   price at detection + up to 4 matched Pons launches nobody smart touched; `--outcomes` scores both from
   GeckoTerminal candles after 7 days; `--report` applies the same bar as the replays, no verdict below 30 events.
-  Convergence runs at dozens/day, so ~10 days of continuous running gives the first verdict. It must run somewhere
-  continuously (owner's machine is free); **the radar is not validated until this says PASS — say so on every surface.**
+  Convergence runs at dozens/day, so ~10 days of running gives the first verdict. **It runs on GitHub Actions**
+  (`.github/workflows/radar-log.yml`, every 30 min, `--once` over 90 min; free because the repo is PUBLIC — if it ever
+  goes private this starts costing minutes). The log + `REPORT.txt` live on the **`radar-data` branch**, never main (main
+  deploys to Railway). Schedules only fire once the workflow is on main. **The radar is not validated until the report
+  says PASS — say so on every surface.**
 
 ### What the 2026-09-30 work found (all zero-RPC or free-node)
 - **⚠ The research ledger counted CONTRACTS as smart money.** `provenLedger` never filtered them (the live leaderboard
