@@ -1,0 +1,54 @@
+# Forward test of the smart-money radar (tools/radar-log.mjs) — runs on GitHub's machines, not the owner's laptop.
+# Free: the repo is public, so Actions minutes cost nothing; the job only talks to the free native node, DexScreener,
+# Pons and GeckoTerminal. Every 30 min: one pass over the last 90 min (overlap absorbs GitHub's cron delays), then
+# fill 7-day outcomes for matured rows, then rewrite REPORT.txt. The log lives on the `radar-data` branch — never on
+# main, so these commits never trigger a Railway deploy. Disable in the Actions tab to stop it.
+name: radar-log
+
+on:
+  schedule:
+    - cron: "7,37 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: radar-log
+  cancel-in-progress: false
+
+jobs:
+  log:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check out the log branch (created on the first run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir radar-data && cd radar-data
+          git init -q
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth 1 origin radar-data; then git checkout -q -b radar-data FETCH_HEAD; else git checkout -q --orphan radar-data; fi
+
+      - name: Log new convergences, score matured ones, report
+        env:
+          RADAR_DIR: radar-data
+        run: |
+          node tools/radar-log.mjs --once
+          node tools/radar-log.mjs --outcomes
+          node tools/radar-log.mjs --report | tee radar-data/REPORT.txt
+
+      - name: Commit the log
+        run: |
+          cd radar-data
+          git add -A
+          git diff --cached --quiet && exit 0
+          git -c user.name="radar-log" -c user.email="radar-log@users.noreply.github.com" commit -q -m "radar log $(date -u +%FT%RZ)"
+          git push -q origin radar-data

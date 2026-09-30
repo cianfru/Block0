@@ -14,16 +14,20 @@
 // at block 0 are excluded: that is launch access, not skill, and it is exactly how an insider of one launch would
 // otherwise be minted "smart money". Proof is counted on OTHER tokens only, so a wallet can never be credited as
 // smart for the very token being judged.
-//   provenLedger(profiles) → Map wallet → [{ t, token }] of CLEAN wins, ascending
+//   provenLedger(profiles, { exclude }) → Map wallet → [{ t, token }] of CLEAN wins, ascending. `exclude` = a Set of
+//   addresses that are never smart money (contracts: routers, aggregators, bots — see tools/scan-wallet-kinds.mjs).
 //   provenAt(ledger, wallet, T, { exclude, minWins }) → was this wallet proven strictly BEFORE T?
-export function provenLedger(profiles, { minRealized = 100, minInvested = 200 } = {}) {
+// walletKind(code) → "eoa" | "delegated" | "contract" — one definition, shared with the browser radar.
+export { walletKind } from "./public/radar-core.js";
+
+export function provenLedger(profiles, { minRealized = 100, minInvested = 200, exclude = null } = {}) {
   const led = new Map();
   for (const p of profiles || []) {
     for (const w of p.traders || []) {
       if (w.sniper) continue;                                   // launch access, not skill
       if (!(w.realized >= minRealized) || !(w.invested >= minInvested)) continue;
       if (w.exitT == null) continue;                            // still holding → nothing proven yet
-      const a = (w.a || "").toLowerCase(); if (!a) continue;
+      const a = (w.a || "").toLowerCase(); if (!a || exclude?.has(a)) continue;
       if (!led.has(a)) led.set(a, []);
       led.get(a).push({ t: w.exitT, token: p.addr });
     }

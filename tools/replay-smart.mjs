@@ -11,7 +11,7 @@ import { readFileSync, readdirSync } from "node:fs";
 import { join } from "node:path";
 import { blueprintMatch } from "../intel.mjs";
 import { provenLedger, provenAt } from "../smart-money.mjs";
-import { STUDY_DIR } from "./cohort-lib.mjs";
+import { STUDY_DIR, contractSet } from "./cohort-lib.mjs";
 
 const arg = Object.fromEntries(process.argv.slice(2).map((a) => { const [k, v] = a.replace(/^--/, "").split("="); return [k, v ?? true]; }));
 const MAXMC = Number(arg.maxMcap || 1e6), MINAGE = Number(arg.minAgeH || 1), MAXAGE = Number(arg.maxAgeH || 168);
@@ -31,8 +31,9 @@ if (withTraders.length < profs.length * 0.5) {
   console.log("  to backfill it, then re-run this experiment. Nothing is inferred in the meantime.\n");
   process.exit(2);
 }
-const ledger = provenLedger(profs);
-console.log(`proven ledger: ${ledger.size} wallets with ≥1 clean closed win (bar = ${MINWINS} wins on distinct non-sniped tokens)`);
+const CONTRACTS = contractSet();      // routers/aggregators/bots are never smart money (tools/scan-wallet-kinds.mjs)
+const ledger = provenLedger(profs, { exclude: CONTRACTS });
+console.log(`proven ledger: ${ledger.size} wallets (${CONTRACTS.size} contracts excluded) with ≥1 clean closed win (bar = ${MINWINS} wins on distinct non-sniped tokens)`);
 
 const stateAt = (p, T) => { if (T < p.t0 || T > p.t1) return null; let b = null; for (const pt of p.series) { if (pt.t > T) break; if (pt.mcap > 0) b = pt; } return b; };
 const fwdPeak = (p, T) => { let m = 0; for (const pt of p.series) if (pt.t > T && pt.mcap > m) m = pt.mcap; return m || (meta.get(p.addr)?.heldPeak || 0); };

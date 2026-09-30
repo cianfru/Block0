@@ -25,6 +25,65 @@ describes work that is now stopped.**
 `BACKGROUND_ON=1`. That is the whole switch. Nothing was deleted: every loop, test, tool and research module is
 intact and reachable. Restore the cron by uncommenting two lines in `rebuild-model.yml`.
 
+## 📡 PIVOT: THE SMART-MONEY RADAR — zero cost, forward-tested (owner, 2026-09-30)
+Owner direction: stop pattern-matching tokens; show where the chain's proven wallets are, what they are doing, and
+flag launches where they converge. Keep it at $0. What exists now:
+- **`/radar` (`public/radar.html`) runs entirely in the visitor's browser.** The native node sends
+  `access-control-allow-origin: *`, so the page reads the chain directly — one `eth_getLogs` with topic2 = [738
+  wallets] (buys) + one with topic1 (sells) per poll, ~36 KB/17 min. DexScreener (also CORS-open, keyless) gives
+  price/mcap/liquidity. No server work, no key, no bill — it also works from any static host (the `wallet?`/`token?`
+  links need the Node server). Pons is NOT CORS-open, so the page never calls it.
+- **Core is pure + shared:** `public/radar-core.js` (decode → classify → positions → verdict) and
+  `public/radar-feed.js` (I/O, fetch injected). Node uses the same code via `radar-feed.mjs`. Tests: `test/radar.test.mjs`.
+- **Wallet list = `public/smart-wallets.json`**, built with zero RPC by `tools/build-smart-wallets.mjs` from the
+  committed study: *proven* = profitable closed round trips on ≥2 distinct tokens (no block-0 snipes, ≥$200 in);
+  *sharp* = ≥3 winning tokens and ≥60% of closed trips profitable. 738 wallets / 158 sharp, records from launches
+  2026-07-13 → 09-09 — **it goes stale**; refreshing it means new backtests (free node, slow). Only counts and rates
+  are shown — the reconstruction's dollar PnL is not trustworthy (below). The file also carries `quotes` (every Pons
+  `pairToken` + infra): a SELL of a launch RECEIVES WETH/GOOGL/etc. from the pool and would otherwise read as a buy.
+- **Forward test = `tools/radar-log.mjs`** (pre-registered in its header): logs every new convergence with the market
+  price at detection + up to 4 matched Pons launches nobody smart touched; `--outcomes` scores both from
+  GeckoTerminal candles after 7 days; `--report` applies the same bar as the replays, no verdict below 30 events.
+  Convergence runs at dozens/day, so ~10 days of running gives the first verdict. **It runs on GitHub Actions**
+  (`.github/workflows/radar-log.yml`, every 30 min, `--once` over 90 min; free because the repo is PUBLIC — if it ever
+  goes private this starts costing minutes). The log + `REPORT.txt` live on the **`radar-data` branch**, never main (main
+  deploys to Railway). Schedules only fire once the workflow is on main. **The radar is not validated until the report
+  says PASS — say so on every surface.**
+
+### What the 2026-09-30 work found (all zero-RPC or free-node)
+- **⚠ The research ledger counted CONTRACTS as smart money.** `provenLedger` never filtered them (the live leaderboard
+  did). 20 routers/aggregators/bots were "proven" and dominated activity (the top one had "54 tokens won"); they made
+  "2 proven buyers" fire on 47% of all graduated launches. Fixed: `tools/scan-wallet-kinds.mjs` classifies every
+  candidate once via `eth_getCode` → `study/wallet-kinds.json`; `provenLedger(…, { exclude })`; `contractSet()`.
+  With contracts out, convergence still fires on 29% of launches — frequent, not selective.
+- **⚠ `rpc.isContract` treated EIP-7702 delegated EOAs as contracts** (code = `0xef0100`+address) — 70 of 758 proven
+  wallets are people with delegation. Fixed via the shared `walletKind()`.
+- **⚠ Airdrop spam reads as smart buys.** Tokens are pushed into known traders' wallets from a contract (Koda: 38
+  "buys", all from one distributor, txs sent by someone else). A buy now counts only if the wallet SENT the tx
+  (`eth_getTransactionByHash`, batched ≤20 — the node 429s bigger batches; cached forever in the browser).
+- **The historical test could not answer the question.** `tools/replay-smart.mjs` (daily top-1): smart-only 2.34× vs
+  random 2.05× median forward peak on 57 days — noise. `tools/replay-convergence.mjs` (every event, matched
+  controls): only 13 measurable events because profiles stop a median 6.6 days after launch (outcomes censored) —
+  FAIL but uninformative. `tools/replay-convergence-market.mjs` reruns it on market candles
+  (`tools/fetch-candles.mjs` → `data/candles/`, gitignored) — **not run yet**: GeckoTerminal allows ~3–12 calls/min,
+  so 1,089 tokens takes hours (123 fetched, then the session limit stopped it). Incremental; re-run to finish.
+- **⚠ Early-hour prices disagree between sources.** DINO in its first ~10h: reconstruction $1–5M vs GeckoTerminal
+  ~$250k; they agree within ~20% from day 2. Events happen at a median ~3h old — exactly where neither is trustworthy.
+  Wallet-level "$ invested/realised" in profiles is unreliable (one DINO wallet "invested" $6.3M in a ~$5M token).
+
+## 🔴 THE "AVOID LOSERS" TEST ALSO FAILED — 2026-09-26 (`tools/replay-safety.mjs`, zero RPC)
+- Question: even without alpha, do the forensic flags (bundles, top10 ≥60%, sniperHeld ≥10%, risk ≥50, serial deployer)
+  at 6h/24h predict a **wipeout** (current mcap < 10% of the check-time mcap)? Thresholds + pass rule (RR ≥1.5, CI > 1,
+  both time halves) were written in the script header BEFORE any outcome was computed. n=627 eligible.
+- **No flag passes.** Bundles: RR ~1.1–1.3, CI spans 1. Concentration/risk look *protective* (12% vs 25% wipeout) — but
+  stratified by entry mcap that is a SIZE confound (flagged tokens are small at 6h, and a small graduated token has no
+  room to lose 90%); within bands there is no consistent effect. Entry mcap alone dominates (≈1% wipeout <$30k,
+  ≈56–61% >$300k). Serial-deployer flag: only 2 cases — the profiled cohort has almost no repeat deployers.
+- **Scope caveat:** the cohort is ~all GRADUATED Pons tokens. Pre-graduation rugs are not in it, so this does NOT test
+  whether the flags catch those — that would need a new, unbiased sample (free native node, logs only).
+- Consequence: the forensic layer is DESCRIPTIVE (it shows facts about a token's holders), not demonstrated to be
+  PREDICTIVE of outcomes, even negatively. Never market it as "avoid rugs with X% accuracy" on this evidence.
+
 ## 💸 WHY IT WAS PARKED — the Alchemy bill, and what it taught us
 - **111,112,268 compute units for 3–10 Sep 2026 = $50.00** (~15.9M CU/day) on a project with no validated result.
   Full forensic breakdown in **`docs/rpc-cost.md`** — read it before re-enabling anything.

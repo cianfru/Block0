@@ -1,0 +1,206 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="favicon.svg">
+<link rel="icon" type="image/x-icon" href="favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<title>Block0 — Smart-money radar</title>
+<meta name="description" content="Where the Robinhood Chain's proven traders are buying and selling right now — read straight from the chain in your browser. Wallet records, not predictions.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="block0.css">
+<style>
+  .rd-hero{padding:28px 0 10px}
+  .rd-hero h1{font-family:var(--serif);font-weight:400;font-size:clamp(34px,6vw,54px);line-height:1.02;margin:0 0 10px;letter-spacing:-.01em}
+  .rd-hero h1 i{color:var(--lime)}
+  .rd-hero p{color:var(--dim);max-width:640px;margin:0;font-size:15px;line-height:1.5}
+  .rd-bar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;margin:18px 0 12px;font:12px var(--mono);color:var(--mute)}
+  .rd-bar b{color:var(--tx);font-weight:500}
+  .dot{display:inline-block;width:7px;height:7px;border-radius:50%;background:var(--mute);margin-right:6px;vertical-align:1px}
+  .dot.live{background:var(--lime);box-shadow:0 0 8px var(--lime)} .dot.err{background:var(--coral)}
+  .rd-ctl{display:flex;flex-wrap:wrap;gap:8px;margin:0 0 18px}
+  .seg{display:inline-flex;border:1px solid var(--line-2);border-radius:999px;overflow:hidden}
+  .seg button,.tog{background:none;border:0;color:var(--dim);font:500 12px var(--sans);padding:7px 12px;cursor:pointer}
+  .seg button.on{background:var(--lime);color:#08080b}
+  .tog{border:1px solid var(--line-2);border-radius:999px}
+  .tog.on{border-color:var(--lime);color:var(--lime)}
+  .rd-list{display:grid;gap:12px}
+  .card{min-width:0;overflow:hidden;border:1px solid var(--line);background:var(--glass);border-radius:var(--radius);padding:14px 16px}
+  .card.converging{border-color:rgba(200,255,77,.35)} .card.exiting{border-color:rgba(255,59,92,.35)}
+  .c-top{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+  .logo{width:34px;height:34px;border-radius:50%;background:var(--line);object-fit:cover;flex:none}
+  .c-id{min-width:0;flex:1;overflow:hidden;overflow-wrap:anywhere}
+  .c-sym{font-weight:700;font-size:16px}
+  .c-name{color:var(--mute);font-size:12px;margin-left:6px}
+  .c-addr{display:block;font:11px var(--mono);color:var(--mute);cursor:copy;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .c-new{color:var(--amber)}
+  .badge{font:600 10px var(--mono);letter-spacing:.08em;padding:4px 8px;border-radius:999px;border:1px solid var(--line-2);color:var(--mute);white-space:nowrap}
+  .badge.converging{color:#08080b;background:var(--lime);border-color:var(--lime)} .badge.exiting{color:#fff;background:var(--coral);border-color:var(--coral)}
+  .c-met{display:flex;flex-wrap:wrap;gap:6px 16px;margin:10px 0 8px;font:12px var(--mono);color:var(--dim)}
+  .c-met span b{color:var(--tx);font-weight:500} .thin{color:var(--coral)!important}
+  .c-verdict{font-size:14px;margin:0 0 10px}
+  .w{display:grid;grid-template-columns:minmax(92px,auto) auto 1fr auto;gap:4px 10px;align-items:center;font:12px var(--mono);padding:5px 0;border-top:1px solid var(--line)}
+  .w .tier{font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid currentColor}
+  .tier.sharp{color:var(--lime)} .tier.proven{color:var(--cyan)}
+  .w .rec{color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .st{text-align:right;white-space:nowrap} .st.buying{color:var(--lime)} .st.trimmed{color:var(--amber)} .st.exited,.st.selling{color:var(--coral)}
+  .w a{color:var(--tx);text-decoration:none} .w a:hover{text-decoration:underline}
+  .more{background:none;border:0;color:var(--mute);font:12px var(--sans);cursor:pointer;padding:6px 0 0}
+  .c-links{display:flex;gap:14px;margin-top:8px;font-size:12px} .c-links a{color:var(--dim)}
+  .empty{color:var(--mute);padding:30px 0;text-align:center;font-size:14px}
+  .rd-note{color:var(--mute);font-size:12.5px;line-height:1.6;border-top:1px solid var(--line);margin-top:28px;padding:18px 0 40px;max-width:760px}
+  .rd-note b{color:var(--dim)}
+  @media (max-width:560px){.w{grid-template-columns:auto auto 1fr}.w .rec{display:none}.card{padding:12px}}
+</style>
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div></div>
+
+<header class="hd">
+  <div class="hd-in">
+    <a href="./" class="wordmark">block<b>0</b></a>
+    <nav class="nav"><a href="radar" class="on">Radar</a></nav>
+    <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="rd-hero">
+    <h1>Where the <i>proven</i> wallets are moving.</h1>
+    <p>Every buy and sell by this chain's wallets with a clean trading record, read straight from the chain in your browser.
+       Two or more of them buying the same launch and holding is flagged <b>converging</b>. It is a record of what they did — not a prediction of what the token will do.</p>
+  </section>
+
+  <div class="rd-bar" id="bar"><span><span class="dot" id="dot"></span><span id="status">starting…</span></span></div>
+
+  <div class="rd-ctl">
+    <div class="seg" id="win"><button data-h="0.25">15m</button><button data-h="1" class="on">1h</button><button data-h="3">3h</button><button data-h="6">6h</button></div>
+    <button class="tog" data-f="conv">Converging only</button>
+    <button class="tog" data-f="sharp">Sharp wallets only</button>
+    <button class="tog" data-f="cheap">Under $1M</button>
+    <button class="tog on" data-f="liq">Hide thin liquidity</button>
+  </div>
+
+  <div class="rd-list" id="list"><div class="empty">Reading the chain…</div></div>
+
+  <div class="rd-note" id="note"></div>
+</main>
+
+<script type="module">
+import { verdict } from "./radar-core.js";
+import { makeFeed, marketFor, walletsFrom } from "./radar-feed.js";
+
+const $ = (s) => document.querySelector(s);
+const esc = (s) => String(s ?? "").replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
+const usd = (x) => x == null ? "—" : x >= 1e6 ? "$" + (x / 1e6).toFixed(2) + "M" : x >= 1e3 ? "$" + Math.round(x / 1e3) + "k" : "$" + Math.round(x);
+const ago = (sec) => sec < 60 ? "just now" : sec < 3600 ? Math.round(sec / 60) + "m ago" : sec < 86400 ? (sec / 3600).toFixed(1) + "h ago" : Math.round(sec / 86400) + "d ago";
+const clip = (s, n) => (s.length > n ? s.slice(0, n - 1) + "…" : s);  // names are attacker-controlled, any length
+const short = (a) => a.slice(0, 6) + "…" + a.slice(-4);
+const THIN = 5000, POLL_MS = 30000, MARKET_MS = 60000;
+
+const store = { get(k, d) { try { return JSON.parse(localStorage.getItem("radar:" + k)) ?? d; } catch { return d; } }, set(k, v) { try { localStorage.setItem("radar:" + k, JSON.stringify(v)); } catch {} } };
+const filters = new Set(store.get("filters", ["liq"]));
+let hours = store.get("hours", 1);
+// immutable lookups (code kinds, tx senders) persist across visits; capped so localStorage never fills
+const cache = { kinds: store.get("kinds", {}), senders: store.get("senders", {}) };
+function saveCache() {
+  const cap = (o, n) => { const k = Object.keys(o); return k.length <= n ? o : Object.fromEntries(k.slice(-n).map((x) => [x, o[x]])); };
+  store.set("kinds", cap(cache.kinds, 4000)); store.set("senders", cap(cache.senders, 6000));
+}
+let W, feed, state = null, market = {}, marketAt = 0, open = new Set(), timer = null, gen = 0;
+
+function status(text, kind = "") { $("#status").textContent = text; $("#dot").className = "dot " + kind; }
+
+function row(r, now) {
+  const m = market[r.token] || {}, thin = m.liquidityUsd != null && m.liquidityUsd < THIN;
+  const pairAge = m.pairCreatedAt ? ago(now - m.pairCreatedAt).replace(" ago", "") : "—";
+  const ws = filters.has("sharp") ? r.wallets.filter((w) => w.tier === "sharp") : r.wallets;
+  const shown = open.has(r.token) ? ws : ws.slice(0, 4);
+  const wal = shown.map((w) => {
+    const val = m.priceUsd ? usd(Math.max(w.bought, w.sold) * m.priceUsd) : "";
+    const rec = w.tokensWon != null ? `${w.tokensWon} tokens won · ${Math.round((w.winRate || 0) * 100)}% of trips profitable` : "";
+    return `<div class="w"><a href="wallet?a=${esc(w.a)}" title="${esc(w.a)}">${esc(short(w.a))}</a><span class="tier ${esc(w.tier)}">${esc(w.tier)}</span>` +
+      `<span class="rec">${esc(rec)}</span><span class="st ${esc(w.status)}">${esc(w.status)}${val ? " ≈" + esc(val) : ""} · ${esc(ago(now - state.at(w.lastBlock)))}</span></div>`;
+  }).join("");
+  const more = ws.length > 4 ? `<button class="more" data-t="${esc(r.token)}">${open.has(r.token) ? "show fewer" : `+${ws.length - 4} more wallets`}</button>` : "";
+  const line = verdict(r, { minutesAgo: (now - state.at(r.lastBlock)) / 60, mcapUsd: m.mcapUsd });
+  return `<article class="card ${esc(r.signal)}">
+    <div class="c-top">${m.logo ? `<img class="logo" src="${esc(m.logo)}" alt="" loading="lazy">` : `<div class="logo"></div>`}
+      <div class="c-id"><span class="c-sym">${esc(clip(m.sym || "new token", 24))}</span><span class="c-name">${esc(clip(m.name || "", 48))}</span><br><span class="c-addr" data-copy="${esc(r.token)}" title="copy address">${esc(r.token)}</span></div>
+      <span class="badge ${esc(r.signal)}">${esc(r.signal.toUpperCase())}</span></div>
+    ${m.sym ? "" : `<div class="c-met c-new">no DEX pair indexed yet — a brand-new or pre-graduation launch; price and liquidity unknown</div>`}
+    <div class="c-met"${m.sym ? "" : " hidden"}><span>mcap <b>${esc(usd(m.mcapUsd))}</b></span><span class="${thin ? "thin" : ""}">liquidity <b class="${thin ? "thin" : ""}">${esc(usd(m.liquidityUsd))}</b>${thin ? " · thin" : ""}</span>
+      <span>pool age <b>${esc(pairAge)}</b></span><span>24h <b>${m.change24 == null ? "—" : esc((m.change24 > 0 ? "+" : "") + m.change24 + "%")}</b></span></div>
+    <p class="c-verdict">${esc(line)}</p>${wal}${more}
+    <div class="c-links">${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">DexScreener ↗</a>` : ""}<a href="token?address=${esc(r.token)}">Forensic dossier →</a></div>
+  </article>`;
+}
+
+function render() {
+  if (!state) return;
+  const now = Date.now() / 1000;
+  let rows = state.rows;
+  if (filters.has("conv")) rows = rows.filter((r) => r.signal === "converging");
+  if (filters.has("sharp")) rows = rows.filter((r) => r.wallets.some((w) => w.tier === "sharp"));
+  if (filters.has("cheap")) rows = rows.filter((r) => !(market[r.token]?.mcapUsd >= 1e6));
+  if (filters.has("liq")) rows = rows.filter((r) => !(market[r.token]?.liquidityUsd < THIN));
+  const nConv = state.rows.filter((r) => r.signal === "converging").length;
+  $("#bar").innerHTML = `<span><span class="dot live" id="dot"></span><span id="status">live · block ${state.head.toLocaleString()}</span></span>` +
+    `<span>tracking <b>${W.wallets.length}</b> wallets (<b>${W.wallets.filter((w) => w.tier === "sharp").length}</b> sharp)</span>` +
+    `<span><b>${state.rows.length}</b> tokens touched · <b>${nConv}</b> converging</span><span>updated ${esc(ago(now - state.updated / 1000))}</span>`;
+  $("#list").innerHTML = rows.length ? rows.slice(0, 80).map((r) => row(r, now)).join("") : `<div class="empty">Nothing matches in this window. Widen it or relax a filter.</div>`;
+}
+
+async function refreshMarket(force) {
+  if (!state || (!force && Date.now() - marketAt < MARKET_MS)) return;
+  marketAt = Date.now();
+  const need = state.rows.slice(0, 90).map((r) => r.token);
+  Object.assign(market, await marketFor(need));
+}
+
+async function start() {
+  const my = ++gen; clearTimeout(timer);
+  feed = makeFeed(W, { cache }); state = null; market = {};
+  status(`reading the last ${hours >= 1 ? hours + "h" : hours * 60 + "m"} from the chain…`);
+  $("#list").innerHTML = `<div class="empty">Reading the chain — verifying each buy was sent by the wallet itself…</div>`;
+  const loop = async () => {
+    try {
+      const r = await feed.tick(hours, { progress: ({ done, total }) => { if (my === gen && !state) status(`verifying buys ${done}/${total} — each must be sent by the wallet itself`); } });
+      saveCache();
+      if (my !== gen) return;
+      state = { ...r, updated: Date.now() };
+      await refreshMarket(!marketAt);
+      if (my !== gen) return;
+      render();
+    } catch (e) { if (my === gen) status("node busy — retrying (" + e.message.slice(0, 60) + ")", "err"); }
+    if (my === gen) timer = setTimeout(loop, POLL_MS);
+  };
+  loop();
+}
+
+document.addEventListener("click", (e) => {
+  const t = e.target;
+  if (t.matches("#win button")) { hours = +t.dataset.h; store.set("hours", hours); document.querySelectorAll("#win button").forEach((b) => b.classList.toggle("on", b === t)); start(); }
+  else if (t.matches(".tog")) { const f = t.dataset.f; filters.has(f) ? filters.delete(f) : filters.add(f); t.classList.toggle("on"); store.set("filters", [...filters]); render(); }
+  else if (t.matches(".more")) { const k = t.dataset.t; open.has(k) ? open.delete(k) : open.add(k); render(); }
+  else if (t.dataset.copy) { navigator.clipboard?.writeText(t.dataset.copy); t.textContent = "copied"; setTimeout(render, 900); }
+});
+
+(async () => {
+  document.querySelectorAll("#win button").forEach((b) => b.classList.toggle("on", +b.dataset.h === hours));
+  document.querySelectorAll(".tog").forEach((b) => b.classList.toggle("on", filters.has(b.dataset.f)));
+  try { W = walletsFrom(await (await fetch("smart-wallets.json")).json()); }
+  catch { status("could not load the wallet list", "err"); return; }
+  $("#note").innerHTML = `<b>How this works.</b> A wallet is <b>proven</b> when it closed ${esc(W.rules.proven)}; <b>sharp</b> when it has ${esc(W.rules.sharp)}.
+    Records come from ${esc(W.basis.launches)} launches between ${esc(W.basis.from)} and ${esc(W.basis.to)}; routers, bots and other contracts are excluded (${esc(W.basis.contractsExcluded)}).
+    A <b>buy</b> counts only when the wallet sent the transaction itself — tokens pushed into a known trader's wallet by someone else are ignored.
+    Everything is read from the chain's public node and DexScreener by your browser; nothing here is paid for or stored.<br><br>
+    <b>What it is not.</b> A wallet's record says it traded well before. It does not say this trade will work. We tested whether "two proven wallets bought" predicted better returns on this chain's history and the data could not show it either way — so the answer is being measured forward, in public, from the calls this radar makes. Amounts assume 18 decimals and are approximate.`;
+  start();
+})();
+</script>
+</body>
+</html>

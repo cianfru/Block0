@@ -290,6 +290,7 @@ async function serveStatic(res, urlPath) {
   const route = urlPath === "/" ? "landing.html"
     : (urlPath === "/setups" || urlPath === "/setups.html") ? "setups.html"
     : (urlPath === "/board" || urlPath === "/board.html") ? "board.html"
+    : (urlPath === "/radar" || urlPath === "/radar.html") ? "radar.html"
     : (urlPath === "/leaderboard" || urlPath === "/leaderboard.html") ? "leaderboard.html"
     : (urlPath === "/token" || urlPath === "/token.html") ? "index.html"
     : (urlPath === "/wallet" || urlPath === "/wallet.html") ? "wallet.html"

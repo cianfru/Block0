@@ -50,3 +50,14 @@ test("a wallet is never credited as smart for the very token being judged", () =
   assert.equal(provenAt(led, w, T0 + 5 * D, { exclude: "tokB" }), false, "judging tokB itself, only A counts → not proven");
   assert.equal(provenAt(led, w, T0 + 10 * D, { exclude: "tokB" }), true, "by day 10 A + C stand on their own");
 });
+
+test("contracts are excluded from the ledger; people (incl. EIP-7702 delegated) are not", async () => {
+  const { walletKind } = await import("../smart-money.mjs");
+  const led2 = provenLedger(profiles, { exclude: new Set([W(1)]) });
+  assert.equal(led2.has(W(1)), false);                          // a router with two clean "wins" is never smart
+  assert.equal(led2.has(W(3)), true);
+  assert.equal(walletKind("0x"), "eoa");
+  assert.equal(walletKind("0xef0100" + "ab".repeat(20)), "delegated");
+  assert.equal(walletKind("0x6080604052"), "contract");
+  assert.equal(walletKind("0xef0100" + "ab".repeat(21)), "contract");   // not exactly a 7702 pointer
+});

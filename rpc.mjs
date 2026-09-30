@@ -1,3 +1,4 @@
+import { walletKind } from "./public/radar-core.js";
 // Minimal, dependency-free JSON-RPC client. Works with any EVM RPC URL (set RPC_URL on Railway to your
 // Alchemy/QuickNode key). Falls back to public drpc endpoints so the POC runs with no key. drpc + mevblocker
 // enrich logs with blockTimestamp, so we get the time of every transfer without a separate block fetch.
@@ -69,7 +70,8 @@ export async function isContract(address) {
   if (!a) return false;
   if (_codeCache.has(a)) return _codeCache.get(a);
   let out;
-  try { const code = await rpc("eth_getCode", [a, "latest"], 3); out = !!code && code !== "0x" && code !== "0x0"; }
+  // an EIP-7702 delegated EOA has a pointer as code but is a person — only real contracts count (walletKind)
+  try { out = walletKind(await rpc("eth_getCode", [a, "latest"], 3)) === "contract"; }
   catch { return false; }
   _codeCache.set(a, out);
   return out;
