@@ -154,5 +154,7 @@ test("freshness: board and dossier agree at 45min and 3h; missing/future clocks 
     assert.equal(d.flags.insiderSellersNow, d.stale ? null : 2);
   }
   assert.equal(token.flags.insiderSellersNow, 2);
-  for (const readAt of [undefined, null, 0, NaN, Infinity, NOW + 1]) assert.equal(readFreshness(readAt, NOW).expired, true);
+  for (const readAt of [undefined, null, 0, NaN, Infinity, NOW + 11 * 60e3]) assert.equal(readFreshness(readAt, NOW).expired, true);
+  // a visitor clock a few minutes slow sees a just-made read as fresh, not expired
+  assert.deepEqual([readFreshness(NOW + 5 * 60e3, NOW).expired, readFreshness(NOW + 5 * 60e3, NOW).stale, readFreshness(NOW + 5 * 60e3, NOW).ageMs], [false, false, 0]);
 });
