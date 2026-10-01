@@ -154,3 +154,18 @@ test("tick: live mode posts through social.post with max_cost; a 402 stops posti
   assert.equal(t3.state.stoppedDay, "2026-10-01");
   assert.ok(t3.out.held.some((h) => h.why === "post failed"));
 });
+
+test("board snapshot: latest read per token, slim fields, aged-out tokens dropped, /api/board shape", async () => {
+  const { mergeReads, boardSnapshot } = await import("../agent/board-snapshot.mjs");
+  const t = (a, o = {}) => ({ address: a, sym: "S" + a.slice(-2), mcapUsd: 1000, ageH: 2, risk: 30, label: "CLEAN", graduated: false,
+    flags: { snipers: 1, bundles: 0, top10Pct: 40, holders: 300, coordPct: 9, insiderSellersNow: 0 }, whales: [1, 2], ...o });
+  let r = mergeReads({}, [t(A(1)), t(A(2), { graduated: true, mcapUsd: 9000 }), t(A(3), { risk: null })], { now: NOW });
+  assert.deepEqual(Object.keys(r).sort(), [A(1), A(2)]);                       // unread (risk null) skipped
+  assert.equal(r[A(1)].flags.coordPct, undefined); assert.equal(r[A(1)].whales, undefined);   // slim
+  r = mergeReads(r, [t(A(1), { risk: 70 })], { now: NOW + 3600e3 });
+  assert.equal(r[A(1)].risk, 70);                                              // latest read wins
+  const b = boardSnapshot(r, { launchTotal: 5, graduatedTotal: 2 }, { now: NOW + 3600e3 });
+  assert.deepEqual([b.cooking.length, b.graduated.length, b.dex.length, b.stats.launchTotal], [1, 1, 0, 5]);
+  assert.equal(b.graduated[0].section, "graduated"); assert.equal(b.cooking[0].ageH, 2); assert.equal(b.graduated[0].ageH, 3);   // age = launch age at read + time since
+  assert.deepEqual(Object.keys(mergeReads(r, [], { now: NOW + 80 * 3600e3 })), []);   // past 72h → dropped
+});

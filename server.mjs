@@ -4,6 +4,7 @@
 //
 // The POC tails by polling recent blocks every few seconds — robust everywhere. Production upgrade: swap the
 // poll loop for an `eth_subscribe` websocket (one line of intent, noted below) for true push latency.
+import { composeValidation } from "./validation-view.mjs";
 import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join } from "node:path";
@@ -527,23 +528,8 @@ const server = createServer(async (req, res) => {
     if (u.pathname === "/api/validation") {
       try {
         const v = JSON.parse(await readFile(join(__dir, "study", "validation.json"), "utf8"));
-        // Enrich with the live build progress + the named winner roll from the cohort so /methodology can show the
-        // study GROWING (backtested / queued-left) and the actual winners it found — both refresh on every daily run.
-        try {
-          const c = JSON.parse(await readFile(join(__dir, "study", "cohort.json"), "utf8"));
-          if (c.run) v.progress = { ...c.run, generatedAt: c.generatedAt || v.generatedAt };
-          // the roll = every token that closed above $1M for a day (Q1 reached), biggest first — with its Q2 fate
-          // (held / faded after / still young) so the funnel is visible in the list itself, not one scary tier.
-          const T = c.tokens || [];
-          const roll = T.filter((t) => (t.heldPeak || 0) >= 1e6)
-            .sort((a, b) => (b.heldPeak || 0) - (a.heldPeak || 0))
-            .map((t) => ({ sym: t.sym || t.name || null, addr: t.addr, tier: t.label, heldPeak: t.heldPeak || null,
-              curMcap: t.curMcap ?? null, sustainedH: t.sustainedH || null, holders: t.holders || null, peakHolders: t.peakHolders || null, graduated: !!t.graduated }));
-          if (roll.length) v.winnerRoll = roll;
-          if (!v.funnel || !v.cohort?.funnel) { const touched = T.filter((t) => (t.peakMcap || 0) >= 1e6).length, reached = roll.length, sustained = T.filter((t) => t.label === "major" || t.label === "runner").length;
-            v.funnel = v.funnel || v.cohort?.funnel || { launched: T.length, touched, reached, sustained, pctTouched: T.length ? +(touched / T.length * 100).toFixed(1) : null, pctReached: T.length ? +(reached / T.length * 100).toFixed(1) : null, pctSustained: T.length ? +(sustained / T.length * 100).toFixed(1) : null }; }
-          else v.funnel = v.funnel || v.cohort.funnel;
-        } catch {}
+        // enriched with build progress, the winner roll and the funnel — validation-view.mjs (shared with the static export)
+        try { composeValidation(v, JSON.parse(await readFile(join(__dir, "study", "cohort.json"), "utf8"))); } catch {}
         res.writeHead(200, { "content-type": "application/json", "cache-control": "max-age=3600" });
         return res.end(JSON.stringify(v));
       } catch { res.writeHead(404, { "content-type": "application/json" }); return res.end('{"error":"no validation data"}'); }

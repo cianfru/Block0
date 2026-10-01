@@ -18,6 +18,7 @@ import { runTick, emptyState } from "../agent/tick.mjs";
 import { makeOrbio } from "../agent/orbio.mjs";
 import { fetchActive, fetchGraduated } from "../pons.mjs";
 import { computeIntel } from "../intel.mjs";
+import { mergeReads, boardSnapshot } from "../agent/board-snapshot.mjs";
 
 const env = process.env;
 const DIR = env.AGENT_DIR || join("data", "agent");
@@ -33,6 +34,7 @@ const WATCH = process.argv.includes("--watch");
 const until = Date.now() + Number(env.AGENT_WATCH_MIN || 345) * 60e3, every = Number(env.AGENT_INTERVAL_MIN || 15) * 60e3;
 const orbio = makeOrbio({ apiKey: env.ORBIO_API_KEY || null });
 let state = read("state.json", emptyState());
+let reads = read("board-reads.json", {}), boardStats = null;   // latest read per live token → board.json for the static site
 
 for (;;) {
   const t0 = Date.now();
@@ -47,6 +49,8 @@ for (;;) {
     opts: WATCH ? { timeBudgetMs: Math.max(60e3, every - 3 * 60e3) } : {},
   });
   state = r.state;
+  reads = mergeReads(reads, r.out.tokens);
+  if (r.out.stats) boardStats = r.out.stats;
   persist(r.out);
   if (!WATCH || Date.now() + every > until) break;
   await new Promise((s) => setTimeout(s, Math.max(0, every - (Date.now() - t0))));
@@ -54,6 +58,8 @@ for (;;) {
 
 function persist(out) {
   writeFileSync(join(DIR, "state.json"), JSON.stringify(state));
+  writeFileSync(join(DIR, "board-reads.json"), JSON.stringify(reads));
+  writeFileSync(join(DIR, "board.json"), JSON.stringify(boardSnapshot(reads, boardStats)));
   append("dry-run.jsonl", out.dryRun);
   append("posted.jsonl", [...out.posted, ...out.replies]);
   append("events.jsonl", [...out.logged, ...out.held].map((e) => ({ at: e.at, kind: e.kind, address: e.address, sym: e.sym, headline: e.headline, why: e.why })));

@@ -28,7 +28,7 @@ export async function runTick(deps) {
     caps = {}, log = () => {} } = deps;
   const o = { ...DEFAULTS, ...(deps.opts || {}) };
   const state = { ...emptyState(), ...(deps.state || {}) };
-  const out = { posted: [], dryRun: [], logged: [], held: [], replies: [], errors: [] };
+  const out = { posted: [], dryRun: [], logged: [], held: [], replies: [], errors: [], tokens: [], stats: null };
   const started = Date.now();
 
   // 1 · Orbio agents (free) → economics events
@@ -44,6 +44,7 @@ export async function runTick(deps) {
   try {
     const [act, grad] = await Promise.all([pons.fetchActive({ pageSize: 100, sort: "newest", age: "7d" }), pons.fetchGraduated()]);
     for (const t of [...act.items, ...grad.items]) if (t.address) universe.set(t.address, t);
+    out.stats = { launchTotal: act.launchTotal || null, graduatedTotal: grad.items.length || null };
   } catch (e) { out.errors.push("pons: " + e.message); }
   for (const a of agents) if (!universe.has(a.address)) universe.set(a.address, { address: a.address, sym: a.sym, mcapUsd: a.mcapUsd, launchedAt: a.launchedAt ? new Date(a.launchedAt * 1000).toISOString() : null, graduated: a.graduated });
   const ageH = (t) => (t.launchedAt ? (now - Date.parse(t.launchedAt)) / 3.6e6 : null);
@@ -64,7 +65,8 @@ export async function runTick(deps) {
       try {
         const r = await readToken(t);
         state.profiledAt[t.address] = now;
-        tokens.push({ ...r, address: t.address, sym: t.sym || r.sym, mcapUsd: t.mcapUsd ?? r.mcapUsd, ageH: ageH(t), venue: agentByToken.has(t.address) ? "orbio-agent" : "pons" });
+        tokens.push({ ...r, address: t.address, sym: t.sym || r.sym, mcapUsd: t.mcapUsd ?? r.mcapUsd, ageH: ageH(t), venue: agentByToken.has(t.address) ? "orbio-agent" : "pons",
+          graduated: t.graduated ?? r.graduated, progress: t.progress ?? null });
       } catch (e) { out.errors.push(`read ${t.sym || t.address}: ${e.message}`); }
     }
   };
@@ -136,6 +138,7 @@ export async function runTick(deps) {
   for (const [id, a] of Object.entries(state.answered)) if (now - a.at > 7 * 86400e3) delete state.answered[id];
   state.budget = freshBudget(state.budget, now);
 
+  out.tokens = tokens;
   log(`agents ${agents.length} · candidates ${cands.length} · read ${tokens.length} · events ${all.length} · ${dryRun ? "dry-run" : "posted"} ${dryRun ? out.dryRun.length : out.posted.length} · held ${out.held.length} · logged ${out.logged.length} · errors ${out.errors.length}`);
   return { state, out };
 }

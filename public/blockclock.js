@@ -8,7 +8,9 @@
   function utc() { const d = new Date(); return p2(d.getUTCHours()) + ":" + p2(d.getUTCMinutes()) + ":" + p2(d.getUTCSeconds()) + " UTC"; }
   function text() { return (block ? "block " + block.toLocaleString() + " · " : "") + utc(); }
   function paint() { const s = text(); const els = document.querySelectorAll(".blockclock"); for (const el of els) el.textContent = s; }
-  async function head() { try { const d = await fetch("/api/head").then((r) => r.json()); if (d && d.block) block = d.block; } catch (e) { /* keep last */ } paint(); }
+  // no server (static host) → ask the chain's free public node directly; it allows browser requests
+  async function nodeHead() { try { const d = await fetch("https://rpc.mainnet.chain.robinhood.com", { method: "POST", headers: { "content-type": "application/json" }, body: '{"jsonrpc":"2.0","id":1,"method":"eth_blockNumber","params":[]}' }).then((r) => r.json()); if (d && d.result) block = parseInt(d.result, 16); } catch (e) {} }
+  async function head() { try { const d = await fetch("/api/head").then((r) => r.json()); if (d && d.block) block = d.block; else await nodeHead(); } catch (e) { await nodeHead(); } paint(); }
   window.B0CLOCK = { paint, text };
   paint(); head();
   setInterval(paint, 1000);
