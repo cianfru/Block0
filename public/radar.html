@@ -110,6 +110,9 @@ function saveCache() {
   const cap = (o, n) => { const k = Object.keys(o); return k.length <= n ? o : Object.fromEntries(k.slice(-n).map((x) => [x, o[x]])); };
   store.set("kinds", cap(cache.kinds, 4000)); store.set("senders", cap(cache.senders, 6000));
 }
+// The wallet and dossier pages need the Node server's /api. On a static host (Vercel) there is none, so those links
+// are left out rather than leading to a 404.
+let HAS_API = false;
 let W, feed, state = null, market = {}, marketAt = 0, open = new Set(), timer = null, gen = 0;
 
 function status(text, kind = "") { $("#status").textContent = text; $("#dot").className = "dot " + kind; }
@@ -122,7 +125,8 @@ function row(r, now) {
   const wal = shown.map((w) => {
     const val = m.priceUsd ? usd(Math.max(w.bought, w.sold) * m.priceUsd) : "";
     const rec = w.tokensWon != null ? `${w.tokensWon} tokens won · ${Math.round((w.winRate || 0) * 100)}% of trips profitable` : "";
-    return `<div class="w"><a href="wallet?a=${esc(w.a)}" title="${esc(w.a)}">${esc(short(w.a))}</a><span class="tier ${esc(w.tier)}">${esc(w.tier)}</span>` +
+    const who = HAS_API ? `<a href="wallet?a=${esc(w.a)}" title="${esc(w.a)}">${esc(short(w.a))}</a>` : `<span data-copy="${esc(w.a)}" title="copy ${esc(w.a)}" style="cursor:copy">${esc(short(w.a))}</span>`;
+    return `<div class="w">${who}<span class="tier ${esc(w.tier)}">${esc(w.tier)}</span>` +
       `<span class="rec">${esc(rec)}</span><span class="st ${esc(w.status)}">${esc(w.status)}${val ? " ≈" + esc(val) : ""} · ${esc(ago(now - state.at(w.lastBlock)))}</span></div>`;
   }).join("");
   const more = ws.length > 4 ? `<button class="more" data-t="${esc(r.token)}">${open.has(r.token) ? "show fewer" : `+${ws.length - 4} more wallets`}</button>` : "";
@@ -135,7 +139,7 @@ function row(r, now) {
     <div class="c-met"${m.sym ? "" : " hidden"}><span>mcap <b>${esc(usd(m.mcapUsd))}</b></span><span class="${thin ? "thin" : ""}">liquidity <b class="${thin ? "thin" : ""}">${esc(usd(m.liquidityUsd))}</b>${thin ? " · thin" : ""}</span>
       <span>pool age <b>${esc(pairAge)}</b></span><span>24h <b>${m.change24 == null ? "—" : esc((m.change24 > 0 ? "+" : "") + m.change24 + "%")}</b></span></div>
     <p class="c-verdict">${esc(line)}</p>${wal}${more}
-    <div class="c-links">${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">DexScreener ↗</a>` : ""}<a href="token?address=${esc(r.token)}">Forensic dossier →</a></div>
+    <div class="c-links">${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">DexScreener ↗</a>` : ""}${HAS_API ? `<a href="token?address=${esc(r.token)}">Forensic dossier →</a>` : ""}</div>
   </article>`;
 }
 
@@ -192,6 +196,7 @@ document.addEventListener("click", (e) => {
 (async () => {
   document.querySelectorAll("#win button").forEach((b) => b.classList.toggle("on", +b.dataset.h === hours));
   document.querySelectorAll(".tog").forEach((b) => b.classList.toggle("on", filters.has(b.dataset.f)));
+  HAS_API = await fetch("/api/status").then((r) => r.ok && (r.headers.get("content-type") || "").includes("json")).catch(() => false);
   try { W = walletsFrom(await (await fetch("smart-wallets.json")).json()); }
   catch { status("could not load the wallet list", "err"); return; }
   $("#note").innerHTML = `<b>How this works.</b> A wallet is <b>proven</b> when it closed ${esc(W.rules.proven)}; <b>sharp</b> when it has ${esc(W.rules.sharp)}.
