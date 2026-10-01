@@ -1,2 +1,2 @@
-events logged 36 · priced & under $1M 30 · scored 0 · controls scored 0
+events logged 41 · priced & under $1M 34 · scored 0 · controls scored 0
 no verdict yet: 0 scored events with matched controls (the pre-registered minimum is 30)
