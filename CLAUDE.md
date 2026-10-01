@@ -1,3 +1,26 @@
+## 🧭 THE PRODUCT — read `docs/product.md` first (owner: "we need to have a clear product", 2026-10-01)
+**Block0 tells you what materially changed in a Robinhood Chain launch, who caused it, and the on-chain evidence —
+never what to buy.** Dossier (explain one launch) · board + radar (find where something is happening) · agent on X
+(distribute the few changes that matter). All read one shared record (the agent's reads). Next: token timeline →
+event lifecycle/follow-ups → watchlist → published editorial policy. Not a predictor, not a pick list.
+
+## 🔎 CODE AUDIT 2026-10-01 — fixed on the branch (see commits "Facts:…", "Forward test protocol v2…")
+- **Vocabulary is now precise, keep it that way:** "early wallets" (snipers + bundles: a timing fact), never
+  "insiders". **Selling = tokens sent into a venue** (pool/curve/AMM/router); anything else is `earlyMovedOutNow`
+  "transferred out". **"Now" = the 30 min before the observation** (chain head via the store's calibration), never
+  before the token's last transfer — `analyzeTransfers()` in intel.mjs is the pure, tested core (`test/intel-analyze`).
+- **Radar (`public/radar-core.js`):** a buy needs trade evidence — a known venue, or a contract + payment in the same tx
+  (quote token sent, or native `value` on the wallet's own tx); a contract that delivered a paid buy is a venue for the
+  window. Free claims = "received", sends to other contracts = "deposit". Positions count transfers out ("moved"); the
+  verdict says "bought and has not sold or moved it since", never "holds". Logs dedupe on tx+logIndex. Known gap: a
+  sale into a bonding curve pays native ETH (no log) and reads as a deposit unless a tracked wallet bought from that
+  curve in the window.
+- **Forward test = protocol v2 (`tools/radar-protocol.mjs`, pure + tested):** event ids, own controls only, outcome
+  window starts the first full hour after detection, close7 needs the horizon's last 24 h covered, transient candle
+  failures retried. v1 rows kept, counted, never scored.
+- **Board rows carry `readAt`;** >45 min → "now" fields blanked (`stale`), >3 h → off the board.
+- **`test.yml` runs the suite on every PR and push to main.**
+
 ## 🛑 PROJECT PARKED — 2026-09-10 (owner: "kill the whole thing… this project is going nowhere")
 
 **Everything recurring is OFF. Read this section before touching anything else in this file; most of what follows
