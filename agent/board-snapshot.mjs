@@ -22,11 +22,22 @@ export function mergeReads(prev, tokens, { now = Date.now(), maxAgeH = 72 } = {}
   return next;
 }
 
-export function boardSnapshot(reads, stats, { now = Date.now(), limit = 60 } = {}) {
-  const rows = Object.values(reads || {}).map(({ launchedAgeH, readAt, ...t }) => ({ ...t, ageH: launchedAgeH == null ? null : +(launchedAgeH + (now - readAt) / 3.6e6).toFixed(1),
-    section: t.graduated ? "graduated" : "cooking" }))
+// Every row says WHEN it was read (readAt, ms): the board is assembled every cycle but a token may not have been
+// re-read in that cycle. Rows older than maxReadMin are left off; the "right now" fields (wallets selling in the last
+// 30 min) only mean something close to the read, so past liveMin they are blanked and the row is marked stale.
+// `updated` is when the board was assembled; `observedAt` is the newest chain read on it.
+export const LIVE_MIN = 45, MAX_READ_MIN = 180;
+const NOW_FLAGS = ["insiderSellersNow", "insiderDumpNowPct"];
+export function boardSnapshot(reads, stats, { now = Date.now(), limit = 60, liveMin = LIVE_MIN, maxReadMin = MAX_READ_MIN } = {}) {
+  const rows = Object.values(reads || {}).filter((t) => now - t.readAt <= maxReadMin * 60e3)
+    .map(({ launchedAgeH, ...t }) => {
+      const stale = now - t.readAt > liveMin * 60e3;
+      const flags = stale ? { ...t.flags, ...Object.fromEntries(NOW_FLAGS.map((k) => [k, null])) } : t.flags;
+      return { ...t, flags, stale, ageH: launchedAgeH == null ? null : +(launchedAgeH + (now - t.readAt) / 3.6e6).toFixed(1), section: t.graduated ? "graduated" : "cooking" };
+    })
     .sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0)).slice(0, limit);
-  return { updated: now, source: "block0 agent (free node) — refreshed every ~15 min", stats: { ...(stats || {}) },
+  return { updated: now, observedAt: rows.length ? Math.max(...rows.map((r) => r.readAt)) : null,
+    source: "block0 agent (free node) — each row carries its own read time", stats: { ...(stats || {}) },
     cooking: rows.filter((r) => !r.graduated), graduated: rows.filter((r) => r.graduated), dex: [] };
 }
 

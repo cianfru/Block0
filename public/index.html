@@ -412,7 +412,8 @@ function render(d) {
   const movers = [...buyers, ...sellers].sort((a, b) => Math.abs(b.net || 0) - Math.abs(a.net || 0)).slice(0, 12);
 
   const flow = `<section class="sec">
-    <p class="eyebrow">Who is moving it <b>· last 30 minutes</b></p>
+    <p class="eyebrow">${STATIC && d.readAt && Date.now() - d.readAt > 45 * 60e3
+      ? `Who was moving it <b>· the 30 minutes before this read, ${ago(d.readAt)} ago</b>` : "Who is moving it <b>· last 30 minutes</b>"}</p>
     <div class="flow">
       <div class="fl add"><div class="k">Adding</div><div class="n">${buyers.length}</div>
         <div class="amt">+${qty(addVol) ?? "0"} tokens</div>

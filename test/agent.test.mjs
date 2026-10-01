@@ -219,6 +219,27 @@ test("board snapshot: latest read per token, slim fields, aged-out tokens droppe
   assert.equal(mergeReads(stale, [], { now: NOW + 3600e3 })[A(9)], undefined);
 });
 
+test("board snapshot: every row carries its read time; old reads lose the 'now' fields, older ones leave the board", async () => {
+  const { mergeReads, boardSnapshot } = await import("../agent/board-snapshot.mjs");
+  const t = (a, o = {}) => ({ address: a, sym: "S", mcapUsd: 1000, ageH: 2, risk: 30, flags: { holders: 300, insiderSellersNow: 2, insiderDumpNowPct: 3.1, top10Pct: 40 }, ...o });
+  let r = mergeReads({}, [t(A(1)), t(A(2)), t(A(3))], { now: NOW });
+  r = mergeReads(r, [t(A(1))], { now: NOW + 60 * 60e3 });                       // A(1) re-read an hour later
+  r[A(3)].readAt = NOW - 3 * 3600e3;                                              // A(3) last read 4 h before the board
+  const b = boardSnapshot(r, {}, { now: NOW + 60 * 60e3 });
+  const row = (a) => b.cooking.find((x) => x.address === a);
+  assert.deepEqual([row(A(1)).stale, row(A(1)).flags.insiderSellersNow, row(A(1)).readAt], [false, 2, NOW + 60 * 60e3]);
+  assert.deepEqual([row(A(2)).stale, row(A(2)).flags.insiderSellersNow, row(A(2)).flags.top10Pct], [true, null, 40]);   // 60 min old: "now" blanked
+  assert.equal(row(A(3)), undefined);                                             // past 3 h: off the board
+  assert.equal(b.observedAt, NOW + 60 * 60e3);
+});
+
+test("format: a reply that is too long drops facts, never the address or footer", () => {
+  const r = formatReply({ sym: "LONGNAMETOKEN123", address: A(2), mcapUsd: 4.8e6, ageH: 30, risk: 22,
+    flags: { holders: 51234, top10Pct: 31.4, bundles: 12, snipers: 233, insiderSellersNow: 45 }, ownerRep: { launched: 400, graduated: 0 } });
+  assert.ok(r.length <= MAX_LEN, r.length);
+  assert.ok(r.includes(A(2)) && r.endsWith("Facts, not advice."));
+});
+
 test("dossier: the /api/token fields the page reads, bounded, movers split by net flow; unread tokens get none", async () => {
   const { dossierOf } = await import("../agent/board-snapshot.mjs");
   const whales = Array.from({ length: 60 }, (_, i) => ({ a: A(100 + i), bal: 1000 - i, first: 1e9 + i, bought: 1000, sold: 0, net: i % 3 === 0 ? 5 : i % 3 === 1 ? -5 - i : 0, sniper: i < 2 }));

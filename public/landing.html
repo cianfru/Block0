@@ -222,9 +222,9 @@ const vcol=(r)=>r>=66?"c":r>=25?"a":"g";
 function cardHTML(r){
   const risk=r.risk||0, col=B0.HEX(risk), f=r.flags||{};
   const sn=f.snipers?`${f.snipers} · ${f.sniperHeldPct||0}% held`:"none", snc=!f.snipers?"g":(f.sniperHeldPct>=20?"c":f.sniperHeldPct>=8?"a":"g");
-  const bn=f.bundles||0, t10=f.top10Pct||0, t10c=t10>=55?"c":t10>=35?"a":"g", sell=f.insiderSellersNow||0;
+  const bn=f.bundles||0, t10=f.top10Pct||0, t10c=t10>=55?"c":t10>=35?"a":"g", sell=f.insiderSellersNow, sellTxt=sell==null?"not current":sell?sell+" wallet"+(sell>1?"s":""):"none";
   const venue=r.venue==="orbio-agent"?"orbio agent":r.graduated?"graduated":"pons launch";
-  return `<div class="hc-top"><div><span class="hc-sym">${esc(clip(r.sym||"?",14))}</span><span class="hc-meta">${venue} · ${B0.fmtAge(r.ageH)} · ${B0.mcT(r.mcapUsd)}</span></div><span class="hc-clock blockclock"></span></div>
+  return `<div class="hc-top"><div><span class="hc-sym">${esc(clip(r.sym||"?",14))}</span><span class="hc-meta">${venue} · ${B0.fmtAge(r.ageH)} · ${B0.mcT(r.mcapUsd)}${r.readAt?` · read ${Math.max(1,Math.round((Date.now()-r.readAt)/60000))}m ago`:""}</span></div><span class="hc-clock blockclock"></span></div>
     <div class="hc-mid"><div class="hc-dial" style="--p:${risk};--c:${col}"><div class="hc-dt"><div class="hc-dnum">${risk}</div><div class="hc-dlab">risk</div></div></div>
       <div class="hc-vwrap"><span class="hc-vlabel ${vcol(risk)}">${esc(r.label||"—")}</span><span class="hc-bp">${(f.holders||0).toLocaleString()} holders · read from its own transfers</span></div></div>
     ${bn?`<div class="hc-bundle">${B0.ico("warn")} <b>${bn} bundle${bn>1?"s":""} detected</b> — wallets bought as one</div>`:`<div class="hc-bundle ok"><span class="ic">✓</span> <b>No bundles</b> in the launch</div>`}
@@ -232,7 +232,7 @@ function cardHTML(r){
       <div class="hc-flag"><span class="hc-fl">Snipers</span><span class="hc-fv ${snc}">${sn}</span></div>
       <div class="hc-flag"><span class="hc-fl">Bundles</span><span class="hc-fv ${bn?"c":"g"}">${bn||"none"}</span></div>
       <div class="hc-flag"><span class="hc-fl">Top 10 hold</span><span class="hc-fv ${t10c}">${t10?Math.round(t10)+"%":"—"}</span></div>
-      <div class="hc-flag"><span class="hc-fl">Selling now</span><span class="hc-fv ${sell?"c":"g"}">${sell?sell+" wallet"+(sell>1?"s":""):"none"}</span></div>
+      <div class="hc-flag"><span class="hc-fl">Selling now</span><span class="hc-fv ${sell?"c":sell==null?"":"g"}">${sellTxt}</span></div>
     </div>
     <a class="hc-cta" href="/token?address=${esc(r.address)}">Full read: holders, bundles, who is selling →</a>`;
 }
@@ -242,7 +242,7 @@ function show(r,cap){ const card=$("#herocard"); card.style.opacity="0";
   if(cap) $("#hcap").textContent=cap; }
 
 let ROWS=[], DEMO=[], di=0, dtimer=0, pinned=false;
-function pickDemo(rows){ // one clean, one middling, one with insiders selling — a launchpad reads live, not one colour
+function pickDemo(rows){ // one clean, one middling, one with early wallets selling — a launchpad reads live, not one colour
   // only launches with real activity: a minutes-old token with no holders reads "risk 0" because nothing has happened yet
   const live=rows.filter(r=>(r.flags?.holders||0)>=25&&(r.ageH||0)>=0.5);
   rows=live.length>=2?live:rows.filter(r=>(r.flags?.holders||0)>0);
@@ -274,9 +274,9 @@ async function load(){
     if(!ROWS.length) throw 0;
     ticker(ROWS,b.stats);
     const selling=ROWS.filter(r=>(r.flags.insiderSellersNow||0)>0).length, bundled=ROWS.filter(r=>(r.flags.bundles||0)>0).length;
-    $("#p1n").textContent=ROWS.length; $("#p1s").textContent=`${bundled} with bundles · ${selling} with insiders selling now`;
-    const upd=b.updated?Math.max(1,Math.round((Date.now()-b.updated)/60000)):null;
-    $("#proofline").innerHTML=`<span><b>${ROWS.length}</b> live launches read${upd?` · updated ${upd} min ago`:""}</span>`+(selling?`<span class="red">${selling} with insiders selling now</span>`:"");
+    $("#p1n").textContent=ROWS.length; $("#p1s").textContent=`${bundled} with bundles · ${selling} with early wallets selling now`;
+    const obs=b.observedAt||b.updated, upd=obs?Math.max(1,Math.round((Date.now()-obs)/60000)):null;
+    $("#proofline").innerHTML=`<span><b>${ROWS.length}</b> live launches read${upd?` · latest read ${upd} min ago`:""}</span>`+(selling?`<span class="red">${selling} with early wallets selling now</span>`:"");
     DEMO=pickDemo(ROWS); if(!pinned){ rotate(0); clearInterval(dtimer); dtimer=setInterval(()=>rotate(di+1),6000); }
   }catch(e){
     $("#herocard").innerHTML='<div class="hc-empty">The live board is warming up.<br><a href="/radar">See where proven wallets are buying →</a></div>';
@@ -290,7 +290,7 @@ async function scan(e){
   if(!ROWS.length) await load();
   const r=ROWS.find(t=>(t.address||"").toLowerCase()===v.toLowerCase());
   if(r) show(r,"your token · its latest read from the live board");
-  else { $("#herocard").innerHTML=`<div class="hc-empty">That token isn't on the live board. It reads every Pons and Orbio launch under 72 hours old with at least $5k market cap.<br><br><a href="https://dexscreener.com/robinhood/${esc(v)}" target="_blank" rel="noopener">Open it on DexScreener ↗</a></div>`; $("#hcap").textContent=""; }
+  else location.href="/token?address="+v.toLowerCase();   // the dossier covers every token the agent reads, or says it has none
   return false;
 }
 // the radar's forward test status, read straight from its public log

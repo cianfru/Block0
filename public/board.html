@@ -65,7 +65,7 @@
     </div>
 
     <div class="alertsbar" id="alertsbar">
-      <div class="ah"><b>⚡ Live alerts</b><span>insiders selling · smart money converging · clean launches — from the board's own verdicts</span><span class="cnt" id="acnt"></span><a class="tg" id="atg" hidden target="_blank" rel="noopener">Get them on Telegram →</a></div>
+      <div class="ah"><b>⚡ Live alerts</b><span>early wallets selling · owner and principal moves · repeat owners — detected on every read</span><span class="cnt" id="acnt"></span><a class="tg" id="atg" hidden target="_blank" rel="noopener">Get them on Telegram →</a></div>
       <div class="al" id="alist"><div class="empty">Watching the board…</div></div>
     </div>
     <input class="search" id="q" placeholder="Search name, symbol, or paste a contract address" autocomplete="off">
@@ -193,7 +193,7 @@ async function load(){try{
   if(!nc&&!ng){sc.innerHTML=`<span class="chip">${b.scanning?"scanning universe…":"waiting for first scan…"}</span>`;render();return;}
   sc.innerHTML=
     (s.launchTotal?`<span class="chip tnum">${s.launchTotal.toLocaleString()} launches</span>`:"")+
-    (STATIC?`<span class="chip tnum">${nc+ng} on the board</span>${b.updated?`<span class="chip tnum">read ${Math.max(1,Math.round((Date.now()-b.updated)/60000))} min ago</span>`:""}`
+    (STATIC?`<span class="chip tnum">${nc+ng} on the board</span>${b.observedAt?`<span class="chip tnum">latest read ${Math.max(1,Math.round((Date.now()-b.observedAt)/60000))} min ago</span>`:""}`
       :`<span class="chip tnum">${s.activeTotal||nc} active</span><span class="chip tnum">${s.graduatedTotal||ng} graduated</span>`);
   render();
 }catch(e){$("#statchips").innerHTML='<span class="chip">board unavailable — retrying…</span>';}}
@@ -214,7 +214,7 @@ function staticMode(){
 })();
 
 // ── live alerts strip (polls the public feed; no third party) ──
-const KLAB={"insider-dump":"insiders selling","smart-convergence":"smart money","clean-launch":"clean launch","principal-withdrawn":"principal withdrawn","serial-owner":"repeat owner","cliff-24h":"lock ending","credit-idle":"credit idle","first-harvest":"first harvest"};
+const KLAB={"insider-dump":"early wallets selling","smart-convergence":"smart money","clean-launch":"clean launch","principal-withdrawn":"principal withdrawn","serial-owner":"repeat owner","cliff-24h":"lock ending","credit-idle":"credit idle","first-harvest":"first harvest"};
 const ago=(t)=>{const s=Math.max(0,(Date.now()-t)/1000);return s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":s<86400?Math.round(s/3600)+"h":Math.round(s/86400)+"d";};
 async function loadAlerts(){try{
   const d=await fetch("/api/alerts/feed?n=8").then(r=>r.json());

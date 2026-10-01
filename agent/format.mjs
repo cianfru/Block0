@@ -58,8 +58,11 @@ export function formatReply(read) {
     f.bundles > 0 ? `${f.bundles} bundle${f.bundles > 1 ? "s" : ""}` : "no bundles",
     f.snipers > 0 && `${f.snipers} snipers`,
     f.insiderSellersNow > 0 && `${f.insiderSellersNow} early wallets selling now`,
-  ].filter(Boolean).join(" · ");
+  ].filter(Boolean);
   const head = `$${cleanSym(read.sym)} · ${[$(read.mcapUsd) && `${$(read.mcapUsd)} mcap`, age(read.ageH)].filter(Boolean).join(" · ")}`;
   const owner = read.ownerRep ? `owner: ${read.ownerRep.launched} launches, ${read.ownerRep.graduated} graduated` : null;
-  return [head, facts, owner, read.address, "Facts, not advice."].filter(Boolean).join("\n").slice(0, MAX_LEN);
+  // the address and footer are never cut: drop whole facts from the end until the reply fits
+  const build = () => [head, facts.join(" · "), owner, read.address, "Facts, not advice."].filter(Boolean).join("\n");
+  while (build().length > MAX_LEN && facts.length) facts.pop();
+  return build();
 }
