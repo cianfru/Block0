@@ -312,7 +312,8 @@ dumping — places it against a study of past winners, and shows the wallet inte
     `engine.mjs` treat a zero timestamp as ABSENT, and `store.mjs` `fillTimestamps()` derives missing times from the
     block calibration for the live intel path. **RULE: never trust a log's blockTimestamp without `> 0`.**
 
-- **Logo / favicon (owner brief 2026-09-05: "b0" mark, white b, fluo green 0):** a CONSTRUCTED geometric mark, no font
+- **Logo / favicon (owner brief 2026-09-05: "b0" mark, white b, fluo green 0; recoloured 2026-10-01: lavender-white b,
+  the 0 in the ultraviolet → hot-pink gradient — `tools/logo/gen.mjs` `color.z: "grad"`):** a CONSTRUCTED geometric mark, no font
   dependency (the old favicon typeset Instrument Serif in `<text>`, which fell back to Georgia in favicon contexts and
   thinned out at 16px). Concept: the **0 is the atom** (monoline ring, slashed wall-to-wall so it reads as a zero, not an O),
   the **b is the same ring plus a stem** — everything starts from block zero. Lime `#c8ff4d` on `#08080b`; a light variant
@@ -445,8 +446,12 @@ dumping — places it against a study of past winners, and shows the wallet inte
 
 ## Front end
 - **ONE repo, no parallel app** — hand-written `public/*.html` (+ shared `public/block0-cards.js` renderer + `block0.css`).
-  Terminal aesthetic: near-black `#08080b`, lime `#c8ff4d` accent, cyan/magenta/coral signal colours, Instrument Serif
-  display + Inter body + mono data.
+  **Palette "ultraviolet rave" (owner, 2026-10-01: stand apart from the black/green/white everyone uses):** violet-black
+  `#0a0614` ground, lavender-white `#f3eeff` text; BRAND = ultraviolet `#9b5cff` → hot pink `#ff2fd0` (`--grad`, flat
+  `--brand`; `--lime` is kept only as an alias of `--brand`). DATA colours never double as brand: `--mint #2bffb0` clean /
+  good, `--cyan #22e9ff` flow, `--amber #f5ff2a` (acid yellow) caution, `--coral #ff2e4d` (fluo red) selling / bad,
+  `--magenta #b06bff` bundled marks. A NEW "good" use takes `--mint`, never the brand. Instrument Serif display + Inter
+  body + mono data.
 - **Pages:** `/` landing · `/board` grid · `/token` dossier · `/leaderboard` proven wallets · `/wallet` per-wallet PnL ·
   `/methodology` · owner-only `/control` (forensics) · `/desk` (daily post cards) · `/post` (social manager).
 - **⭐ LANDING = SHOW THE PRODUCT, not the philosophy (owner, 2026-09; big redesign).** Killed the abstract scroll-tunnel

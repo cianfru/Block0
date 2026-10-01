@@ -1,7 +1,7 @@
 /* Block0 post-card renderer — shared by /desk and /post. Draws a card object (from /api/cards) onto a
    1080×1080 canvas, colourful and on-brand, using the page's loaded brand fonts. window.B0DESK.draw(canvas, card). */
 (function () {
-  const A = { lime: "#c8ff4d", cyan: "#35e6e0", magenta: "#ff5cf0", amber: "#ffd23d", coral: "#ff3b5c", dim: "#b6b6bd", mute: "#7f7f88", bg: "#08080b" };
+  const A = { lime: "#2bffb0", cyan: "#22e9ff", magenta: "#b06bff", amber: "#f5ff2a", coral: "#ff2e4d", dim: "#bdb3d9", mute: "#857ca0", bg: "#0a0614" };
   const SERIF = '"Instrument Serif",Georgia,serif';
   const SANS = '"Inter",system-ui,sans-serif';
   const MONO = "ui-monospace,Menlo,monospace";
@@ -11,7 +11,7 @@
     g.fillStyle = A.bg; g.fillRect(0, 0, W, H);
     let rg = g.createRadialGradient(W - 140, 120, 40, W - 140, 120, 760); rg.addColorStop(0, hexa(acc, .18)); rg.addColorStop(1, hexa(acc, 0));
     g.fillStyle = rg; g.fillRect(0, 0, W, H);
-    g.strokeStyle = "rgba(255,255,255,.035)"; g.lineWidth = 1;
+    g.strokeStyle = "rgba(226,214,255,.035)"; g.lineWidth = 1;
     for (let x = M; x < W; x += 64) { g.beginPath(); g.moveTo(x, 0); g.lineTo(x, H); g.stroke(); }
     for (let y = 64; y < H; y += 64) { g.beginPath(); g.moveTo(0, y); g.lineTo(W, y); g.stroke(); }
     let hl = g.createLinearGradient(0, 0, W, 0); hl.addColorStop(0, A.lime); hl.addColorStop(.5, A.cyan); hl.addColorStop(1, A.magenta);
@@ -57,7 +57,7 @@
 
   function ring(g, cx, cy, r, frac, col, label) {
     g.lineWidth = 42; g.lineCap = "round";
-    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.strokeStyle = "rgba(255,255,255,.08)"; g.stroke();
+    g.beginPath(); g.arc(cx, cy, r, 0, Math.PI * 2); g.strokeStyle = "rgba(226,214,255,.08)"; g.stroke();
     g.beginPath(); g.arc(cx, cy, r, -Math.PI / 2, -Math.PI / 2 + Math.PI * 2 * clamp(frac, 0, 1)); g.strokeStyle = col;
     g.save(); g.shadowColor = hexa(col, .6); g.shadowBlur = 26; g.stroke(); g.restore();
     g.lineCap = "butt";
@@ -66,10 +66,10 @@
   function gauge(g, cx, cy, r, val, base, col) {
     const w = 40, a0 = Math.PI * 0.9, a1 = Math.PI * 2.1;
     g.lineWidth = w; g.lineCap = "round";
-    g.beginPath(); g.arc(cx, cy, r, a0, a1); g.strokeStyle = "rgba(255,255,255,.08)"; g.stroke();
+    g.beginPath(); g.arc(cx, cy, r, a0, a1); g.strokeStyle = "rgba(226,214,255,.08)"; g.stroke();
     g.beginPath(); g.arc(cx, cy, r, a0, a0 + (a1 - a0) * clamp(val, 0, 1)); g.strokeStyle = col;
     g.save(); g.shadowColor = hexa(col, .55); g.shadowBlur = 22; g.stroke(); g.restore();
-    if (base > 0) { const a = a0 + (a1 - a0) * clamp(base, 0, 1); g.strokeStyle = "rgba(255,255,255,.7)"; g.lineWidth = 4;
+    if (base > 0) { const a = a0 + (a1 - a0) * clamp(base, 0, 1); g.strokeStyle = "rgba(226,214,255,.7)"; g.lineWidth = 4;
       g.beginPath(); g.moveTo(cx + Math.cos(a) * (r - w / 2 - 4), cy + Math.sin(a) * (r - w / 2 - 4)); g.lineTo(cx + Math.cos(a) * (r + w / 2 + 4), cy + Math.sin(a) * (r + w / 2 + 4)); g.stroke(); }
     g.lineCap = "butt";
     g.textAlign = "center"; g.fillStyle = "#fff"; g.font = `72px ${SERIF}`; g.fillText(Math.round(val * 100) + "%", cx, cy + 18);
@@ -82,7 +82,7 @@
     segs.forEach((s) => {
       g.font = `22px ${MONO}`; g.fillStyle = A.dim; g.fillText(s.label, x0, y - 8);
       g.textAlign = "right"; g.fillStyle = "#fff"; g.fillText(String(s.v), x0 + bw, y - 8); g.textAlign = "left";
-      roundRect(g, x0, y, bw, 20, 10); g.fillStyle = "rgba(255,255,255,.08)"; g.fill();
+      roundRect(g, x0, y, bw, 20, 10); g.fillStyle = "rgba(226,214,255,.08)"; g.fill();
       const w = Math.max(20, bw * ((s.v || 0) / max)); roundRect(g, x0, y, w, 20, 10); g.fillStyle = s.color; g.save(); g.shadowColor = hexa(s.color, .5); g.shadowBlur = 14; g.fill(); g.restore();
       y += 86;
     });
