@@ -152,7 +152,7 @@
     <a href="/" class="wordmark">block<b>0</b></a>
     <nav class="nav">
       <a href="/board">Board</a>
-      <a href="/leaderboard">Leaderboard</a>
+      <a href="/radar">Radar</a>
       <a href="/token" class="on">Dossier</a>
       <a href="/methodology">Methodology</a>
     </nav>
@@ -172,7 +172,7 @@
     <div class="ft-top">
       <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag"><b>Block0 does not predict price.</b> Every number here is reconstructed from public Robinhood-Chain transfer data and is reproducible.</p></div>
       <div class="ft-cols">
-        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/setups">Experiment</a></div>
+        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/radar">Smart-money radar</a></div>
         <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a></div>
       </div>
     </div>
@@ -346,7 +346,8 @@ function render(d) {
   const sym = symOf(d), mcap = money(d.mcapUsd);
   // no symbol → identify by the address's own leading characters rather than inventing or printing "?"
   const initial = sym ? sym.slice(0, 2).toUpperCase() : (d.address || "0x").slice(2, 4).toUpperCase();
-  const logo = d.logo ? `<img src="https://ipfs.io/ipfs/${esc(d.logo)}" alt="" onerror="this.remove()">` : "";
+  const logoSrc = d.logo ? (/^https?:\/\//.test(d.logo) ? d.logo : "https://ipfs.io/ipfs/" + d.logo) : null;
+  const logo = logoSrc ? `<img src="${esc(logoSrc)}" alt="" onerror="this.remove()">` : "";
   const conf = d.confidence || {};
 
   const identity = `<div class="idrow">
@@ -380,7 +381,9 @@ function render(d) {
           <div class="m"><div class="k">Creator</div><div class="v">${val(f.creatorPct, (v) => pct(v))}</div>
             <div class="s">of supply held by the deployer</div></div>
         </div>
-        <p class="prov">Read from <code>/api/token</code>. Every clause is bound to one field and is omitted when
+        <p class="prov">${STATIC ? `Read by the Block0 agent from this token's own transfers on the free Robinhood Chain
+          node, ${ago(d.readAt)} ago. Refreshed about every 15 minutes while the token is on the live board.`
+          : "Read from <code>/api/token</code>."} Every clause is bound to one field and is omitted when
           that field is unavailable${conf.level ? ` · read confidence ${esc(conf.level)}` : ""}.</p>
         ${conf.reasons && conf.reasons.length ? `<p class="prov" style="color:var(--amber)">${esc(conf.reasons[0])}</p>` : ""}
       </div>
@@ -433,18 +436,20 @@ function render(d) {
     ${held.length ? `<p class="prov">Balances now, with the moment each wallet first appeared. Wallets that have
       exited to zero are excluded.</p>` : ""}</section>`;
 
-  const dep = d.deployer || {};
+  const dep = d.deployer || {}, owner = d.venue === "orbio-agent", who = owner ? "owner" : "deployer";
   const depBody = has(dep.launched) && dep.launched > 1
     ? `<div class="meas">
-        <div class="m"><div class="k">Launches</div><div class="v">${dep.launched}</div><div class="s">by this deployer</div></div>
-        <div class="m"><div class="k">Reached the market</div><div class="v">${val(dep.graduated)}</div><div class="s">of those launches</div></div>
-        <div class="m"><div class="k">Faded</div><div class="v ${dep.faded > 0 ? "warn" : ""}">${val(dep.faded)}</div><div class="s">collapsed after listing</div></div>
-        <div class="m"><div class="k">Wallet</div><div class="v" style="font-size:.9rem">${dep.address ? copyable(dep.address, "wa") : UNK}</div><div class="s">deployer address</div></div>
+        <div class="m"><div class="k">Launches</div><div class="v">${dep.launched}</div><div class="s">by this ${who}</div></div>
+        <div class="m"><div class="k">${owner ? "Graduated" : "Reached the market"}</div><div class="v">${val(dep.graduated)}</div><div class="s">of those launches</div></div>
+        ${has(dep.faded) ? `<div class="m"><div class="k">Faded</div><div class="v ${dep.faded > 0 ? "warn" : ""}">${val(dep.faded)}</div><div class="s">collapsed after listing</div></div>` : ""}
+        <div class="m"><div class="k">Wallet</div><div class="v" style="font-size:.9rem">${dep.address ? copyable(dep.address, "wa") : UNK}</div><div class="s">${who} address</div></div>
       </div>`
-    : unavailable("Deployer history",
-        "This is the only launch by this deployer in the launchpad metadata. A first launch is not evidence either way.");
+    : unavailable(owner ? "Owner history" : "Deployer history", has(dep.launched)
+        ? `This is the only launch by this ${who}${dep.scope ? " among " + dep.scope : " in the launchpad metadata"}. A first launch is not evidence either way.`
+        : `The launchpad did not report a ${who} for this token.`);
 
-  const deployer = `<section class="sec"><p class="eyebrow">Deployer</p>${depBody}</section>`;
+  const deployer = `<section class="sec"><p class="eyebrow">${owner ? "Owner <b>· Orbio agent</b>" : "Deployer"}</p>${depBody}
+    ${dep.scope && dep.launched > 1 ? `<p class="prov">Counted across ${esc(dep.scope)}.</p>` : ""}</section>`;
 
   const price = `<section class="sec"><p class="eyebrow">Price <b>· context, not the product</b></p>
     <div id="pricebox">${unavailable("Price history", "Loading market data…")}</div></section>`;
@@ -452,7 +457,8 @@ function render(d) {
   // The pilot's actual question. Asked at the bottom, after the evidence, and only once per token per browser —
   // a prompt that follows someone around is worse than no answer. Both replies are recorded; "no" is the more
   // useful one, and the free-text box is where the reason lives.
-  const asked = (() => { try { return localStorage.getItem("b0.asked." + ADDR) === "1"; } catch { return true; } })();
+  // (not on the static site: there is no server there to receive the answer, and asking into the void is worse)
+  const asked = STATIC || (() => { try { return localStorage.getItem("b0.asked." + ADDR) === "1"; } catch { return true; } })();
   const ask = asked ? "" : `<section class="sec"><p class="eyebrow">One question</p>
     <div class="ask" id="ask">
       <p>Did this tell you something you could not get from a price chart?</p>
@@ -477,8 +483,8 @@ function render(d) {
       ${has(d.blueprint) ? `<p style="margin-top:14px">This token's structural resemblance reads
         <b>${d.blueprint}/100</b>${d.blueprintLabel ? ` — ${esc(String(d.blueprintLabel).toLowerCase())}` : ""}.
         Method and every count on the <a href="/methodology">methodology page</a>.</p>` : ""}
-      <p style="margin-top:14px">A separate <a href="/setups">forward experiment</a> is now recording timestamped
-      observations and grading its own decisions, including the ones that fail.</p>
+      <p style="margin-top:14px">The one signal still open — proven wallets converging on a launch — is being tested
+      forward, in public, with rules written before the first result: see the <a href="/radar">radar</a>.</p>
     </div>
   </details>`;
 
@@ -520,17 +526,29 @@ function go(e) {
   return false;
 }
 
+/* The static site has no /api/chart, so it asks GeckoTerminal directly (keyless, CORS-open): the token's deepest
+   pool, then up to a week of hourly candles. */
+async function geckoCandles() {
+  const GT = "https://api.geckoterminal.com/api/v2/networks/robinhood";
+  const pools = await fetch(`${GT}/tokens/${ADDR}/pools?page=1`).then((x) => (x.ok ? x.json() : null));
+  const pool = pools?.data?.[0]?.attributes?.address;
+  if (!pool) return { candles: [], source: "GeckoTerminal" };
+  const o = await fetch(`${GT}/pools/${pool}/ohlcv/hour?aggregate=1&limit=168&currency=usd&token=${ADDR}`).then((x) => (x.ok ? x.json() : null));
+  const list = (o?.data?.attributes?.ohlcv_list || []).slice().sort((a, b) => a[0] - b[0]);
+  return { candles: list.map(([t, op, h, l, c]) => ({ t, o: op, h, l, c })), source: "GeckoTerminal" };
+}
+
 /* Price loads on its own, after the forensics are already on screen — a slow market feed must never hold up
    the read that Block0 can produce from its own data. */
 async function loadPrice() {
   const box = () => $("#pricebox"); if (!box()) return;
   try {
-    const m = await fetch(`/api/chart?address=${ADDR}&tf=1h`).then((x) => x.json());
+    const m = STATIC ? await geckoCandles() : await fetch(`/api/chart?address=${ADDR}&tf=1h`).then((x) => x.json());
     const c = m.candles || [], s = c.length >= 3 ? sparkline(c) : null;
     if (!box()) return;
     box().innerHTML = s
       ? s + `<p class="prov">${c.length} hourly candles · source ${esc(m.priceSource || m.source || "market feed")}.
-             Swap-implied and smoothed; treat exact figures as estimates.</p>`
+             ${STATIC ? "Market data shown for context; it is not part of the read above." : "Swap-implied and smoothed; treat exact figures as estimates."}</p>`
       : unavailable("Price history",
           "No indexed candles for this pool yet. Young pools are frequently not carried by the market feeds, and Block0 does not invent a price to fill the gap.");
   } catch {
@@ -538,6 +556,19 @@ async function loadPrice() {
       "The market feed did not respond. The forensic read above is unaffected.");
   }
 }
+
+let STATIC = false;
+const ago = (t) => { const m = Math.max(1, Math.round((Date.now() - t) / 60000)); return m < 60 ? m + " min" : m < 2880 ? Math.round(m / 60) + " h" : Math.round(m / 1440) + " days"; };
+const notCovered = () => `<section class="sec" style="border-top:0">
+  <p class="eyebrow">No read for this token</p>
+  <p class="read" style="max-width:34ch">This token is not on the live board right now.</p>
+  <p class="prov" style="max-width:68ch;font-size:.82rem">Block0's agent reads every Pons and Orbio launch under 72 hours
+    old with at least $5k market cap and five holders, every ~15 minutes, and keeps a dossier for each one. Older or
+    smaller tokens, and tokens listed outside the launchpad, are not covered on this site yet.</p>
+  <p style="margin-top:18px;display:flex;gap:10px;flex-wrap:wrap">
+    <a class="chip" href="/board">See what is on the board →</a>
+    <a class="chip" href="https://dexscreener.com/robinhood/${esc(ADDR)}" target="_blank" rel="noopener">Price chart on DexScreener ↗</a></p>
+</section>`;
 
 async function load() {
   const empty = `<section class="sec" style="border-top:0"><p class="eyebrow">Read a launch</p>
@@ -550,7 +581,18 @@ async function load() {
     return;
   }
   try {
-    const d = await fetch(`/api/token?address=${ADDR}`).then((x) => x.json());
+    // The Node server builds a dossier on demand. The static site (block0.app on Vercel) has no server: it serves the
+    // read the Block0 agent last made of each launch on the live board, or says plainly that it has none.
+    let d = null;
+    const live = await fetch(`/api/token?address=${ADDR}`).catch(() => null);
+    if (live && live.ok && (live.headers.get("content-type") || "").includes("json")) d = await live.json();
+    else {
+      STATIC = true;
+      const s = await fetch(`/api/dossier/${ADDR}`).catch(() => null);
+      if (!s || !s.ok) { $("#root").innerHTML = notCovered() + empty; return; }
+      d = await s.json();
+      if (has(d.ageH) && d.readAt) d.ageH += (Date.now() - d.readAt) / 3.6e6;
+    }
     if (d.error) throw new Error(d.error);
     document.title = (symOf(d) ? "$" + symOf(d) : "Unnamed token") + " — Block0 dossier";
     render(d);

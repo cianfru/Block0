@@ -1,17 +1,20 @@
 # Forward test of the smart-money radar (tools/radar-log.mjs) — runs on GitHub's machines, not the owner's laptop.
 # Free: the repo is public, so Actions minutes cost nothing; the job only talks to the free native node, DexScreener,
-# Pons and GeckoTerminal. Every 30 min: one pass over the last 90 min (overlap absorbs GitHub's cron delays), then
-# fill 7-day outcomes for matured rows, then rewrite REPORT.txt. The log lives on the `radar-data` branch — never on
-# main, so these commits never trigger a Railway deploy. Disable in the Actions tab to stop it.
+# Pons and GeckoTerminal. One job polls every 60 s for ~5h40m, commits the log + REPORT.txt every 15 min, then starts
+# its own successor (GitHub ran the old 30-min schedule only every ~4–6 h). The cron below is only a restart if the
+# chain ever breaks. The log lives on the `radar-data` branch — never on main, so these commits never deploy anything.
+# To stop it: set the repo variable RUNNER_CHAIN to "0" (the current job finishes, no successor), or disable the
+# workflow in the Actions tab.
 name: radar-log
 
 on:
   schedule:
-    - cron: "7,37 * * * *"
+    - cron: "23 */6 * * *"
   workflow_dispatch:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: radar-log
@@ -20,7 +23,7 @@ concurrency:
 jobs:
   log:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 355
     steps:
       - uses: actions/checkout@v4
 
@@ -32,23 +35,29 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
           mkdir radar-data && cd radar-data
           git init -q
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
           if git fetch -q --depth 1 origin radar-data; then git checkout -q -b radar-data FETCH_HEAD; else git checkout -q --orphan radar-data; fi
 
-      - name: Log new convergences, score matured ones, report
+      - name: Score matured events
         env:
           RADAR_DIR: radar-data
-        run: |
-          node tools/radar-log.mjs --once
-          node tools/radar-log.mjs --outcomes
-          node tools/radar-log.mjs --report | tee radar-data/REPORT.txt
+        run: node tools/radar-log.mjs --outcomes || true
 
-      - name: Commit the log
+      - name: Watch (commits every 15 min)
+        env:
+          RADAR_DIR: radar-data
+          RADAR_GIT_COMMIT: "1"
+        run: node tools/radar-log.mjs --minutes=340
+
+      # Start the next job. Skipped when this one was cancelled, when it died within 30 min (a crash loop waits for
+      # the cron instead), or when RUNNER_CHAIN is "0".
+      - name: Start the successor
+        if: (success() || failure()) && vars.RUNNER_CHAIN != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          cd radar-data
-          git add -A
-          git diff --cached --quiet && exit 0
-          git -c user.name="radar-log" -c user.email="radar-log@users.noreply.github.com" commit -q -m "radar log $(date -u +%FT%RZ)"
-          git push -q origin radar-data
+          if [ $(( $(date +%s) - STARTED )) -lt 1800 ]; then echo "ran under 30 min — not chaining"; exit 0; fi
+          gh workflow run radar-log.yml --ref "${GITHUB_REF_NAME}" -R "${GITHUB_REPOSITORY}"

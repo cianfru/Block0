@@ -62,7 +62,7 @@
 <header class="hd">
   <div class="hd-in">
     <a href="./" class="wordmark">block<b>0</b></a>
-    <nav class="nav"><a href="radar" class="on">Radar</a></nav>
+    <nav class="nav"><a href="board">Board</a><a href="radar" class="on">Radar</a><a href="token">Dossier</a><a href="methodology">Methodology</a></nav>
     <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span></div>
   </div>
 </header>
@@ -139,7 +139,7 @@ function row(r, now) {
     <div class="c-met"${m.sym ? "" : " hidden"}><span>mcap <b>${esc(usd(m.mcapUsd))}</b></span><span class="${thin ? "thin" : ""}">liquidity <b class="${thin ? "thin" : ""}">${esc(usd(m.liquidityUsd))}</b>${thin ? " · thin" : ""}</span>
       <span>pool age <b>${esc(pairAge)}</b></span><span>24h <b>${m.change24 == null ? "—" : esc((m.change24 > 0 ? "+" : "") + m.change24 + "%")}</b></span></div>
     <p class="c-verdict">${esc(line)}</p>${wal}${more}
-    <div class="c-links">${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">DexScreener ↗</a>` : ""}${HAS_API ? `<a href="token?address=${esc(r.token)}">Forensic dossier →</a>` : ""}</div>
+    <div class="c-links">${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">DexScreener ↗</a>` : ""}<a href="token?address=${esc(r.token)}">Forensic dossier →</a></div>
   </article>`;
 }
 

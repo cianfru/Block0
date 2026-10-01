@@ -14,6 +14,10 @@
 //              is therefore "a convergence seen within the hour", which is what a user of a periodic digest gets.
 //   (Amended 2026-09-30, before any real event was logged: added --once mode, the lag field, and a GeckoTerminal
 //    new-pools fallback for the control universe when Pons is unreachable from the runner.)
+//   (Amended 2026-10-01, 41 events logged, none scored: GitHub ran the 30-min --once schedule only every ~4–6 h, so
+//    most convergences were never seen. The Action now runs the live 60-s watch mode (1 h window) for ~5h40m and
+//    restarts itself. Event definition, controls, outcomes and verdict are unchanged; lastBuyAgoMin still records
+//    the detection lag, which now drops from up to ~50 min to ~1 min.)
 //              Eligible for scoring only with a price and mcap < $1M (the early-stage claim).
 //   Controls : at the same moment, up to 4 Pons launches with mcap ×0.5–2 of the event's and launch age ×0.5–2 of
 //              its pool age, no smart-wallet activity in the window, priced the same way.
@@ -23,24 +27,28 @@
 //              70% and later 30% of events, and close7 mean percentile > 0.5. No verdict below 30 scored events.
 //
 //   node tools/radar-log.mjs              poll every 60 s, append to data/radar/log.jsonl (run it anywhere; free)
-//   node tools/radar-log.mjs --once       one pass over the last 90 min, then exit — what the scheduled GitHub Action
-//                                         runs every 30 min (.github/workflows/radar-log.yml, log on branch radar-data)
+//        [--minutes=N]                    stop after N minutes; with RADAR_GIT_COMMIT=1, rewrite REPORT.txt and commit +
+//                                         push RADAR_DIR every 15 min — what .github/workflows/radar-log.yml runs
+//   node tools/radar-log.mjs --once       one pass over the last 90 min, then exit
 //   node tools/radar-log.mjs --outcomes   fill 7-day outcomes for matured rows from market candles
 //   node tools/radar-log.mjs --report     the pre-registered verdict over scored events
 import { appendFileSync, existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { execSync } from "node:child_process";
 import { loadWallets, makeFeed, marketFor } from "../radar-feed.mjs";
 import { fetchActive, fetchGraduated } from "../pons.mjs";
 
 const DIR = process.env.RADAR_DIR || join("data", "radar"), LOG = join(DIR, "log.jsonl");
 const ONCE = process.argv.includes("--once"), WINDOW_H = ONCE ? 1.5 : 1, POLL_MS = 60000, WEEK = 7 * 86400, MAXMC = 1e6, N_CTL = 4;
 const arg = new Set(process.argv.slice(2));
+const MINUTES = Number(process.argv.find((a) => a.startsWith("--minutes="))?.split("=")[1] || 0);
+const COMMIT = process.env.RADAR_GIT_COMMIT === "1", COMMIT_MS = 15 * 60e3;
 mkdirSync(DIR, { recursive: true });
 const readLog = () => (existsSync(LOG) ? readFileSync(LOG, "utf8").split("\n").filter(Boolean).map((l) => JSON.parse(l)) : []);
 const now = () => Math.floor(Date.now() / 1000);
 
 if (arg.has("--outcomes")) await outcomes();
-else if (arg.has("--report")) report();
+else if (arg.has("--report")) console.log(report());
 // (--once falls through to watch(), which returns after one pass)
 else await watch();
 
@@ -48,6 +56,8 @@ async function watch() {
   const W = loadWallets(), feed = makeFeed(W);
   const recent = new Map(readLog().filter((r) => r.kind === "event").map((r) => [r.token, r.t]));
   console.log(`radar-log · ${W.wallets.length} wallets · ${LOG} · ${recent.size} events so far`);
+  const stopAt = MINUTES ? Date.now() + MINUTES * 60e3 : Infinity;
+  let committedAt = Date.now();
   for (;;) {
     try {
       const { rows, head, at } = await feed.tick(WINDOW_H);
@@ -78,8 +88,18 @@ async function watch() {
       }
     } catch (e) { console.log(new Date().toISOString(), "poll failed:", e.message); if (ONCE) process.exitCode = 1; }
     if (ONCE) return;
+    const last = Date.now() + POLL_MS > stopAt;
+    if (COMMIT && (last || Date.now() - committedAt >= COMMIT_MS)) { commit(); committedAt = Date.now(); }
+    if (last) return;
     await new Promise((s) => setTimeout(s, POLL_MS));
   }
+}
+
+function commit() {
+  try {
+    writeFileSync(join(DIR, "REPORT.txt"), report() + "\n");
+    execSync(`git -C "${DIR}" add -A && (git -C "${DIR}" diff --cached --quiet || (git -C "${DIR}" -c user.name=radar-log -c user.email=radar-log@users.noreply.github.com commit -q -m "radar log ${new Date().toISOString().slice(0, 16)}Z" && git -C "${DIR}" push -q origin radar-data))`, { stdio: "inherit", shell: "/bin/bash" });
+  } catch (e) { console.log("  ! commit failed:", e.message); }
 }
 
 async function launches() {
@@ -122,10 +142,11 @@ async function outcomes() {
 }
 
 function report() {
+  const out = [], say = (l) => out.push(l);
   const rows = readLog(), ctl = rows.filter((r) => r.kind === "control" && r.peak7 != null);
   const ev = rows.filter((r) => r.kind === "event" && r.peak7 != null && r.mcapUsd < MAXMC).sort((a, b) => a.t - b.t);
   const all = rows.filter((r) => r.kind === "event");
-  console.log(`events logged ${all.length} · priced & under $1M ${all.filter((r) => r.priceUsd && r.mcapUsd < MAXMC).length} · scored ${ev.length} · controls scored ${ctl.length}`);
+  say(`events logged ${all.length} · priced & under $1M ${all.filter((r) => r.priceUsd && r.mcapUsd < MAXMC).length} · scored ${ev.length} · controls scored ${ctl.length}`);
   const age = (r) => r.t - (r.pairCreatedAt || r.t);
   for (const e of ev) {
     const m = ctl.filter((c) => age(c) >= age(e) * 0.5 - 3600 && age(c) <= age(e) * 2 + 3600 && c.mcapUsd >= e.mcapUsd * 0.5 && c.mcapUsd <= e.mcapUsd * 2);
@@ -134,14 +155,15 @@ function report() {
     e.pPeak = pct("peak7"); e.pClose = pct("close7");
   }
   const s = ev.filter((e) => e.pPeak != null);
-  if (s.length < 30) { console.log(`no verdict yet: ${s.length} scored events with matched controls (the pre-registered minimum is 30)`); return; }
+  if (s.length < 30) { say(`no verdict yet: ${s.length} scored events with matched controls (the pre-registered minimum is 30)`); return out.join("\n"); }
   const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
   const ci = (a) => { const b = []; for (let k = 0; k < 2000; k++) b.push(mean(a.map(() => a[Math.floor(Math.random() * a.length)]))); b.sort((x, y) => x - y); return [b[50], b[1949]]; };
   const cut = Math.floor(s.length * 0.7), v = [mean(s.map((e) => e.pClose)) > 0.5];
   for (const [h, set] of [["early", s.slice(0, cut)], ["late", s.slice(cut)]]) {
     const pp = set.map((e) => e.pPeak), [lo, hi] = ci(pp);
-    console.log(`  ${h} n=${set.length} · peak7 percentile ${mean(pp).toFixed(2)} [${lo.toFixed(2)}–${hi.toFixed(2)}]`);
+    say(`  ${h} n=${set.length} · peak7 percentile ${mean(pp).toFixed(2)} [${lo.toFixed(2)}–${hi.toFixed(2)}]`);
     v.push(mean(pp) >= 0.58 && lo > 0.5);
   }
-  console.log(`  close7 percentile ${mean(s.map((e) => e.pClose)).toFixed(2)} · VERDICT: ${v.every(Boolean) ? "PASS" : "FAIL"}`);
+  say(`  close7 percentile ${mean(s.map((e) => e.pClose)).toFixed(2)} · VERDICT: ${v.every(Boolean) ? "PASS" : "FAIL"}`);
+  return out.join("\n");
 }

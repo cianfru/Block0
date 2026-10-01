@@ -128,6 +128,7 @@
   <div class="hd-in">
     <a href="/" class="wordmark">block<b>0</b></a>
     <nav class="nav">
+      <a href="/board">Live board</a>
       <a href="/radar">Smart-money radar</a>
       <a href="#agent">The agent</a>
       <a href="/methodology">The research</a>
@@ -172,7 +173,7 @@
     <div class="tri">
       <div class="use"><span class="st live">live</span><h3>Smart-money radar</h3><p>Every buy and sell by 738 wallets with a clean trading record on this chain, read in your browser. Two or more of them buying and holding the same launch is flagged.</p><a class="go2" href="/radar">Open the radar →</a></div>
       <div class="use"><span class="st" id="agentState">in dry run</span><h3>The agent</h3><p>An agent on Orbio that posts reproducible facts to X: insiders starting to sell, a creator withdrawing staked principal, a repeat owner launching again. Never a call.</p><a class="go2" href="https://github.com/cianfru/Block0/tree/agent-data" target="_blank" rel="noopener">See what it would post →</a></div>
-      <div class="use"><span class="st live">live</span><h3>Token read</h3><p>Paste any launch from the last 72 hours to see its latest read: risk, snipers, bundles, top-10 share and wallets selling now. Refreshed every 15 minutes.</p><a class="go2" href="#top" onclick="document.getElementById('addr').focus();return false">Read a token →</a></div>
+      <div class="use"><span class="st live">live</span><h3>Live board + dossier</h3><p>Every Pons and Orbio launch under 72 hours old, read every 15 minutes: snipers, bundles, top-10 share, wallets selling now, the largest holders and the deployer's other launches.</p><a class="go2" href="/board">Open the board →</a></div>
     </div>
   </section>
 
@@ -192,7 +193,7 @@
     <div class="ft-top">
       <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">On-chain facts for Robinhood Chain launches, read from public data. Never a buy or sell recommendation.</p></div>
       <div class="ft-cols">
-        <div><p class="micro">Product</p><a href="/radar">Smart-money radar</a><a href="#agent">The agent</a></div>
+        <div><p class="micro">Product</p><a href="/board">Live board</a><a href="/radar">Smart-money radar</a><a href="#agent">The agent</a></div>
         <div><p class="micro">Trust</p><a href="/methodology">The research</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
       </div>
     </div>
@@ -233,7 +234,7 @@ function cardHTML(r){
       <div class="hc-flag"><span class="hc-fl">Top 10 hold</span><span class="hc-fv ${t10c}">${t10?Math.round(t10)+"%":"—"}</span></div>
       <div class="hc-flag"><span class="hc-fl">Selling now</span><span class="hc-fv ${sell?"c":"g"}">${sell?sell+" wallet"+(sell>1?"s":""):"none"}</span></div>
     </div>
-    <a class="hc-cta" href="https://dexscreener.com/robinhood/${esc(r.address)}" target="_blank" rel="noopener">Open the chart ↗</a>`;
+    <a class="hc-cta" href="/token?address=${esc(r.address)}">Full read: holders, bundles, who is selling →</a>`;
 }
 function setAcc(el,risk){el.style.setProperty("--acc",risk>=66?"rgba(255,59,92,.16)":risk>=25?"rgba(255,210,61,.14)":"rgba(200,255,77,.16)");}
 function show(r,cap){ const card=$("#herocard"); card.style.opacity="0";

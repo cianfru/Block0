@@ -1,9 +1,12 @@
 # Block0 agent (tools/agent-tick.mjs --watch) — DRY RUN unless the repo variable AGENT_DRY_RUN is set to "0".
-# One job every 6 h that loops every 15 min for ~5h45m: the in-memory transfer store stays warm, so only the first
-# cycle pays full cold reads on the free node. Free while the repo is public. State + ledgers are committed to the
-# `agent-data` branch after every cycle — never main, so nothing here triggers a Railway deploy.
-# Secrets/vars (Settings → Secrets and variables → Actions): ORBIO_API_KEY (secret, needed only for posting and
-# mentions), vars AGENT_X_HANDLE, PUBLIC_URL, AGENT_DRY_RUN, AGENT_MAX_ORIGINALS_PER_DAY, AGENT_MAX_CREDIT_PER_DAY.
+# One job loops every 15 min for ~5h40m (the in-memory transfer store stays warm, so only the first cycle pays full
+# cold reads on the free node), then starts its own successor — GitHub's scheduler is too unreliable on this repo to
+# be the clock. The cron below is only a restart if the chain ever breaks. Free while the repo is public.
+# State, ledgers, the board snapshot and per-token dossiers go to the `agent-data` branch after every cycle — never
+# main, so nothing here deploys anything.
+# Secrets/vars (Settings → Secrets and variables → Actions): ORBIO_API_KEY (secret — posting, mentions and the free
+# X-account check), vars AGENT_X_HANDLE (optional), AGENT_DRY_RUN, AGENT_MAX_ORIGINALS_PER_DAY,
+# AGENT_MAX_CREDIT_PER_DAY. To stop: RUNNER_CHAIN = "0" (the current job finishes, no successor) or disable it here.
 # Never add RPC_URL / ALCHEMY_* here: token reads stay on the free native node.
 name: agent
 
@@ -14,6 +17,7 @@ on:
 
 permissions:
   contents: write
+  actions: write
 
 concurrency:
   group: agent
@@ -34,6 +38,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
+          echo "STARTED=$(date +%s)" >> "$GITHUB_ENV"
           mkdir agent-data && cd agent-data
           git init -q
           git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
@@ -50,8 +55,17 @@ jobs:
           AGENT_FORWARD_REPORT: radar-report.txt
           AGENT_DRY_RUN: ${{ vars.AGENT_DRY_RUN || '1' }}
           AGENT_X_HANDLE: ${{ vars.AGENT_X_HANDLE }}
-          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
           AGENT_MAX_ORIGINALS_PER_DAY: ${{ vars.AGENT_MAX_ORIGINALS_PER_DAY || '5' }}
           AGENT_MAX_CREDIT_PER_DAY: ${{ vars.AGENT_MAX_CREDIT_PER_DAY || '1.5' }}
           ORBIO_API_KEY: ${{ secrets.ORBIO_API_KEY }}
         run: node tools/agent-tick.mjs --watch
+
+      # Start the next job. Skipped when this one was cancelled, when it died within 30 min (a crash loop waits for
+      # the cron instead), or when RUNNER_CHAIN is "0".
+      - name: Start the successor
+        if: (success() || failure()) && vars.RUNNER_CHAIN != '0'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if [ $(( $(date +%s) - STARTED )) -lt 1800 ]; then echo "ran under 30 min — not chaining"; exit 0; fi
+          gh workflow run agent.yml --ref "${GITHUB_REF_NAME}" -R "${GITHUB_REPOSITORY}"
