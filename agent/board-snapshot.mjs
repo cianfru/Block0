@@ -4,7 +4,7 @@
 import { KINDS } from "../alert-events.mjs";
 import { AGENT_KINDS } from "./agent-events.mjs";
 
-const FLAGS = ["snipers", "sniperHeldPct", "bundles", "top10Pct", "holders", "wallets", "insiderSellersNow", "insiderDumpNowPct"];
+const FLAGS = ["snipers", "sniperHeldPct", "bundles", "bundleWallets", "bundleHeldPct", "top10Pct", "holders", "wallets", "insiderSellersNow", "insiderDumpNowPct"];
 
 export function mergeReads(prev, tokens, { now = Date.now(), maxAgeH = 72 } = {}) {
   const next = { ...(prev || {}) };
@@ -14,7 +14,9 @@ export function mergeReads(prev, tokens, { now = Date.now(), maxAgeH = 72 } = {}
     if (!t?.address || t.risk == null || (t.flags?.holders ?? 0) < 5) { if (t?.address) delete next[t.address]; continue; }
     const flags = {}; for (const k of FLAGS) if (t.flags?.[k] != null) flags[k] = t.flags[k];
     next[t.address] = { address: t.address, sym: t.sym, mcapUsd: t.mcapUsd ?? null, launchedAgeH: t.ageH ?? null, readAt: now,
-      risk: t.risk, label: t.label ?? null, momentum: t.momentum ?? null, graduated: !!t.graduated, progress: t.progress ?? null, venue: t.venue ?? "pons", flags };
+      risk: t.risk, label: t.label ?? null, momentum: t.momentum ?? null, graduated: !!t.graduated, progress: t.progress ?? null, venue: t.venue ?? "pons", flags,
+      parts: t.parts ?? null,                                     // the risk breakdown the card's sub-score bars draw
+      deployerRep: t.deployer ? { launched: t.deployer.launched, graduated: t.deployer.graduated, faded: t.deployer.faded } : null };
   }
   for (const [a, t] of Object.entries(next)) if ((t.launchedAgeH ?? 0) + (now - t.readAt) / 3.6e6 > maxAgeH || (t.flags?.holders ?? 0) < 5) delete next[a];
   return next;
