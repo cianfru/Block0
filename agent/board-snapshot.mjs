@@ -6,7 +6,9 @@ const FLAGS = ["snipers", "sniperHeldPct", "bundles", "top10Pct", "holders", "wa
 export function mergeReads(prev, tokens, { now = Date.now(), maxAgeH = 72 } = {}) {
   const next = { ...(prev || {}) };
   for (const t of tokens || []) {
-    if (!t?.address || t.risk == null) continue;
+    // untraded tokens are left off: Orbio lists every agent still on its bonding curve at the curve's starting value
+    // (~$10k), so they clear the mcap floor with zero holders — a "risk 0, looks clean" card about nothing
+    if (!t?.address || t.risk == null || (t.flags?.holders ?? 0) < 5) { if (t?.address) delete next[t.address]; continue; }
     const flags = {}; for (const k of FLAGS) if (t.flags?.[k] != null) flags[k] = t.flags[k];
     next[t.address] = { address: t.address, sym: t.sym, mcapUsd: t.mcapUsd ?? null, launchedAgeH: t.ageH ?? null, readAt: now,
       risk: t.risk, label: t.label ?? null, graduated: !!t.graduated, progress: t.progress ?? null, venue: t.venue ?? "pons", flags };

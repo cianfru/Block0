@@ -159,8 +159,8 @@ test("board snapshot: latest read per token, slim fields, aged-out tokens droppe
   const { mergeReads, boardSnapshot } = await import("../agent/board-snapshot.mjs");
   const t = (a, o = {}) => ({ address: a, sym: "S" + a.slice(-2), mcapUsd: 1000, ageH: 2, risk: 30, label: "CLEAN", graduated: false,
     flags: { snipers: 1, bundles: 0, top10Pct: 40, holders: 300, coordPct: 9, insiderSellersNow: 0 }, whales: [1, 2], ...o });
-  let r = mergeReads({}, [t(A(1)), t(A(2), { graduated: true, mcapUsd: 9000 }), t(A(3), { risk: null })], { now: NOW });
-  assert.deepEqual(Object.keys(r).sort(), [A(1), A(2)]);                       // unread (risk null) skipped
+  let r = mergeReads({}, [t(A(1)), t(A(2), { graduated: true, mcapUsd: 9000 }), t(A(3), { risk: null }), t(A(4), { flags: { holders: 0 } })], { now: NOW });
+  assert.deepEqual(Object.keys(r).sort(), [A(1), A(2)]);                       // unread (risk null) and untraded (0 holders) skipped
   assert.equal(r[A(1)].flags.coordPct, undefined); assert.equal(r[A(1)].whales, undefined);   // slim
   r = mergeReads(r, [t(A(1), { risk: 70 })], { now: NOW + 3600e3 });
   assert.equal(r[A(1)].risk, 70);                                              // latest read wins
