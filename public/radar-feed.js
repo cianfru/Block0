@@ -27,7 +27,7 @@ export function makeFeed(W, { fetch: f = fetch, rpcUrl = NATIVE, cache = {} } = 
     throw new Error(method + ": rate-limited");
   };
   const topics = W.wallets.map((w) => topicOf(w.a));
-  const kinds = cache.kinds || {}, senders = cache.senders || {}, transfers = [];
+  const kinds = cache.kinds || {}, senders = cache.senders || {}, transfers = [], seen = new Set();
   let onProgress = null;
   // the node accepts JSON-RPC batches of ≤20 (larger ones are 429'd as a burst)
   const batch = async (calls) => {
@@ -50,7 +50,9 @@ export function makeFeed(W, { fetch: f = fetch, rpcUrl = NATIVE, cache = {} } = 
     for (let s = from; s <= to; s += SPAN) {
       const e = Math.min(to, s + SPAN - 1), range = { fromBlock: "0x" + s.toString(16), toBlock: "0x" + e.toString(16) };
       const [inn, out] = await Promise.all([rpc("eth_getLogs", [{ ...range, topics: [TRANSFER, null, topics] }]), rpc("eth_getLogs", [{ ...range, topics: [TRANSFER, topics] }])]);
-      transfers.push(...decodeTransfers([...inn, ...out]));
+      // one log = one transfer, however it arrived: a transfer between two tracked wallets is in BOTH queries, and a
+      // pull that failed half-way is retried from its start (audit F10)
+      for (const t of decodeTransfers([...inn, ...out])) { const k = t.tx + ":" + t.i; if (!seen.has(k)) { seen.add(k); transfers.push(t); } }
     }
     const cps = unknownCounterparties(transfers, { ...W, kinds });
     for (let i = 0; i < cps.length; i += 20) {
@@ -60,7 +62,7 @@ export function makeFeed(W, { fetch: f = fetch, rpcUrl = NATIVE, cache = {} } = 
     const txs = unverifiedBuys(transfers, { ...W, kinds, senders });
     for (let i = 0; i < txs.length; i += 20) {
       const got = await batch(txs.slice(i, i + 20).map((h) => ["eth_getTransactionByHash", [h]]));
-      txs.slice(i, i + 20).forEach((h, k) => { const t = got[k]; if (t) senders[h] = { from: String(t.from).toLowerCase(), to: String(t.to || "").toLowerCase() }; });
+      txs.slice(i, i + 20).forEach((h, k) => { const t = got[k]; if (t) senders[h] = { from: String(t.from).toLowerCase(), to: String(t.to || "").toLowerCase(), value: t.value || "0x0" }; });
       onProgress?.({ phase: "verify", done: Math.min(i + 20, txs.length), total: txs.length });
       await new Promise((s) => setTimeout(s, 400));
     }
@@ -79,7 +81,7 @@ export function makeFeed(W, { fetch: f = fetch, rpcUrl = NATIVE, cache = {} } = 
       if (from <= head) await pull(from, head);
       last = head;
       const keepFrom = head - Math.ceil((hours * 3600) / secPerBlock);
-      for (let i = transfers.length - 1; i >= 0; i--) if (transfers[i].block < keepFrom) transfers.splice(i, 1);
+      for (let i = transfers.length - 1; i >= 0; i--) if (transfers[i].block < keepFrom) { seen.delete(transfers[i].tx + ":" + transfers[i].i); transfers.splice(i, 1); }
       const moves = classify(transfers, { ...W, kinds, senders });
       return { head, at: clock, moves, rows: positions(moves, W.meta, { sinceBlock: keepFrom }) };
     },

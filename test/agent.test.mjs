@@ -55,7 +55,7 @@ test("format: ≤280 chars, address + footer always present, no link, unvalidate
   const ev = { kind: "insider-dump", sym: "PEPE", address: A(1), mcapUsd: 212000, ageH: 5, venue: "orbio-agent", headline: "3 insider wallets started selling · 4.1% of supply moving" };
   const t = formatPost(ev);
   assert.ok(t.length <= MAX_LEN);
-  assert.match(t, /^▼ \$PEPE — insiders selling\n/);
+  assert.match(t, /^▼ \$PEPE — early wallets selling\n/);
   assert.match(t, /\$212k mcap · 5h old · Orbio agent/);
   assert.match(t, new RegExp(`\\n${A(1)}\\n`));
   assert.match(t, /On-chain facts, not advice\.$/);

@@ -11,7 +11,7 @@
 // clock, previous-state map and last-fired map so it's unit-testable and restart-safe when persisted by the caller.
 
 export const KINDS = {
-  "insider-dump":      { sev: "bad",  icon: "▼", label: "insiders selling" },
+  "insider-dump":      { sev: "bad",  icon: "▼", label: "early wallets selling" },
   "smart-convergence": { sev: "good", icon: "◎", label: "smart money converging" },
   "clean-launch":      { sev: "good", icon: "●", label: "clean launch on pace" },
 };
@@ -53,11 +53,11 @@ export function detectEvents(prev, tokens, opts = {}) {
     const live = (t.mcapUsd || 0) >= o.minMcap && (t.ageH == null || t.ageH <= o.maxAgeH);
     if (!was) continue;                       // first sight = seed, never fire (no cold-start backlog blast)
     if (!live) continue;
-    // insiders STARTED selling
+    // early wallets (snipers/bundles) STARTED selling — verified sales into a venue, not transfers (intel.mjs)
     if (cur.sellers >= 1 && was.sellers === 0) {
       const pct = t.flags?.insiderDumpNowPct;
       fire("insider-dump", t, { sellers: cur.sellers, pct: pct ?? null, top10Pct: t.flags?.top10Pct ?? null },
-        `${cur.sellers} insider wallet${cur.sellers > 1 ? "s" : ""} started selling${pct ? ` · ${pct}% of supply moving` : ""}`);
+        `${cur.sellers} early wallet${cur.sellers > 1 ? "s" : ""} sold into the pool in the last 30 min${pct ? ` · ${pct}% of held supply` : ""}`);
     }
     // smart money CONSENSUS — several proven wallets BOUGHT within a tight window (record-weighted) and the cluster is
     // fresh. This replaces the flat "≥2 now hold it": bags bought days apart are a position, not an event.

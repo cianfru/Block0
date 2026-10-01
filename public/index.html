@@ -394,8 +394,10 @@ function render(d) {
     ["Snipers", f.snipers, has(f.sniperHeldPct) ? `holding ${pct(f.sniperHeldPct)} of supply` : "share unknown", "warn"],
     ["Bundles", f.bundles, has(f.bundleWallets) ? `${f.bundleWallets} wallets buying in one block` : "wallets unknown", "bad"],
     ["Linked clusters", f.coordClusters, has(f.coordPct) ? `${pct(f.coordPct)} of supply in linked wallets` : "share unknown", "warn"],
-    ["Cohort selling", f.insiderSellersNow,
-      has(f.insiderDumpNowPct) ? `${pct(f.insiderDumpNowPct, 2)} of held supply moved out` : "amount unknown", "bad"],
+    ["Early wallets selling", f.insiderSellersNow,
+      has(f.insiderDumpNowPct) ? `${pct(f.insiderDumpNowPct, 2)} of held supply sold into the pool, last 30 min` : "amount unknown", "bad"],
+    ...(has(f.earlyMovedOutNow) ? [["Early wallets moving out", f.earlyMovedOutNow,
+      has(f.earlyMovedOutPct) ? `${pct(f.earlyMovedOutPct, 2)} sent to other wallets, last 30 min — not a sale` : "amount unknown", "warn"]] : []),
   ].map(([k, v, s, cls]) => `<div class="m"><div class="k">${k}</div>
       <div class="v ${has(v) && v > 0 ? cls : ""}">${val(v)}</div><div class="s">${s}</div></div>`).join("");
 

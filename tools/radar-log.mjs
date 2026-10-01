@@ -71,7 +71,7 @@ async function watch() {
           recent.set(r.token, t);
           const ev = { kind: "event", t, token: r.token, sym: m.sym || null, nHolding: r.nHolding, nSharp: r.nSharp, nSellers: r.nSellers,
             wallets: r.wallets.filter((w) => w.status === "buying" || w.status === "trimmed").map((w) => w.a),
-            lastBuyAgoMin: Math.round((at(head) - at(r.lastBlock)) / 60),
+            lastBuyAgoMin: Math.round((at(head) - at(r.lastBuyBlock ?? r.lastBlock)) / 60),
             priceUsd: m.priceUsd ?? null, mcapUsd: m.mcapUsd ?? null, liquidityUsd: m.liquidityUsd ?? null, pool: m.url?.split("/").pop() || null, pairCreatedAt: m.pairCreatedAt ?? null };
           appendFileSync(LOG, JSON.stringify(ev) + "\n");
           console.log(new Date().toISOString(), "EVENT", ev.sym || ev.token, `${ev.nHolding} holding (${ev.nSharp} sharp)`, ev.mcapUsd ? "$" + Math.round(ev.mcapUsd) : "no market");

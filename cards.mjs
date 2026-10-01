@@ -51,7 +51,7 @@ function pulseCard(board) {
     hero: String(clean), heroSub: `of ${all.length} live launches read clean`,
     title: "Today on the Robinhood Chain",
     lines: [`${clean} clean · ${caution} caution · ${avoid} high-risk`,
-      dumping ? `${dumping} with insiders selling right now` : "no live insider dumping on the board",
+      dumping ? `${dumping} with early wallets selling right now` : "no early-wallet selling on the board",
       grad ? `${grad} tokens have ever graduated the curve` : "sorted by forensics, not hype"],
     viz: { type: "bars", segs: [
       { label: "clean", v: clean, color: A.lime },

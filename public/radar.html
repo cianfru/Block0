@@ -46,7 +46,7 @@
   .w .tier{font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid currentColor}
   .tier.sharp{color:var(--lime)} .tier.proven{color:var(--cyan)}
   .w .rec{color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .st{text-align:right;white-space:nowrap} .st.buying{color:var(--lime)} .st.trimmed{color:var(--amber)} .st.exited,.st.selling{color:var(--coral)}
+  .st{text-align:right;white-space:nowrap} .st.buying{color:var(--lime)} .st.trimmed{color:var(--amber)} .st.exited,.st.selling{color:var(--coral)} .st.moved{color:var(--dim)}
   .w a{color:var(--tx);text-decoration:none} .w a:hover{text-decoration:underline}
   .more{background:none;border:0;color:var(--mute);font:12px var(--sans);cursor:pointer;padding:6px 0 0}
   .c-links{display:flex;gap:14px;margin-top:8px;font-size:12px} .c-links a{color:var(--dim)}
@@ -130,7 +130,7 @@ function row(r, now) {
       `<span class="rec">${esc(rec)}</span><span class="st ${esc(w.status)}">${esc(w.status)}${val ? " ≈" + esc(val) : ""} · ${esc(ago(now - state.at(w.lastBlock)))}</span></div>`;
   }).join("");
   const more = ws.length > 4 ? `<button class="more" data-t="${esc(r.token)}">${open.has(r.token) ? "show fewer" : `+${ws.length - 4} more wallets`}</button>` : "";
-  const line = verdict(r, { minutesAgo: (now - state.at(r.lastBlock)) / 60, mcapUsd: m.mcapUsd });
+  const line = verdict(r, { minutesAgo: (now - state.at(r.signal === "converging" && r.lastBuyBlock != null ? r.lastBuyBlock : r.lastBlock)) / 60, mcapUsd: m.mcapUsd });
   return `<article class="card ${esc(r.signal)}">
     <div class="c-top">${m.logo ? `<img class="logo" src="${esc(m.logo)}" alt="" loading="lazy">` : `<div class="logo"></div>`}
       <div class="c-id"><span class="c-sym">${esc(clip(m.sym || "new token", 24))}</span><span class="c-name">${esc(clip(m.name || "", 48))}</span><br><span class="c-addr" data-copy="${esc(r.token)}" title="copy address">${esc(r.token)}</span></div>

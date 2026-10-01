@@ -4,7 +4,7 @@
 import { KINDS } from "../alert-events.mjs";
 import { AGENT_KINDS } from "./agent-events.mjs";
 
-const FLAGS = ["snipers", "sniperHeldPct", "bundles", "bundleWallets", "bundleHeldPct", "top10Pct", "holders", "wallets", "insiderSellersNow", "insiderDumpNowPct"];
+const FLAGS = ["snipers", "sniperHeldPct", "bundles", "bundleWallets", "bundleHeldPct", "top10Pct", "holders", "wallets", "insiderSellersNow", "insiderDumpNowPct", "earlyMovedOutNow", "earlyMovedOutPct"];
 
 export function mergeReads(prev, tokens, { now = Date.now(), maxAgeH = 72 } = {}) {
   const next = { ...(prev || {}) };
@@ -27,7 +27,7 @@ export function mergeReads(prev, tokens, { now = Date.now(), maxAgeH = 72 } = {}
 // 30 min) only mean something close to the read, so past liveMin they are blanked and the row is marked stale.
 // `updated` is when the board was assembled; `observedAt` is the newest chain read on it.
 export const LIVE_MIN = 45, MAX_READ_MIN = 180;
-const NOW_FLAGS = ["insiderSellersNow", "insiderDumpNowPct"];
+const NOW_FLAGS = ["insiderSellersNow", "insiderDumpNowPct", "earlyMovedOutNow", "earlyMovedOutPct"];
 export function boardSnapshot(reads, stats, { now = Date.now(), limit = 60, liveMin = LIVE_MIN, maxReadMin = MAX_READ_MIN } = {}) {
   const rows = Object.values(reads || {}).filter((t) => now - t.readAt <= maxReadMin * 60e3)
     .map(({ launchedAgeH, ...t }) => {
