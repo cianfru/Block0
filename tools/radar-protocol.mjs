@@ -18,7 +18,13 @@
 //   • Verdict (unchanged statistic and bar): each scored event's peak7 percentile among ITS OWN scored controls; mean
 //     ≥ 0.58 with bootstrap 95% CI lower bound > 0.5 in both the earlier 70% and later 30% of events, and the mean
 //     close7 percentile > 0.5 over events whose end is covered. No verdict below 30 scored v2 events.
-export const PROTOCOL = 2, WEEK = 7 * 86400, MAXMC = 1e6, EMPTY_RUNS = 3;
+// PROTOCOL v3 (2026-10-01 follow-up): no outflow of ANY size may count toward convergence.
+// The v2 definition above is historical, not retroactively amended. v1/v2 rows are excluded.
+// In addition to the existing peak rules, require >=30 paired close outcomes and >=80% close
+// coverage in EACH chronological peak split. A close pair needs >=80% of its own logged
+// controls covered. These conservative completeness gates are not a power calculation.
+export const PROTOCOL = 3, WEEK = 7 * 86400, MAXMC = 1e6, EMPTY_RUNS = 3;
+export const MIN_CLOSE_PAIRS = 30, MIN_CLOSE_COVERAGE = 0.8;
 
 export const eventId = (token, t) => `${token}:${t}`;
 
@@ -33,14 +39,14 @@ export function outcomeFromCandles(entryT, entryPrice, candles, { week = WEEK } 
     postCandles: c.length, endCovered, note: endCovered ? null : "end of horizon not covered" };
 }
 
-// rows → { lines, verdict } — the report, v2 rows only
+// rows → { lines, verdict } — current protocol only; never mutate the input ledger.
 export function report(rows, { seed = 1 } = {}) {
   const lines = [], say = (l) => lines.push(l);
   const v1 = rows.filter((r) => r.kind === "event" && r.v !== PROTOCOL);
   const ev = rows.filter((r) => r.kind === "event" && r.v === PROTOCOL);
   const ctl = rows.filter((r) => r.kind === "control" && r.v === PROTOCOL);
   const eligible = ev.filter((r) => r.priceUsd && r.mcapUsd < MAXMC);
-  const scored = eligible.filter((r) => r.peak7 != null).sort((a, b) => a.t - b.t);
+  const scored = eligible.filter((r) => r.peak7 != null).map((r) => ({ ...r, pPeak: null, pClose: null })).sort((a, b) => a.t - b.t);
   say(`protocol v${PROTOCOL} · events logged ${ev.length} · priced & under $1M ${eligible.length} · peak scored ${scored.length}`
     + ` · end covered ${scored.filter((r) => r.close7 != null).length}`);
   const byEvent = new Map();
@@ -53,17 +59,23 @@ export function report(rows, { seed = 1 } = {}) {
     if (!own.length) noCtl++; else if (!peakCtl.length) ctlPending++;
     if (peakCtl.length) e.pPeak = pct(e, peakCtl, "peak7");
     const closeCtl = own.filter((c) => c.close7 != null);
-    if (e.close7 != null && closeCtl.length) e.pClose = pct(e, closeCtl, "close7");
+    if (e.close7 != null && closeCtl.length && closeCtl.length / own.length >= MIN_CLOSE_COVERAGE) e.pClose = pct(e, closeCtl, "close7");
   }
   const s = scored.filter((e) => e.pPeak != null);
   say(`controls: ${ctl.length} logged · ${ctl.filter((c) => c.peak7 != null).length} scored · events with no control ${noCtl} · events whose controls are not scored yet ${ctlPending}`);
-  if (v1.length) say(`(${v1.length} events logged by the v1 detector are kept in the log and not scored — see tools/radar-protocol.mjs)`);
+  if (v1.length) say(`(${v1.length} events logged by legacy detectors (v1/v2) are kept in the log and not scored — see tools/radar-protocol.mjs)`);
   if (s.length < 30) { say(`no verdict yet: ${s.length} scored events with scored controls of their own (the pre-registered minimum is 30)`); return { lines, verdict: null }; }
   const mean = (a) => a.reduce((x, y) => x + y, 0) / a.length;
   let st = seed >>> 0; const rand = () => { st = (st + 0x6d2b79f5) >>> 0; let t = st; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; };   // seeded: the same log always gives the same report
   const ci = (a) => { const b = []; for (let k = 0; k < 2000; k++) b.push(mean(a.map(() => a[Math.floor(rand() * a.length)]))); b.sort((x, y) => x - y); return [b[50], b[1949]]; };
   const cut = Math.floor(s.length * 0.7), closes = s.filter((e) => e.pClose != null).map((e) => e.pClose);
-  const pass = [closes.length > 0 && mean(closes) > 0.5];
+  const coverage = [s.slice(0, cut), s.slice(cut)].map((set) => set.filter((e) => e.pClose != null).length / set.length);
+  say(`close coverage: ${closes.length}/${s.length} paired · early ${(coverage[0] * 100).toFixed(0)}% · late ${(coverage[1] * 100).toFixed(0)}%`);
+  if (closes.length < MIN_CLOSE_PAIRS || coverage.some((c) => c < MIN_CLOSE_COVERAGE)) {
+    say(`no verdict yet: need ${MIN_CLOSE_PAIRS} paired close outcomes and ${MIN_CLOSE_COVERAGE * 100}% close coverage in each time split (and each event's controls)`);
+    return { lines, verdict: null };
+  }
+  const pass = [mean(closes) > 0.5];
   for (const [h, set] of [["early", s.slice(0, cut)], ["late", s.slice(cut)]]) {
     const pp = set.map((e) => e.pPeak), [lo, hi] = ci(pp);
     say(`  ${h} n=${set.length} · peak7 percentile ${mean(pp).toFixed(2)} [${lo.toFixed(2)}–${hi.toFixed(2)}]`);

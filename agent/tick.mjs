@@ -10,7 +10,7 @@
 import { detectEvents } from "../alert-events.mjs";
 import { normAgent, agentEvents } from "./agent-events.mjs";
 import { formatPost, formatReply, lint, UNVALIDATED } from "./format.mjs";
-import { plan, record, canReply, freshBudget, DEFAULT_CAPS } from "./budget.mjs";
+import { plan, record, canReply, canSpend, settle, freshBudget, POST_MAX_COST, MENTION_MAX_COST } from "./budget.mjs";
 import { parseMention, resolveSymbol, selectMentions } from "./mentions.mjs";
 import { OrbioError, FREE, postOutcome, mentionsOf } from "./orbio.mjs";
 import { deployerReputation, compactRep } from "../deployer.mjs";
@@ -21,7 +21,7 @@ import { deployerReputation, compactRep } from "../deployer.mjs";
 export const DEFAULTS = { maxAgeH: 72, minMcap: 5000, maxProfiles: 150, timeBudgetMs: 8 * 60e3, concurrency: 3, keepDays: 7 };
 
 export function emptyState() {
-  return { prevAgents: {}, lastFiredAgents: {}, prevBoard: {}, lastFiredBoard: {}, profiledAt: {}, perToken: {}, budget: null, answered: {}, stoppedDay: null };
+  return { prevAgents: {}, lastFiredAgents: {}, prevBoard: {}, lastFiredBoard: {}, profiledAt: {}, perToken: {}, budget: null, answered: {}, replyAttempts: {}, stoppedDay: null };
 }
 
 export async function runTick(deps) {
@@ -112,7 +112,24 @@ export async function runTick(deps) {
   } else state.orbio = { checkedAt: now, error: "no ORBIO_API_KEY" };
   const handle = (deps.handle || acct?.username || "").replace(/^@/, "");
   const platform = acct?.platform || null;
-  const ceiling = caps.maxCreditPerDay ?? DEFAULT_CAPS.maxCreditPerDay;
+  // Reconcile pending replies with a known post id; never resubmit an uncertain send.
+  if (!dryRun && deps.apiKey && state.stoppedDay !== new Date(now).toISOString().slice(0, 10)) {
+    // Bound the new free-read fan-out and rotate checks. Old unresolved sends need human reconciliation.
+    const pending = Object.entries(state.replyAttempts).filter(([, a]) => a.status === "pending" && a.postId)
+      .sort(([, a], [, b]) => (a.checkedAt || 0) - (b.checkedAt || 0)).slice(0, 20);
+    for (const [id, a] of pending) {
+      if (now - a.at > 86400e3) { a.status = "needs-review"; continue; }
+      a.checkedAt = now;
+      try {
+        const o = postOutcome((await orbio.tool("social.post.status", { post_id: a.postId }, FREE)).result);
+        if (o.status === "published") {
+          a.status = "published"; state.answered[id] = { at: now, author: a.author };
+          out.replies.push({ at: now, replyTo: id, text: a.text, ...o });
+        } else if (o.status === "failed") { a.status = "failed"; a.nextRetryAt = now + 15 * 60e3; }
+      } catch (e) { stopDay(e); out.errors.push("reply status: " + e.message); }
+      if (state.stoppedDay === new Date(now).toISOString().slice(0, 10)) break;
+    }
+  }
 
   // 7 · publish (or record the dry run)
   let sent = 0;
@@ -121,15 +138,18 @@ export async function runTick(deps) {
     if (problems.length) { out.held.push({ ...ev, text, why: "lint: " + problems.join(", ") }); continue; }
     if (dryRun) { out.dryRun.push({ at: now, kind: ev.kind, address: ev.address, text }); state.budget = record(state.budget, { now, credit: 0, address: ev.address }); state.perToken[ev.address] = now; continue; }
     const block = stopped || state.stoppedDay === new Date(now).toISOString().slice(0, 10) ? "posting stopped for today (balance/auth/connection)"
-      : !platform ? "no X account connected in Orbio" : acct.postsLeft != null && sent >= acct.postsLeft ? "platform allowance" : null;
+      : !platform ? "no X account connected in Orbio" : acct.postsLeft != null && sent >= acct.postsLeft ? "platform allowance"
+      : !canSpend(state.budget, POST_MAX_COST, { now, caps }) ? "credit ceiling" : null;
     if (block) { out.held.push({ ...ev, text, why: block }); continue; }
     try {
-      const r = await orbio.tool("social.post", { platforms: [platform], text }, "0.02");
+      sent++;
+      state.budget = record(state.budget, { now, credit: POST_MAX_COST, address: ev.address });
+      state.perToken[ev.address] = now;
+      const r = await orbio.tool("social.post", { platforms: [platform], text }, String(POST_MAX_COST));
+      state.budget = settle(state.budget, POST_MAX_COST, r, now);
       let o = postOutcome(r.result);
       if (o.postId && !o.url && o.status !== "failed") { try { o = { ...o, ...postOutcome((await orbio.tool("social.post.status", { post_id: o.postId }, FREE)).result) }; } catch { /* the post stands; the link is a nicety */ } }
       if (o.status === "failed") { out.held.push({ ...ev, text, why: "post failed: " + (o.error || "refused") }); continue; }
-      sent++;
-      state.budget = record(state.budget, { now, credit: r.credit ?? 0.0187, address: ev.address }); state.perToken[ev.address] = now;
       out.posted.push({ at: now, kind: ev.kind, address: ev.address, text, ...o, running: r.running || undefined });
     } catch (e) {
       stopDay(e);
@@ -139,13 +159,20 @@ export async function runTick(deps) {
 
   // 8 · mentions — a metered read (≈0.00022 CREDIT per post returned), so only with a key, a connected handle and room
   //     under the daily ceiling. Only mentions from the last 24 h are answered (a first run never replies to a backlog).
-  if (handle && deps.apiKey && state.stoppedDay !== new Date(now).toISOString().slice(0, 10) && freshBudget(state.budget, now).credit + 0.005 <= ceiling) {
+  if (handle && deps.apiKey && state.stoppedDay !== new Date(now).toISOString().slice(0, 10) && canSpend(state.budget, MENTION_MAX_COST, { now, caps })) {
     try {
-      const d = await orbio.tool("social.x.posts", { mentions_of: handle, limit: 20 }, "0.005");
-      state.budget = record(state.budget, { now, kind: "read", credit: d.credit ?? 0.005 });   // unsettled → count the cap
+      state.budget = record(state.budget, { now, kind: "read", credit: MENTION_MAX_COST });
+      const d = await orbio.tool("social.x.posts", { mentions_of: handle, limit: 20 }, String(MENTION_MAX_COST));
+      state.budget = settle(state.budget, MENTION_MAX_COST, d, now);
       const posts = mentionsOf(d.result).filter((p) => p.at == null || now - p.at < 86400e3);
-      for (const p of selectMentions(posts, { selfHandle: handle, answered: state.answered, now })) {
+      const blocked = { ...state.answered };
+      for (const [id, a] of Object.entries(state.replyAttempts)) {
+        if (a.status !== "failed" || a.attempts >= 3 || now < a.nextRetryAt) blocked[id] = a;
+      }
+      let replyCalls = 0;
+      for (const p of selectMentions(posts, { selfHandle: handle, answered: blocked, now })) {
         if (!canReply(state.budget, { now, caps })) break;
+        if (!dryRun && acct?.repliesLeft != null && replyCalls >= acct.repliesLeft) break;
         const ask = parseMention(p.text);
         let text = null;
         if (ask?.symbol) {
@@ -162,12 +189,28 @@ export async function runTick(deps) {
             ownerRep: prior ? { launched: prior.length, graduated: prior.filter((x) => x.graduated).length } : null });
         }
         if (!text || lint(text).length) { state.answered[p.id] = { at: now, author: p.author, skipped: true }; continue; }
-        let credit = 0;
-        if (dryRun) out.dryRun.push({ at: now, kind: "reply", replyTo: p.id, text });
+        if (dryRun) {
+          out.dryRun.push({ at: now, kind: "reply", replyTo: p.id, text });
+          state.budget = record(state.budget, { now, kind: "reply", credit: 0 });
+          state.answered[p.id] = { at: now, author: p.author };
+        }
         else if (!platform) break;
-        else { const r = await orbio.tool("social.post", { platforms: [platform], text, reply_to: p.id }, "0.02"); credit = r.credit ?? 0.0187; out.replies.push({ at: now, replyTo: p.id, text, ...postOutcome(r.result) }); }
-        state.budget = record(state.budget, { now, kind: "reply", credit });
-        state.answered[p.id] = { at: now, author: p.author };
+        else {
+          const a = state.replyAttempts[p.id] = { at: now, author: p.author, text, status: "pending", attempts: (state.replyAttempts[p.id]?.attempts || 0) + 1 };
+          replyCalls++;
+          state.budget = record(state.budget, { now, kind: "reply", credit: POST_MAX_COST });
+          const r = await orbio.tool("social.post", { platforms: [platform], text, reply_to: p.id }, String(POST_MAX_COST));
+          state.budget = settle(state.budget, POST_MAX_COST, r, now);
+          const o = postOutcome(r.result); a.postId = o.postId;
+          if (!r.running && o.status === "published") {
+            a.status = "published";
+            out.replies.push({ at: now, replyTo: p.id, text, ...o });
+            state.answered[p.id] = { at: now, author: p.author };
+          } else if (!r.running && o.status === "failed") {
+            a.status = "failed"; a.nextRetryAt = now + 15 * 60e3;
+            out.errors.push("reply failed: " + (o.error || "refused"));
+          }
+        }
       }
     } catch (e) {
       stopDay(e);
@@ -176,6 +219,7 @@ export async function runTick(deps) {
     }
   }
   for (const [id, a] of Object.entries(state.answered)) if (now - a.at > 7 * 86400e3) delete state.answered[id];
+  for (const [id, a] of Object.entries(state.replyAttempts)) if (["published", "failed"].includes(a.status) && now - a.at > 7 * 86400e3) delete state.replyAttempts[id];
   state.budget = freshBudget(state.budget, now);
 
   out.tokens = tokens;

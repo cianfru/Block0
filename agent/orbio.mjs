@@ -28,7 +28,8 @@ export function makeOrbio({ apiKey = null, fetch: f = fetch, base = ORBIO_API } 
     if (r.status === 401) throw new OrbioError("auth", "Orbio rejected the API key (401)");
     if (r.status === 402) throw new OrbioError("balance", "Orbio balance too low (402)");
     if (r.status === 409) throw new OrbioError("connect", `social account not connected in Orbio (409)${body?.connect_url ? " — " + body.connect_url : ""}`, { connectUrl: body?.connect_url ?? null });
-    if (r.status === 202) return { result: null, credit: null, running: true };
+    // Keep a post handle if supplied, but never mistake a tool-execution id for a social post id.
+    if (r.status === 202) return { result: body?.result ?? (body?.post_id ? body : null), credit: null, running: true };
     if (!r.ok) throw new OrbioError(r.status === 429 ? "rate" : r.status === 400 ? "args" : "http", `tool ${name} → ${r.status}${why ? ": " + String(why).slice(0, 200) : ""}`);
     const credit = body?.cost?.credit != null ? Number(body.cost.credit) : null;
     return { result: body?.result ?? body, credit, running: false };

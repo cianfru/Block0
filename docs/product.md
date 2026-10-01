@@ -1,5 +1,7 @@
 # Block0 — the product (1 October 2026)
 
+Implementation follow-up: [review fixes and their rationale](review-followup-2026-10-01.md).
+
 ## In one line
 **Block0 tells you what materially changed in a Robinhood Chain launch, who caused it, and the on-chain evidence —
 and never what to buy.**

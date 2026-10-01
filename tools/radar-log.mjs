@@ -27,9 +27,9 @@
 //              70% and later 30% of events, and close7 mean percentile > 0.5. No verdict below 30 scored events.
 //
 //
-//   ⚠ SUPERSEDED BY PROTOCOL v2 (2026-10-01) — tools/radar-protocol.mjs holds the rules now in force (event ids, own
+//   ⚠ SUPERSEDED BY PROTOCOL v3 (2026-10-01) — tools/radar-protocol.mjs holds the rules now in force (event ids, own
 //   controls only, a post-entry outcome window, covered endpoints, transient failures retried). The text above is
-//   kept as the record of what v1 promised; v1 rows stay in the log and are not scored.
+//   kept as the record of what v1 promised; v1/v2 rows stay in the log and are not scored.
 //
 //   node tools/radar-log.mjs              poll every 60 s, append to data/radar/log.jsonl (run it anywhere; free)
 //        [--minutes=N]                    stop after N minutes; with RADAR_GIT_COMMIT=1, rewrite REPORT.txt and commit +
@@ -60,7 +60,7 @@ else await watch();
 
 async function watch() {
   const W = loadWallets(), feed = makeFeed(W);
-  // one event per token per 7 days, counted within the protocol in force (a v1 event does not block a v2 one)
+  // one event per token per 7 days within the current protocol; legacy events do not block the new cohort
   const recent = new Map(readLog().filter((r) => r.kind === "event" && r.v === PROTOCOL).map((r) => [r.token, r.t]));
   console.log(`radar-log · ${W.wallets.length} wallets · ${LOG} · ${recent.size} events so far`);
   const stopAt = MINUTES ? Date.now() + MINUTES * 60e3 : Infinity;
@@ -77,11 +77,11 @@ async function watch() {
           const m = mk[r.token] || {}, t = now();
           recent.set(r.token, t);
           const ev = { kind: "event", v: PROTOCOL, id: eventId(r.token, t), t, token: r.token, sym: m.sym || null, nHolding: r.nHolding, nSharp: r.nSharp, nSellers: r.nSellers,
-            wallets: r.wallets.filter((w) => w.status === "buying" || w.status === "trimmed").map((w) => w.a),
+            wallets: r.wallets.filter((w) => w.status === "buying").map((w) => w.a),
             lastBuyAgoMin: Math.round((at(head) - at(r.lastBuyBlock ?? r.lastBlock)) / 60),
             priceUsd: m.priceUsd ?? null, mcapUsd: m.mcapUsd ?? null, liquidityUsd: m.liquidityUsd ?? null, pool: m.url?.split("/").pop() || null, pairCreatedAt: m.pairCreatedAt ?? null };
           appendFileSync(LOG, JSON.stringify(ev) + "\n");
-          console.log(new Date().toISOString(), "EVENT", ev.sym || ev.token, `${ev.nHolding} holding (${ev.nSharp} sharp)`, ev.mcapUsd ? "$" + Math.round(ev.mcapUsd) : "no market");
+          console.log(new Date().toISOString(), "EVENT", ev.sym || ev.token, `${ev.nHolding} buyers without outflow (${ev.nSharp} sharp)`, ev.mcapUsd ? "$" + Math.round(ev.mcapUsd) : "no market");
           if (!(ev.mcapUsd > 0) || !ev.pairCreatedAt) continue;
           universe ??= await launches();
           const age = t - ev.pairCreatedAt;
@@ -132,7 +132,7 @@ async function launches() {
 }
 function shuffle(a) { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
 
-// Fill 7-day outcomes for matured v2 rows (tools/radar-protocol.mjs decides what counts). A failed request is retried
+// Fill 7-day outcomes for matured current-protocol rows (tools/radar-protocol.mjs decides what counts). A failed request is retried
 // on a later run and never recorded as "no candles" (audit F07); an empty answer becomes final on the 3rd run.
 async function outcomes() {
   const rows = readLog(); let filled = 0, transient = 0;
