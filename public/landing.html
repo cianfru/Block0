@@ -6,14 +6,13 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<title>Block0 — read the history behind any Robinhood Chain launch</title>
-<meta name="description" content="Explore token structure, changing participation and experimental setups on Robinhood Chain. Forward observations and transparent limitations.">
+<title>Block0 — on-chain facts for Robinhood Chain launches</title>
+<meta name="description" content="Block0 reads every Pons and Orbio launch on the Robinhood Chain straight from the chain: snipers, bundles, insiders selling, and where wallets with a real track record are moving. Facts, not calls.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/block0.css">
 <script src="/blockclock.js" defer></script>
-<script src="/track.js" defer></script>
 <style>
   /* premium motion: a soft rise-in, staggered; disabled for reduced-motion */
   @keyframes riseIn{from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:none}}
@@ -88,15 +87,6 @@
   .hdots i{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.18);cursor:pointer;transition:background .2s}
   .hdots i.on{background:var(--lime)}
 
-  /* the winner corridor — a side-profile of the model: a price line threading the stage gates */
-  .wincorridor{position:relative;border:1px solid var(--line);border-radius:20px;overflow:hidden;margin-top:20px;
-    background:linear-gradient(180deg,rgba(255,255,255,.03),rgba(255,255,255,.006));box-shadow:inset 0 1px 0 rgba(255,255,255,.06),0 30px 70px -40px rgba(0,0,0,.7)}
-  .wincorridor canvas{display:block;width:100%;height:440px}
-  @media(max-width:700px){.wincorridor canvas{height:330px}}
-  .corr-legend{position:absolute;left:20px;bottom:16px;display:flex;gap:18px;flex-wrap:wrap;font-size:.72rem;color:var(--dim);pointer-events:none}
-  .corr-legend .k{display:inline-flex;align-items:center;gap:7px}
-  .corr-legend .ln{width:18px;height:3px;border-radius:2px}
-
   /* what it checks — concrete signals, not prose */
   .signals{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
   @media(max-width:820px){.signals{grid-template-columns:1fr 1fr}}
@@ -118,28 +108,17 @@
   .proof .pn.g{color:var(--lime)} .proof .pn.c{color:var(--coral)}
   .proof .pl{font-size:.9rem;color:var(--tx);margin-top:8px}
   .proof .ps{font-size:.74rem;color:var(--mute);margin-top:4px}
-  /* proof — the winners the model caught (retrospective, real): what a "best shot" grew into */
-  .wins{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:12px;margin-top:22px}
-  .win{border:1px solid var(--line);border-radius:16px;padding:17px 18px 16px;position:relative;overflow:hidden;
-    background:linear-gradient(180deg,rgba(200,255,77,.045),rgba(255,255,255,.006));box-shadow:inset 0 1px 0 rgba(255,255,255,.05)}
-  .win::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--lime);opacity:.55}
-  .win-top{display:flex;align-items:baseline;justify-content:space-between;gap:8px}
-  .win-sym{font-family:var(--serif);font-size:1.25rem;line-height:1;color:var(--tx)}
-  .win-tier{font-family:var(--mono);font-size:.58rem;letter-spacing:.08em;text-transform:uppercase;padding:2px 6px;border-radius:6px;border:1px solid var(--line-2);color:var(--dim)}
-  .win-tier.major{color:var(--lime);border-color:rgba(200,255,77,.4)} .win-tier.runner{color:var(--cyan);border-color:rgba(90,220,255,.34)}
-  .win-cap{display:block;font-family:var(--serif);font-size:2rem;line-height:1.05;color:var(--lime);margin-top:12px}
-  .win-cl{font-size:.6rem;text-transform:uppercase;letter-spacing:.14em;color:var(--mute)}
-  .win-meta{display:block;font-family:var(--mono);font-size:.72rem;color:var(--dim);margin-top:9px;font-variant-numeric:tabular-nums}
-  /* the product — gated. today's live best shot sits behind the lock */
-  .shotlock{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-top:16px;padding:17px 20px;border-radius:16px;
-    border:1px solid var(--line-2);background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.008));transition:border-color .18s,background .18s}
-  .shotlock:hover{border-color:var(--lime);background:rgba(200,255,77,.05)}
-  .sl-l{display:flex;flex-direction:column;gap:3px;min-width:0}
-  .sl-l b{font-size:.98rem;color:var(--tx);font-weight:600}
-  .sl-lock{opacity:.85;margin-right:4px}
-  .sl-sub{font-size:.76rem;color:var(--mute)}
-  .sl-cta{flex:0 0 auto;font-weight:700;color:var(--lime);font-size:.9rem;white-space:nowrap}
-  @media(max-width:560px){.shotlock{flex-direction:column;align-items:flex-start;gap:10px}}
+  .tri{display:grid;grid-template-columns:repeat(3,1fr);gap:14px;margin-top:22px}
+  @media(max-width:820px){.tri{grid-template-columns:1fr}}
+  .use{border:1px solid var(--line);border-radius:16px;padding:20px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008));display:flex;flex-direction:column;gap:10px}
+  .use h3{margin:0;font-family:var(--serif);font-weight:400;font-size:1.5rem}
+  .use p{margin:0;font-size:.86rem;line-height:1.55;color:var(--dim);flex:1}
+  .use .st{font-family:var(--mono);font-size:.62rem;letter-spacing:.1em;text-transform:uppercase;color:var(--mute)}
+  .use .st.live{color:var(--lime)}
+  .use a.go2{font-weight:600;font-size:.88rem;color:var(--lime);text-decoration:none}
+  .herobtns{display:flex;flex-wrap:wrap;gap:10px;margin-top:16px}
+  .hc-empty{padding:46px 8px;text-align:center;color:var(--mute);font-size:.88rem;line-height:1.6}
+  .hc-empty a{color:var(--tx)}
 </style>
 </head>
 <body>
@@ -148,121 +127,73 @@
 <header class="hd">
   <div class="hd-in">
     <a href="/" class="wordmark">block<b>0</b></a>
-    <nav class="nav"><a href="/setups">Setups · experiment</a>
-      <a href="/board">Board</a>
-      <a href="/leaderboard">Leaderboard</a>
-      <a href="/token">Scan a token</a>
-      <a href="/methodology">How it works</a>
+    <nav class="nav">
+      <a href="/radar">Smart-money radar</a>
+      <a href="#agent">The agent</a>
+      <a href="/methodology">The research</a>
     </nav>
-    <div class="hd-r">
-      <span class="chip chainchip">Robinhood Chain</span><span class="chip blockclock"></span>
-      <button class="btn-connect" id="connect">Connect</button>
-    </div>
+    <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span><span class="chip blockclock"></span></div>
   </div>
-  <div class="gatebar" id="gatebar" hidden></div>
 </header>
 
 <main class="wrap">
-  <!-- HERO: pitch + a real launch, graded -->
   <section class="hero">
     <div class="herowrap">
       <div class="hpitch rise">
-        <p class="micro eye">launch scanner · robinhood chain</p>
-        <h1>Every launch has a<br>history. <em>Read it.</em></h1>
-        <div class="funnel" id="funnel" aria-label="the launch funnel, live">
-          <span class="fs"><b class="fn" id="fTotal">—</b><i>launched</i></span>
-          <span class="farr">→</span>
-          <span class="fs"><b class="fn dimn" id="fGrad">—</b><i>reached the market</i></span>
-          <span class="farr" id="fWinArr" hidden>→</span>
-          <span class="fs" id="fWinWrap" hidden><b class="fn limen" id="fWin">—</b><i>closed above $1M for a day</i></span>
-          <span class="farr" id="fSusArr" hidden>→</span>
-          <span class="fs" id="fSusWrap" hidden><b class="fn limen" id="fSus">—</b><i>held it a week+</i></span>
-        </div>
-        <p class="sub">Paste any token on the Robinhood Chain. Block0 reconstructs it from its own transfer history — who bought first, who is connected to whom, how concentrated it is, who is adding and who is reducing right now. Free, and it shows its working. <b style="color:var(--tx)">It does not predict price.</b></p>
+        <p class="micro eye">on-chain facts · pons &amp; orbio launches</p>
+        <h1>Every launch leaves a trail.<br><em>Read it first.</em></h1>
+        <p class="sub">Block0 reads Robinhood Chain launches straight from the chain: who sniped them, who bundled them, who is selling right now, and where the wallets with a real trading record are moving. It shows what happened. It never tells you what to buy.</p>
         <form class="scan" onsubmit="return scan(event)">
-          <input id="addr" placeholder="Paste any token address — the verdict is free" autocomplete="off">
-          <button class="go" type="submit">Scan</button>
+          <input id="addr" placeholder="Paste a token address from the live board" autocomplete="off">
+          <button class="go" type="submit">Read it</button>
         </form>
-        <div class="proofline" id="proofline"><span>Scanning the Robinhood Chain live…</span></div>
-        <div class="herochips">
-          <a class="chip" href="/board">See what's launching now →</a>
-          <a class="chip" href="/setups">The forward experiment →</a>
+        <div class="proofline" id="proofline"><span>Reading the chain…</span></div>
+        <div class="herobtns">
+          <a class="chip" href="/radar">Where proven wallets are buying →</a>
+          <a class="chip" href="#agent">The agent on Orbio →</a>
         </div>
       </div>
       <div class="hdemo">
-        <div class="hcard" id="herocard"><div class="state" style="padding:60px 0">Pulling a live launch…</div></div>
-        <p class="hcap" id="hcap">a real launch on the board right now — reconstructed from its own transfers</p>
+        <div class="hcard" id="herocard"><div class="hc-empty">Pulling a live launch…</div></div>
+        <p class="hcap" id="hcap">a real launch, read from its own transfers</p>
         <div class="hdots" id="hdots"></div>
       </div>
     </div>
     <div class="ticker"><div class="run" id="ticker"></div></div>
   </section>
 
-  <!-- THE WINNER CORRIDOR — lateral profile, price threading the gates -->
   <section class="sec">
-    <div class="stitle"><p class="micro eye">winners vs traps</p><h2>Watch how participation changes.</h2><p class="sub">The historical corridor illustrates resemblance within a selected study. It does not establish a profitable entry. Our forward experiment records changing conditions and every resulting setup.</p></div>
-    <div class="wincorridor">
-      <canvas id="corr" aria-label="A price line threading the winner corridor's stage gates while weaker launches fall out"></canvas>
-      <div class="corr-legend">
-        <span class="k"><span class="ln" style="background:#c8ff4d"></span> kept climbing → made it</span>
-        <span class="k"><span class="ln" style="background:#ff3b5c"></span> fell apart → died</span>
-      </div>
-    </div>
-  </section>
-
-  <!-- PROOF: the winners the model caught (free, retrospective) — the LIVE best shot is gated below -->
-  <section class="sec" id="shotsec" hidden>
-    <div class="stitle"><p class="micro eye">the funnel · real numbers</p><h2>The launches that closed above $1M — and which ones held it</h2><p class="sub" id="proofSub">A selected historical cohort, graded by observed outcomes. Loading the numbers…</p></div>
-    <div class="wins" id="wins"></div>
-    <p class="sub" style="margin-top:14px;font-size:.82rem">A clean read is the green light to <b style="color:var(--tx)">look closer</b> — not a promise. A dirty launch almost never wins; some clean ones still fade. That honest limit is <a href="/methodology">measured, not hidden</a>.</p>
-    <a class="shotlock" href="/setups" id="shotlock">
-      <span class="sl-l"><b>Explore the forward setup experiment</b><span class="sl-sub">See what changed, what remains unknown and when an experimental setup deteriorates.</span></span>
-      <span class="sl-cta">Unlock →</span>
-    </a>
-  </section>
-
-  <!-- WHAT IT CHECKS -->
-  <section class="sec">
-    <div class="stitle"><p class="micro eye">what it reads</p><h2>Inspect the structure behind a launch</h2><p class="sub">Observed wallet patterns, concentration and distribution, with the limitations of the available data. These are risk indicators, not proof of safety.</p></div>
+    <div class="stitle"><p class="micro eye">what it reads</p><h2>The structure behind a launch</h2><p class="sub">Every number comes from the token's own transfer history on the public node. Nothing is estimated from social posts.</p></div>
     <div class="signals" id="signals"></div>
   </section>
 
-  <!-- LIVE BOARD -->
-  <section class="sec">
-    <div class="stitle"><p class="micro eye">the board</p><h2>The whole launchpad, already graded</h2><p class="sub">Every live launch with its risk score and verdict — the cleanest first. Tap any one for the full breakdown.</p></div>
-    <div class="grid" id="preview"><div class="state">Loading live launches…</div></div>
-    <a class="seeall" href="/board">Open the live board →</a>
+  <section class="sec" id="agent">
+    <div class="stitle"><p class="micro eye">three ways in</p><h2>Look it up, watch it live, or let it tell you</h2></div>
+    <div class="tri">
+      <div class="use"><span class="st live">live</span><h3>Smart-money radar</h3><p>Every buy and sell by 738 wallets with a clean trading record on this chain, read in your browser. Two or more of them buying and holding the same launch is flagged.</p><a class="go2" href="/radar">Open the radar →</a></div>
+      <div class="use"><span class="st" id="agentState">in dry run</span><h3>The agent</h3><p>An agent on Orbio that posts reproducible facts to X: insiders starting to sell, a creator withdrawing staked principal, a repeat owner launching again. Never a call.</p><a class="go2" href="https://github.com/cianfru/Block0/tree/agent-data" target="_blank" rel="noopener">See what it would post →</a></div>
+      <div class="use"><span class="st live">live</span><h3>Token read</h3><p>Paste any launch from the last 72 hours to see its latest read: risk, snipers, bundles, top-10 share and wallets selling now. Refreshed every 15 minutes.</p><a class="go2" href="#top" onclick="document.getElementById('addr').focus();return false">Read a token →</a></div>
+    </div>
   </section>
 
-  <!-- PROOF -->
   <section class="sec">
-    <div class="stitle"><p class="micro eye">does it actually work?</p><h2>Judge it on the numbers</h2><p class="sub">These are retrospective study statistics. Selected cohorts and reconstructed observations limit their use; the new forward record is measured separately.</p></div>
-    <div class="proof" id="proof">
-      <div class="pc"><div class="pn c" id="p1n">—</div><div class="pl" id="p1l">of graded tokens did not reach the study threshold or died</div><div class="ps" id="p1s">the problem we're built for</div></div>
-      <div class="pc"><div class="pn g" id="p2n">—</div><div class="pl" id="p2l">historical checkpoint catch rate</div><div class="ps" id="p2s">not an early-entry success rate</div></div>
-      <div class="pc"><div class="pn" id="p3n">—</div><div class="pl" id="p3l">launches scanned</div><div class="ps" id="p3s">every one reconstructed from the chain</div></div>
+    <div class="stitle"><p class="micro eye">honest by design</p><h2>What is proven, and what is not</h2><p class="sub">We tested whether these signals predict returns. Most did not. The ones still open are being measured in public before anything is posted as a signal.</p></div>
+    <div class="proof">
+      <div class="pc rise"><div class="pn g" id="p1n">—</div><div class="pl">launches read right now</div><div class="ps" id="p1s">every live launch under 72h old</div></div>
+      <div class="pc rise"><div class="pn" id="p2n">738</div><div class="pl">wallets with a clean record</div><div class="ps" id="p2s">158 sharp · routers and bots excluded</div></div>
+      <div class="pc rise"><div class="pn c" id="p3n">—</div><div class="pl">radar forward test</div><div class="ps" id="p3s">a verdict needs 30 scored events</div></div>
     </div>
-    <p class="caveat">Winners are scored on a model rebuilt without them; losers were never part of it. Full method and every count on the <a href="/methodology">how-it-works page</a>; the new forward experiment, with its outcomes, on the <a href="/track-record">track record</a>. Signal, not proof — never a buy recommendation.</p>
-  </section>
-
-  <!-- ACCESS -->
-  <section class="sec">
-    <div class="panel access">
-      <p class="micro eye">access</p>
-      <h2>One free lookup for everyone. The rest runs on the token.</h2>
-      <p>Paste any token and get its full verdict, free — that never changes. Holding BLOCK0 unlocks the rest: the live board, the structural comparisons by stage, alerts and the proven-wallet leaderboard. Connect is a read-only balance check — no signing, no transactions, no custody. And the honest stuff stays public either way: the <a href="/methodology">method</a> and <a href="/track-record">every call we've made, graded</a>.</p>
-      <div class="btns"><a class="btn-lime" href="/board">Unlock the board</a><a class="btn-ghost" href="/token">Free token lookup</a></div>
-    </div>
+    <p class="caveat">On-chain facts, not financial advice. The research behind every claim, including the tests that failed, is on <a href="/methodology">the research page</a> and in the <a href="https://github.com/cianfru/Block0">open repository</a>.</p>
   </section>
 </main>
 
 <footer class="ft">
   <div class="ft-in">
     <div class="ft-top">
-      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">A launch scanner for the Robinhood Chain. Every number is reconstructed from public on-chain data. Signal, not proof — never a buy recommendation.</p></div>
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">On-chain facts for Robinhood Chain launches, read from public data. Never a buy or sell recommendation.</p></div>
       <div class="ft-cols">
-        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Scan a token</a></div>
-        <div><p class="micro">Trust</p><a href="/methodology">How it works</a><a href="/track-record">Track record</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+        <div><p class="micro">Product</p><a href="/radar">Smart-money radar</a><a href="#agent">The agent</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">The research</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
       </div>
     </div>
     <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
@@ -270,312 +201,102 @@
 </footer>
 
 <script src="/block0-cards.js"></script>
-<script src="/block0-gate.js"></script>
 <script>
 const $=(s)=>document.querySelector(s);
-// Scan produces a FREE verdict right here on the landing (the "should I ape?" answer). The full dossier —
-// wallet drill-downs, smart money, the corridor placement — lives behind the token gate, reached from the card's
-// "See the full dossier" button. Free = the read; gated = the depth.
-async function scan(e){
-  e.preventDefault();
-  const v=$("#addr").value.trim();
-  if(!/^0x[0-9a-fA-F]{40}$/.test(v)){ $("#addr").focus(); $("#addr").placeholder="Paste a full 0x… token address"; return false; }
-  const card=$("#herocard"); clearInterval(dtimer); dtimer=0; window.__pinned=true;
-  card.style.opacity="0";
-  setTimeout(()=>{ card.innerHTML='<div class="state" style="padding:56px 0">Scanning '+v.slice(0,6)+'…'+v.slice(-4)+' — reconstructing its on-chain history</div>'; card.style.opacity="1"; },160);
-  try{
-    const r=await fetch("/api/token?address="+v).then(x=>x.json());
-    if(r&&!r.error&&(r.risk!=null)){
-      r.address=r.address||v;
-      card.style.opacity="0";
-      setTimeout(()=>{ card.innerHTML=heroCardHTML(r); setAcc(card,r.risk||0); card.style.opacity="1"; window.B0CLOCK&&B0CLOCK.paint(); },160);
-      $("#hcap").innerHTML='your scan — the verdict is free · full dossier unlocks below';
-      $("#hdots").innerHTML='<i class="on"></i>';
-      $("#hdots").insertAdjacentHTML("beforeend",' <button id="rescan" style="margin-left:8px;background:none;border:none;color:var(--mute);font-size:.7rem;cursor:pointer;font-family:var(--sans)">scan another</button>');
-      const rb=$("#rescan"); if(rb) rb.addEventListener("click",()=>{ window.__pinned=false; $("#addr").value=""; $("#addr").focus(); if(DEMO.length){showDemo(0);dtimer=setInterval(()=>showDemo(di+1),6000);} $("#hcap").innerHTML='a real launch on the board right now — graded automatically'; });
-    } else { location.href="/token?address="+v; } // no public read → fall through to the dossier page
-  }catch(err){ location.href="/token?address="+v; }
-  return false;
-}
-B0GATE.mount({gated:false}); // landing is the public pitch — Connect works, nothing is walled here
+const esc=(s)=>String(s==null?"":s).replace(/[&<>"']/g,(m)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]));
+const clip=(s,n)=>{s=String(s||"");return s.length>n?s.slice(0,n-1)+"…":s;};   // symbols are attacker-controlled, any length
 
-// ---- what it checks: concrete signals ----
 const SIGNALS=[
-  {n:"Snipers",i:"scope",c:"#ff3b5c",d:"Wallets that bought in the first few blocks and are still sitting on the supply."},
-  {n:"Bundles",i:"cluster",c:"#ff3b5c",d:"One actor buying through a swarm of wallets in the same block to fake demand."},
-  {n:"Concentration",i:"converge",c:"#ffd23d",d:"How much of the token the top 10 wallets control — and can dump."},
-  {n:"Insider selling",i:"trenddown",c:"#ff3b5c",d:"Flagged early wallets offloading into the pool right now, live."},
-  {n:"Holder growth",i:"users",c:"#35e6e0",d:"Real new wallets arriving over time — or a hollow chart propped up by a few."},
-  {n:"Smart money",i:"brain",c:"#c8ff4d",d:"Wallets with a track record of winning past launches, showing up again."},
+  {n:"Snipers",i:"scope",c:"#ff3b5c",d:"Wallets that bought in the first blocks and still sit on the supply."},
+  {n:"Bundles",i:"cluster",c:"#ff3b5c",d:"One actor buying through a swarm of wallets in the same block."},
+  {n:"Concentration",i:"converge",c:"#ffd23d",d:"How much of the token the top 10 wallets hold."},
+  {n:"Insiders selling",i:"trenddown",c:"#ff3b5c",d:"Early wallets offloading into the pool right now."},
+  {n:"Holder growth",i:"users",c:"#35e6e0",d:"Real new wallets arriving, or a chart propped up by a few."},
+  {n:"Proven wallets",i:"brain",c:"#c8ff4d",d:"Wallets with closed, profitable trades on other launches, showing up again."},
 ];
-// Icon chips match the product cards: one neutral chip for all, the monoline glyph carries the semantic colour
-// (red = danger tells, amber = caution, teal/lime = healthy) — not six different coloured squares.
 $("#signals").innerHTML=SIGNALS.map(s=>`<div class="sig"><div class="st"><span class="sic" style="color:${s.c}">${B0.ico(s.i)}</span>${s.n}</div><p>${s.d}</p></div>`).join("");
 
-// ---- the live verdict card (the product, shown) ----
-const vcol=(r)=>r>=66?"c":r>=45?"a":r>=25?"a":"g"; // g lime / a amber / c coral
-function heroCardHTML(r){
-  const risk=r.risk||0, col=B0.HEX(risk), vc=vcol(risk);
-  const f=r.flags||{};
-  const sn=f.snipers?`${f.sniperHeldPct||0}% held`:"none", snc=!f.snipers?"g":(f.sniperHeldPct>=20?"c":f.sniperHeldPct>=8?"a":"g");
-  const bn=f.bundles||0, bnc=bn?"c":"g";
-  const t10=f.top10Pct||0, t10c=t10>=55?"c":t10>=35?"a":"g";
-  const sell=f.insiderSellersNow||0, sellc=sell?"c":"g";
-  const venue=r.venue==="uniswap-v4"?"uniswap":r.graduated?"graduated":r.progress!=null?"cooking":"launch";
-  return `<div class="hc-top">
-      <div><span class="hc-sym">${esc(r.sym||"?")}</span><span class="hc-meta">${venue} · ${B0.fmtAge(r.ageH)} · ${B0.mcT(r.mcapUsd)}</span></div>
-      <span class="hc-clock blockclock"></span>
-    </div>
-    <div class="hc-mid">
-      <div class="hc-dial" style="--p:${risk};--c:${col}"><div class="hc-dt"><div class="hc-dnum">${risk}</div><div class="hc-dlab">risk</div></div></div>
-      <div class="hc-vwrap"><span class="hc-vlabel ${vc}">${esc(r.label||"—")}</span><span class="hc-bp">${esc((r.blueprintLabel||"").toLowerCase())||"scored vs past winners"}</span></div>
-    </div>
-    ${bn
-      ? `<div class="hc-bundle">${B0.ico("warn")} <b>${bn} bundle${bn>1?"s":""} detected</b> — coordinated wallets bought as one</div>`
-      : `<div class="hc-bundle ok"><span class="ic">✓</span> <b>No bundles</b> — no coordinated buying in the launch</div>`}
+// ---- the live card: a real launch from the agent's board snapshot (refreshed ~15 min) ----
+const vcol=(r)=>r>=66?"c":r>=25?"a":"g";
+function cardHTML(r){
+  const risk=r.risk||0, col=B0.HEX(risk), f=r.flags||{};
+  const sn=f.snipers?`${f.snipers} · ${f.sniperHeldPct||0}% held`:"none", snc=!f.snipers?"g":(f.sniperHeldPct>=20?"c":f.sniperHeldPct>=8?"a":"g");
+  const bn=f.bundles||0, t10=f.top10Pct||0, t10c=t10>=55?"c":t10>=35?"a":"g", sell=f.insiderSellersNow||0;
+  const venue=r.venue==="orbio-agent"?"orbio agent":r.graduated?"graduated":"pons launch";
+  return `<div class="hc-top"><div><span class="hc-sym">${esc(clip(r.sym||"?",14))}</span><span class="hc-meta">${venue} · ${B0.fmtAge(r.ageH)} · ${B0.mcT(r.mcapUsd)}</span></div><span class="hc-clock blockclock"></span></div>
+    <div class="hc-mid"><div class="hc-dial" style="--p:${risk};--c:${col}"><div class="hc-dt"><div class="hc-dnum">${risk}</div><div class="hc-dlab">risk</div></div></div>
+      <div class="hc-vwrap"><span class="hc-vlabel ${vcol(risk)}">${esc(r.label||"—")}</span><span class="hc-bp">${(f.holders||0).toLocaleString()} holders · read from its own transfers</span></div></div>
+    ${bn?`<div class="hc-bundle">${B0.ico("warn")} <b>${bn} bundle${bn>1?"s":""} detected</b> — wallets bought as one</div>`:`<div class="hc-bundle ok"><span class="ic">✓</span> <b>No bundles</b> in the launch</div>`}
     <div class="hc-flags">
       <div class="hc-flag"><span class="hc-fl">Snipers</span><span class="hc-fv ${snc}">${sn}</span></div>
-      <div class="hc-flag"><span class="hc-fl">Bundles</span><span class="hc-fv ${bnc}">${bn||"none"}</span></div>
-      <div class="hc-flag"><span class="hc-fl">Top 10 hold</span><span class="hc-fv ${t10c}">${t10?t10+"%":"—"}</span></div>
-      <div class="hc-flag"><span class="hc-fl">Selling now</span><span class="hc-fv ${sellc}">${sell?sell+" wallet"+(sell>1?"s":""):"none"}</span></div>
+      <div class="hc-flag"><span class="hc-fl">Bundles</span><span class="hc-fv ${bn?"c":"g"}">${bn||"none"}</span></div>
+      <div class="hc-flag"><span class="hc-fl">Top 10 hold</span><span class="hc-fv ${t10c}">${t10?Math.round(t10)+"%":"—"}</span></div>
+      <div class="hc-flag"><span class="hc-fl">Selling now</span><span class="hc-fv ${sell?"c":"g"}">${sell?sell+" wallet"+(sell>1?"s":""):"none"}</span></div>
     </div>
-    <a class="hc-cta" href="/token?address=${r.address}">See the full dossier →</a>`;
+    <a class="hc-cta" href="https://dexscreener.com/robinhood/${esc(r.address)}" target="_blank" rel="noopener">Open the chart ↗</a>`;
 }
 function setAcc(el,risk){el.style.setProperty("--acc",risk>=66?"rgba(255,59,92,.16)":risk>=25?"rgba(255,210,61,.14)":"rgba(200,255,77,.16)");}
-const esc=(s)=>String(s==null?"":s).replace(/[&<>"]/g,(m)=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[m]));
+function show(r,cap){ const card=$("#herocard"); card.style.opacity="0";
+  setTimeout(()=>{ card.innerHTML=cardHTML(r); setAcc(card,r.risk||0); card.style.opacity="1"; window.B0CLOCK&&B0CLOCK.paint(); },170);
+  if(cap) $("#hcap").textContent=cap; }
 
-let DEMO=[], di=0, dtimer=0;
-function pickDemo(b){
-  const all=(b.cooking||[]).concat(b.dex||[],b.graduated||[]).filter(r=>r.sym&&r.mcapUsd>0&&r.flags);
-  if(!all.length) return [];
-  const byRisk=[...all].sort((a,b)=>a.risk-b.risk);
-  const clean=byRisk[0];
-  const risky=[...all].sort((a,b)=>(b.flags.insiderSellersNow||0)-(a.flags.insiderSellersNow||0)||b.risk-a.risk)[0];
-  const mid=byRisk[Math.floor(byRisk.length/2)];
-  const seen=new Set(), out=[];
-  for(const r of [clean,mid,risky]) if(r&&!seen.has(r.address)){seen.add(r.address);out.push(r);}
-  return out.slice(0,3);
+let ROWS=[], DEMO=[], di=0, dtimer=0, pinned=false;
+function pickDemo(rows){ // one clean, one middling, one with insiders selling — a launchpad reads live, not one colour
+  // only launches with real activity: a minutes-old token with no holders reads "risk 0" because nothing has happened yet
+  const live=rows.filter(r=>(r.flags?.holders||0)>=25&&(r.ageH||0)>=0.5); if(live.length>=2) rows=live;
+  const by=[...rows].sort((a,b)=>a.risk-b.risk), out=[], seen=new Set();
+  const sell=[...rows].sort((a,b)=>(b.flags?.insiderSellersNow||0)-(a.flags?.insiderSellersNow||0)||b.risk-a.risk)[0];
+  for(const r of [by[0],by[Math.floor(by.length/2)],sell]) if(r&&!seen.has(r.address)){seen.add(r.address);out.push(r);}
+  return out;
 }
-function showDemo(i){
-  if(!DEMO.length||window.__pinned) return;
-  di=(i+DEMO.length)%DEMO.length; const r=DEMO[di]; const card=$("#herocard");
-  card.style.opacity="0";
-  setTimeout(()=>{ card.innerHTML=heroCardHTML(r); setAcc(card,r.risk||0); card.style.opacity="1"; window.B0CLOCK&&B0CLOCK.paint(); },180);
-  const dots=$("#hdots"); dots.innerHTML=DEMO.map((_,k)=>`<i class="${k===di?"on":""}" data-k="${k}"></i>`).join("");
-  dots.querySelectorAll("i").forEach(el=>el.addEventListener("click",()=>{clearInterval(dtimer);showDemo(+el.dataset.k);dtimer=setInterval(()=>showDemo(di+1),6000);}));
-}
+function rotate(i){ if(!DEMO.length||pinned) return; di=(i+DEMO.length)%DEMO.length; show(DEMO[di],"a real launch, read from its own transfers");
+  $("#hdots").innerHTML=DEMO.map((_,k)=>`<i class="${k===di?"on":""}" data-k="${k}"></i>`).join("");
+  $("#hdots").querySelectorAll("i").forEach(el=>el.addEventListener("click",()=>{clearInterval(dtimer);rotate(+el.dataset.k);dtimer=setInterval(()=>rotate(di+1),6000);})); }
 
-// ---- ticker + board preview ----
-function tickerFrom(b){
-  const all=(b.cooking||[]).concat(b.graduated||[],b.dex||[]);
-  // build an INFORMATIVE, prioritised mix — a launchpad reads live, not a wall of "too early to call"
-  const hot=[],reads=[]; let clean=0,risky=0,dumping=0;
-  for(const r of all){
-    const f=r.flags||{};
-    if(f.insiderSellersNow>0){ hot.push({t:`▼ ${f.insiderSellersNow} dumping ${esc(r.sym)}`,c:"#ff3b5c"}); dumping++; }
-    else if(r.risk>=66){ hot.push({t:`⚠ ${esc(r.sym)} · high risk (${r.risk})`,c:"#ff3b5c"}); risky++; }
-    else if(r.risk<25){ reads.push({t:`✓ ${esc(r.sym)} reads clean`,c:"#c8ff4d"}); clean++; }
-    else if(r.graduated){ reads.push({t:`★ ${esc(r.sym)} graduated · ${B0.mcT(r.mcapUsd)}`,c:"#ff5cf0"}); }
-    else if(r.risk!=null){ reads.push({t:`${esc(r.sym)} · risk ${r.risk}`,c:"#b6b6bd"}); }
+function ticker(rows,stats){
+  const hot=[],reads=[];
+  for(const r of rows){ const f=r.flags||{}, s=esc(clip(r.sym,14));
+    if(f.insiderSellersNow>0) hot.push({t:`▼ ${f.insiderSellersNow} early wallet${f.insiderSellersNow>1?"s":""} selling ${s}`,c:"#ff3b5c"});
+    else if(f.bundles>0) hot.push({t:`⚠ ${s} · ${f.bundles} bundle${f.bundles>1?"s":""}`,c:"#ffd23d"});
+    else if(r.risk<25) reads.push({t:`✓ ${s} reads clean · ${B0.mcT(r.mcapUsd)}`,c:"#c8ff4d"});
+    else reads.push({t:`${s} · risk ${r.risk}`,c:"#b6b6bd"}); }
+  const out=[...hot,...reads]; if(stats?.launchTotal) out.push({t:`${stats.launchTotal.toLocaleString()} launches on Pons so far`,c:"#b6b6bd"});
+  if(!out.length) return;
+  const el=$("#ticker"); el.innerHTML=out.concat(out).map(x=>`<span style="color:${x.c}">${x.t}</span>`).join("");
+  const half=el.scrollWidth/2; if(half>0) el.style.animationDuration=Math.max(40,Math.round(half/34))+"s";
+}
+async function load(){
+  try{
+    const b=await fetch("/api/board").then(r=>r.json());
+    ROWS=[...(b.cooking||[]),...(b.graduated||[]),...(b.dex||[])].filter(r=>r&&r.sym&&r.risk!=null&&r.flags);
+    if(!ROWS.length) throw 0;
+    ticker(ROWS,b.stats);
+    const selling=ROWS.filter(r=>(r.flags.insiderSellersNow||0)>0).length, bundled=ROWS.filter(r=>(r.flags.bundles||0)>0).length;
+    $("#p1n").textContent=ROWS.length; $("#p1s").textContent=`${bundled} with bundles · ${selling} with insiders selling now`;
+    const upd=b.updated?Math.max(1,Math.round((Date.now()-b.updated)/60000)):null;
+    $("#proofline").innerHTML=`<span><b>${ROWS.length}</b> live launches read${upd?` · updated ${upd} min ago`:""}</span>`+(selling?`<span class="red">${selling} with insiders selling now</span>`:"");
+    DEMO=pickDemo(ROWS); if(!pinned){ rotate(0); clearInterval(dtimer); dtimer=setInterval(()=>rotate(di+1),6000); }
+  }catch(e){
+    $("#herocard").innerHTML='<div class="hc-empty">The live board is warming up.<br><a href="/radar">See where proven wallets are buying →</a></div>';
+    $("#proofline").innerHTML='<span>Live board warming up</span>';
   }
-  const s=b.stats||{}, stats=[];
-  if(clean||risky) stats.push({t:`${clean} clean · ${risky} high-risk on the board now`,c:"#b6b6bd"});
-  if(dumping) stats.push({t:`${dumping} with insiders selling`,c:"#ff3b5c"});
-  if(s.graduatedTotal) stats.push({t:`${s.graduatedTotal.toLocaleString()} have ever graduated the curve`,c:"#b6b6bd"});
-  // interleave: hot first, then reads, stats sprinkled
-  const items=[...hot,...reads]; const out=[];
-  items.forEach((it,i)=>{ out.push(it); if(stats.length && i%4===3) out.push(stats[(i/4|0)%stats.length]); });
-  if(stats.length) out.push(...stats);
-  if(!out.length) out.push({t:"scanning the launch universe…",c:"#b6b6bd"});
-  const run=out.concat(out);
-  const el=$("#ticker");
-  el.innerHTML=run.map(x=>`<span style="color:${x.c}">${x.t}</span>`).join("");
-  // Constant, calm scroll speed regardless of how much is on the tape: one copy of the content should take
-  // (width / SPEED) seconds to pass. The animation translates -50% (exactly one copy), so measure half the run.
-  const SPEED=34; // px per second — deliberately slow/readable
-  const half=el.scrollWidth/2;
-  if(half>0) el.style.animationDuration=Math.max(40,Math.round(half/SPEED))+"s";
 }
-async function loadBoard(){try{
-  const b=await fetch("/api/board").then(r=>r.json());
-  tickerFrom(b);
-  const all=(b.cooking||[]).slice().concat(b.dex||[]).sort((a,b)=>a.risk-b.risk);
-  const four=(all.length?all:(b.graduated||[])).slice(0,4);
-  $("#preview").innerHTML=four.length?four.map((r,i)=>B0.tokenCard(r,i)).join(""):'<div class="state">Board warming up — the first scan takes a moment…</div>';
-  // hero demo (skip while a user's scan result is pinned)
-  const picks=pickDemo(b);
-  if(picks.length){ DEMO=picks; window.__warm=true; if(!window.__pinned){ if(!dtimer){ showDemo(0); dtimer=setInterval(()=>showDemo(di+1),6000);} else { showDemo(di); } } }
-  else if(!window.__warm){ setTimeout(loadBoard,5000); } // cold start: poll faster until the board warms
-  // proof: launches scanned
-  if(b.stats&&(b.stats.launchTotal||b.stats.graduatedTotal)){ $("#p3n").textContent=(b.stats.launchTotal||b.stats.graduatedTotal).toLocaleString(); }
-  // hero funnel — real, live numbers (the total ticks up to the launchpad's own count)
-  if(b.stats){ if(b.stats.launchTotal)tickTo($("#fTotal"),b.stats.launchTotal); if(b.stats.graduatedTotal)tickTo($("#fGrad"),b.stats.graduatedTotal); }
-}catch(e){$("#preview").innerHTML='<div class="state">Board unavailable — retrying…</div>';setTimeout(loadBoard,8000);}}
-
-// ---- proof numbers (fade rate + winners caught) ----
-async function loadProof(){
-  try{ const v=await fetch("/api/validation").then(r=>r.json());
-    if(v.cohort&&v.cohort.winners!=null&&v.cohort.losers!=null){
-      const w=v.cohort.winners,l=v.cohort.losers,tot=w+l;
-      if(tot>0){ const fade=Math.round(l/tot*100);
-        $("#p1n").textContent=fade+"%";
-        $("#p1s").textContent=`${l} of ${tot} with settled outcomes`;
-      }
-    }
-    const h=v.headline||{};
-    if(h.catch!=null){ $("#p2n").textContent=Math.round(h.catch*100)+"%"; $("#p2s").textContent=`held-out · ${h.winnerObs||0} checkpoints`; }
-  }catch(e){}
-  // proofline in hero
-  try{ const [v,b]=await Promise.all([fetch("/api/validation").then(r=>r.json()),fetch("/api/board").then(r=>r.json())]);
-    const parts=[];
-    if(v.cohort&&v.cohort.losers!=null&&v.cohort.winners!=null){const tot=v.cohort.winners+v.cohort.losers; if(tot>0)parts.push(`<span class="red">${Math.round(v.cohort.losers/tot*100)}%</span> of graded tokens did not reach the study threshold`);}
-    const scanned=(b.stats&&(b.stats.launchTotal||b.stats.graduatedTotal))||0;
-    if(scanned)parts.push(`<b>${scanned.toLocaleString()}</b> launches reported by the source`);
-    if(parts.length)$("#proofline").innerHTML=parts.map(p=>`<span>${p}</span>`).join("");
-  }catch(e){}
+async function scan(e){
+  e.preventDefault(); const v=$("#addr").value.trim();
+  if(!/^0x[0-9a-fA-F]{40}$/.test(v)){ $("#addr").value=""; $("#addr").placeholder="Paste a full 0x… token address"; $("#addr").focus(); return false; }
+  pinned=true; clearInterval(dtimer); $("#hdots").innerHTML="";
+  if(!ROWS.length) await load();
+  const r=ROWS.find(t=>(t.address||"").toLowerCase()===v.toLowerCase());
+  if(r) show(r,"your token · its latest read from the live board");
+  else { $("#herocard").innerHTML=`<div class="hc-empty">That token isn't on the live board. It reads every Pons and Orbio launch under 72 hours old with at least $5k market cap.<br><br><a href="https://dexscreener.com/robinhood/${esc(v)}" target="_blank" rel="noopener">Open it on DexScreener ↗</a></div>`; $("#hcap").textContent=""; }
+  return false;
 }
-// count a number up to its live target (eased, tabular so nothing jitters); later calls retarget smoothly
-function tickTo(el,target){
-  if(!el||!(target>0))return;
-  const from=Number((el.textContent||"").replace(/[^0-9]/g,""))||Math.floor(target*0.986);
-  if(from===target){el.textContent=target.toLocaleString();return;}
-  const t0=performance.now(),D=1500,ease=(t)=>1-Math.pow(1-t,3);
-  cancelAnimationFrame(el._tick||0);
-  const step=(t)=>{const k=Math.min(1,(t-t0)/D);el.textContent=Math.round(from+(target-from)*ease(k)).toLocaleString();if(k<1)el._tick=requestAnimationFrame(step);};
-  el._tick=requestAnimationFrame(step);
-}
-// winners leg of the funnel — only from the OUTCOME-labelled study (counts present); never faked from older data
-// the funnel's last two stages come from the study: closed above $1M for a day (a past fact) → held it a week+
-async function loadWinners(){
-  try{ const v=await fetch("/api/validation").then(r=>r.json());
-    const f=v&&(v.funnel||(v.cohort&&v.cohort.funnel));
-    if(f&&f.reached>0){ $("#fWin").textContent=f.reached; $("#fWinWrap").hidden=false; $("#fWinArr").hidden=false;
-      if(f.sustained>0){ $("#fSus").textContent=f.sustained; $("#fSusWrap").hidden=false; $("#fSusArr").hidden=false; } }
-  }catch(e){}
-}
-// PROOF — the winners the model caught (retrospective, real). The LIVE best shot stays gated (the .shotlock CTA).
-// This deliberately shows what a "best shot" grows INTO, not today's actionable pick — the pick is the paid product.
-async function loadWins(){
-  try{ const v=await fetch("/api/validation").then(r=>r.json());
-    const roll=(v.winnerRoll||[]).slice(0,6);
-    if(!roll.length) return;
-    const f=v.funnel||(v.cohort&&v.cohort.funnel)||{}, p=v.progress||{};
-    const done=f.launched||p.cached||p.backtested||0, reached=f.reached||roll.length, sus=f.sustained||0;
-    // the honest funnel, in plain words — never one scary tier
-    let sub=done?`In a selected study of ${done.toLocaleString()} launches, ${reached} closed above $1M for a full day — about 1 in ${Math.max(2,Math.round(done/Math.max(1,reached)))}.`:`${reached} launches closed above $1M for a full day.`;
-    if(sus) sub+=` ${sus} of those held it a week or more. The biggest are below, with what happened next.`;
-    $("#proofSub").textContent=sub;
-    // fate = the Q2 answer, per token: held it / faded after / still too young to call
-    const FATE={major:["held it",'var(--lime)'],runner:["held it",'var(--lime)'],faded:["faded after",'var(--coral)'],pending:["too young to call",'var(--mute)'],mid:["still open",'var(--mute)']};
-    $("#wins").innerHTML=roll.map(w=>{ const [ft,fc]=FATE[w.tier]||["—","var(--mute)"]; const keep=w.peakHolders?Math.round((w.holders/w.peakHolders)*100):null;
-      const bits=[]; if(w.sustainedH>=24) bits.push("above $1M for "+Math.round(w.sustainedH/24)+"d"); if(keep!=null&&(w.tier==="major"||w.tier==="runner")) bits.push(keep+"% still holding");
-      return `<div class="win"><span class="win-top"><span class="win-sym">${esc(w.sym||"?")}</span><span class="win-tier" style="color:${fc};border-color:${fc}">${ft}</span></span>
-        <span class="win-cap">${B0.mcT(w.heldPeak)}</span><span class="win-cl">closed above · a full day</span>
-        <span class="win-meta">${bits.join(" · ")||"closed above $1M for a day"}</span></div>`;}).join("");
-    $("#shotsec").hidden=false;
-  }catch(e){}
-}
-loadBoard();loadProof();loadWinners();loadWins();setInterval(loadBoard,30000);
-
-/* ============ the winner corridor — lateral profile ============ */
-(function(){
-  const cv=$("#corr"); if(!cv) return; const g=cv.getContext("2d");
-  const reduce=matchMedia("(prefers-reduced-motion:reduce)").matches;
-  let W=0,H=0,dpr=1,lastW=-1,lastH=-1,curHu=1;
-  // Size EVERY frame from two proven-reliable sources: WIDTH from the PARENT container (its interior width is always
-  // the full card — the canvas's own rect fights its width attribute and read wrong), HEIGHT from the media-query
-  // constant that exactly matches the CSS `canvas{height:440px/330px}` (measuring the parent's height read a spurious
-  // taller value). No early-return that could lock a transient narrow width (that's what squashed the lane into the
-  // left); reallocate the backing store (which clears the canvas) only when the pixel size actually changes.
-  const MOBILE = () => window.matchMedia("(max-width:700px)").matches;
-  function ensureSize(){
-    W=Math.max(1,Math.round(cv.parentElement.clientWidth));
-    H=MOBILE()?330:440;
-    dpr=Math.min(2,window.devicePixelRatio||1);
-    const bw=Math.round(W*dpr), bh=Math.round(H*dpr);
-    const changed=(bw!==lastW||bh!==lastH);
-    if(changed){ lastW=bw;lastH=bh; cv.width=bw; cv.height=bh; }   // resize (clears) only when needed
-    g.setTransform(dpr,0,0,dpr,0,0);                               // cheap; a resize resets the transform, so re-apply
-    return changed; }
-
-  const smooth=(t)=>t*t*(3-2*t), clamp=(v,a,b)=>v<a?a:v>b?b:v, mix=(a,b,t)=>a+(b-a)*t;
-  const GATES=[{u:.17,l:"first hour"},{u:.43,l:"100 holders"},{u:.69,l:"graduation"},{u:.93,l:"real market"}];
-  const LOSERS=[{drop:.09,s:1.7},{drop:.20,s:4.1},{drop:.34,s:2.3},{drop:.55,s:5.6}];
-  // corridor geometry (v: 0 bottom → 1 top)
-  const cvv=(u)=>0.15+0.66*smooth(u);           // centreline rises as a token proves itself
-  const hw=(u)=>0.155*(1-0.35*u);               // lane narrows a touch over time
-  const winV=(u)=>clamp(cvv(u)+0.055*Math.sin(u*9+0.6)+0.02*Math.sin(u*23),cvv(u)-hw(u)+0.03,cvv(u)+hw(u)-0.03);
-  const loseV=(ls,u)=>{ if(u<=ls.drop) return cvv(u)-0.02+0.03*Math.sin(u*30+ls.s);
-    const t=clamp((u-ls.drop)/0.35,0,1); return mix(cvv(ls.drop)-0.02,0.02,t*t); };
-
-  function frame(hu){
-    curHu=hu; ensureSize();
-    const PL=44,PR=88,PT=40,PB=48; const yT=PT,yB=H-PB,hh=yB-yT;
-    const X=(u)=>PL+u*(W-PL-PR), Y=(v)=>yB-clamp(v,0,1)*hh;
-    g.clearRect(0,0,W,H);
-    // faint grid
-    g.strokeStyle="rgba(255,255,255,.04)"; g.lineWidth=1;
-    for(let i=0;i<=6;i++){const x=PL+i/6*(W-PL-PR);g.beginPath();g.moveTo(x,yT-8);g.lineTo(x,yB+8);g.stroke();}
-    // corridor band (the lane)
-    const N=80;
-    g.beginPath();
-    for(let i=0;i<=N;i++){const u=i/N;const x=X(u),y=Y(cvv(u)+hw(u));i?g.lineTo(x,y):g.moveTo(x,y);}
-    for(let i=N;i>=0;i--){const u=i/N;g.lineTo(X(u),Y(cvv(u)-hw(u)));}
-    g.closePath();
-    const bg=g.createLinearGradient(0,yT,0,yB); bg.addColorStop(0,"rgba(200,255,77,.10)"); bg.addColorStop(.6,"rgba(53,230,224,.05)"); bg.addColorStop(1,"rgba(53,230,224,.02)");
-    g.fillStyle=bg; g.fill();
-    // band edges
-    for(const sgn of [1,-1]){ g.beginPath(); for(let i=0;i<=N;i++){const u=i/N;const x=X(u),y=Y(cvv(u)+sgn*hw(u));i?g.lineTo(x,y):g.moveTo(x,y);} g.strokeStyle="rgba(255,255,255,.10)"; g.lineWidth=1; g.stroke(); }
-    // launch marker (left)
-    g.fillStyle="rgba(255,255,255,.5)"; g.font="12px ui-monospace,Menlo,monospace"; g.textAlign="center";
-    g.fillText("launch", X(0), yB+22);
-    // gates
-    for(const gt of GATES){ const x=X(gt.u), yt=Y(cvv(gt.u)+hw(gt.u))-8, yb=Y(cvv(gt.u)-hw(gt.u))+8; const lit=hu>=gt.u;
-      const col=lit?"#c8ff4d":"rgba(255,255,255,.16)";
-      g.strokeStyle=col; g.lineWidth=lit?2.4:1.6;
-      if(lit){g.shadowColor="rgba(200,255,77,.55)";g.shadowBlur=12;}
-      // bracket posts
-      g.beginPath(); g.moveTo(x-9,yt); g.lineTo(x,yt); g.lineTo(x,yb); g.lineTo(x-9,yb); g.stroke();
-      g.beginPath(); g.moveTo(x+9,yt); g.lineTo(x,yt); g.moveTo(x+9,yb); g.lineTo(x,yb); g.stroke();
-      g.shadowBlur=0;
-      g.fillStyle=lit?"#c8ff4d":"rgba(255,255,255,.42)"; g.font="12px ui-monospace,Menlo,monospace"; g.textAlign="center";
-      g.fillText(gt.l, x, yb+22);
-    }
-    // losers (coral), animated + fading as they fall out
-    for(const ls of LOSERS){ const end=Math.min(hu,1); if(end<0.02) continue;
-      g.beginPath(); let started=false;
-      for(let i=0;i<=N;i++){ const u=i/N; if(u>end) break; const x=X(u),y=Y(loseV(ls,u)); started?g.lineTo(x,y):(g.moveTo(x,y),started=true); }
-      const fell=Math.max(0,Math.min(1,(end-ls.drop)/0.35));
-      g.strokeStyle=`rgba(255,59,92,${(0.75*(1-0.6*fell)).toFixed(2)})`; g.lineWidth=2; g.stroke();
-    }
-    // winner line (lime) with comet head
-    g.beginPath(); for(let i=0;i<=N;i++){ const u=i/N; if(u>hu) break; const x=X(u),y=Y(winV(u)); i?g.lineTo(x,y):g.moveTo(x,y); }
-    g.strokeStyle="#c8ff4d"; g.lineWidth=3; g.lineJoin="round";
-    g.save(); g.shadowColor="rgba(200,255,77,.6)"; g.shadowBlur=14; g.stroke(); g.restore();
-    // head
-    if(hu<1||reduce){ const hx=X(hu),hy=Y(winV(hu)); g.beginPath(); g.arc(hx,hy,5.5,0,7); g.fillStyle="#eaffb0"; g.save(); g.shadowColor="#c8ff4d"; g.shadowBlur=16; g.fill(); g.restore(); }
-    // WINNER badge above the end point (fades in near completion; above so it never clips the right edge)
-    const wa=clamp((hu-0.82)/0.18,0,1);
-    if(wa>0){ const ex=X(1),ey=Y(winV(1)); g.globalAlpha=wa;
-      g.beginPath(); g.arc(ex,ey,7,0,7); g.fillStyle="#c8ff4d"; g.save(); g.shadowColor="#c8ff4d"; g.shadowBlur=18; g.fill(); g.restore();
-      g.font="700 14px Inter,system-ui,sans-serif"; g.textAlign="center"; g.fillStyle="#c8ff4d";
-      g.save(); g.shadowColor="rgba(200,255,77,.5)"; g.shadowBlur=10; g.fillText("WINNER", ex, ey-16); g.restore(); g.globalAlpha=1; }
-  }
-
-  // Keep the backing store matched to the box on any reflow (orientation, font swap, late layout) and repaint the
-  // current frame — this is what makes the mobile size self-correct instead of freezing at a stale height.
-  const ro=new ResizeObserver(()=>{ if(ensureSize()) frame(curHu); }); ro.observe(cv.parentElement); ro.observe(cv);
-  // Paint a correct resting frame immediately, and again once layout is FINAL (full load + web-font swap) — so the
-  // resting/reduced-motion state can't be left drawn at a transient pre-layout width when the loop isn't ticking.
-  requestAnimationFrame(()=>frame(1));
-  addEventListener("load", () => frame(curHu));
-  if (document.fonts && document.fonts.ready) document.fonts.ready.then(() => frame(curHu));
-  if(reduce){ return; }
-  const DUR=3600, HOLD=1600, CYCLE=DUR+HOLD; let t0=null, vis=false;
-  const io=new IntersectionObserver((es)=>{ const on=es[0].isIntersecting; if(on&&!vis)t0=null; vis=on; },{threshold:.15}); io.observe(cv);
-  function loop(t){ if(vis){ if(t0==null)t0=t; const e=(t-t0)%CYCLE; frame(e<DUR?smooth(clamp(e/DUR,0,1)):1); } requestAnimationFrame(loop); }
-  requestAnimationFrame(loop);
-})();
+// the radar's forward test status, read straight from its public log
+fetch("https://raw.githubusercontent.com/cianfru/Block0/radar-data/REPORT.txt").then(r=>r.ok?r.text():"").then(t=>{
+  const logged=t.match(/events logged (\d+)/), scored=t.match(/scored (\d+)/);
+  if(logged){ $("#p3n").textContent=(scored?scored[1]:"0")+" / 30"; $("#p3s").textContent=`${logged[1]} convergences logged · ${/VERDICT: PASS/.test(t)?"passed":/VERDICT: FAIL/.test(t)?"failed — said so":"no verdict yet"}`; }
+}).catch(()=>{});
+load(); setInterval(load,5*60000);
 </script>
 </body>
 </html>

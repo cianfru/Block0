@@ -1,27 +1,12 @@
 {
+  "buildCommand": "rm -rf .out && mkdir .out && cp -r $(ls -A | grep -vx '.out') .out/ && cp index.html .out/token.html && cp landing.html .out/index.html",
+  "outputDirectory": ".out",
+  "installCommand": "",
   "cleanUrls": true,
-  "git": {
-    "deploymentEnabled": {
-      "radar-data": false,
-      "agent-data": false
-    }
-  },
-  "headers": [
-    {
-      "source": "/smart-wallets.json",
-      "headers": [
-        {
-          "key": "Cache-Control",
-          "value": "public, max-age=3600"
-        }
-      ]
-    }
+  "rewrites": [
+    { "source": "/api/validation", "destination": "/data/validation.json" },
+    { "source": "/api/board", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/board.json" }
   ],
-  "redirects": [
-    {
-      "source": "/",
-      "destination": "/radar",
-      "permanent": false
-    }
-  ]
+  "git": { "deploymentEnabled": { "radar-data": false, "agent-data": false } },
+  "headers": [{ "source": "/smart-wallets.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] }]
 }
