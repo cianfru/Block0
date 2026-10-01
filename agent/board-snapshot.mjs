@@ -13,7 +13,7 @@ export function mergeReads(prev, tokens, { now = Date.now(), maxAgeH = 72 } = {}
     next[t.address] = { address: t.address, sym: t.sym, mcapUsd: t.mcapUsd ?? null, launchedAgeH: t.ageH ?? null, readAt: now,
       risk: t.risk, label: t.label ?? null, graduated: !!t.graduated, progress: t.progress ?? null, venue: t.venue ?? "pons", flags };
   }
-  for (const [a, t] of Object.entries(next)) if ((t.launchedAgeH ?? 0) + (now - t.readAt) / 3.6e6 > maxAgeH) delete next[a];
+  for (const [a, t] of Object.entries(next)) if ((t.launchedAgeH ?? 0) + (now - t.readAt) / 3.6e6 > maxAgeH || (t.flags?.holders ?? 0) < 5) delete next[a];
   return next;
 }
 

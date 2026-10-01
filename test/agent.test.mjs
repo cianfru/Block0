@@ -168,4 +168,6 @@ test("board snapshot: latest read per token, slim fields, aged-out tokens droppe
   assert.deepEqual([b.cooking.length, b.graduated.length, b.dex.length, b.stats.launchTotal], [1, 1, 0, 5]);
   assert.equal(b.graduated[0].section, "graduated"); assert.equal(b.cooking[0].ageH, 2); assert.equal(b.graduated[0].ageH, 3);   // age = launch age at read + time since
   assert.deepEqual(Object.keys(mergeReads(r, [], { now: NOW + 80 * 3600e3 })), []);   // past 72h → dropped
+  const stale = { ...r, [A(9)]: { ...r[A(1)], address: A(9), flags: { holders: 0 } } };          // carried over from older state
+  assert.equal(mergeReads(stale, [], { now: NOW + 3600e3 })[A(9)], undefined);
 });
