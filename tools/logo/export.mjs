@@ -1,9 +1,9 @@
 import { mark, svg } from "./gen.mjs";
 import { writeFileSync, mkdirSync } from "node:fs";
 import { chromium } from "playwright";
-const BG = "#0a0614", INK = "#0a0614";
+const BG = "#0a0a0d", INK = "#0a0a0d";
 const P = { zero: "slash", w: 17, r: 29, gap: 12, stemTop: 22 };
-const dark = mark(P).inner, light = mark({ ...P, color: { b: INK, z: "grad" } }).inner;
+const dark = mark(P).inner, light = mark({ ...P, color: { b: INK, z: "#e0c400" } }).inner;   // deeper yellow: fluo yellow vanishes on white
 // the 0 alone = the atom (favicon fallback at the tiniest sizes could use it; also a standalone glyph)
 const OUT = process.argv[2] || "public"; mkdirSync(OUT, { recursive: true });
 const files = {

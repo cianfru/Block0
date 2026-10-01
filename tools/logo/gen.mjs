@@ -1,8 +1,8 @@
 // b0 mark — constructed geometry, no font. The 0 is the atom (a monoline ring); the b is the same ring plus a stem.
 // Coordinates in a 200×200 box; the mark is centred by measuring its extents.
-// Palette "ultraviolet rave" (2026-10-01): lavender-white b, the 0 in an ultraviolet → hot-pink gradient ("grad").
-export const UV = "#9b5cff", PINK = "#ff2fd0", WHITE = "#f3eeff", BG = "#0a0614";
-export function mark({ zero = "slash", w = 20, r = 24, gap = 12, stemTop = 30, color = { b: WHITE, z: "grad" } } = {}) {
+// Palette (2026-10-01): soft-white b, a solid FLUO-YELLOW 0. ("grad" — a UV → periwinkle sweep — is kept as an option.)
+export const UV = "#7f63ff", PINK = "#5f7fff", YELLOW = "#fff200", WHITE = "#f2f2f5", BG = "#0a0a0d";
+export function mark({ zero = "slash", w = 20, r = 24, gap = 12, stemTop = 30, color = { b: WHITE, z: YELLOW } } = {}) {
   const R = r + w / 2;                       // outer radius
   const base = 160, cy = base - R;           // baseline = bowl outer bottom
   const stemX = 46;                          // stem centreline
