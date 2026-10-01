@@ -172,10 +172,12 @@ test("tick: live mode posts to the connected platform with max_cost; a 402 stops
   assert.ok(!/https?:/.test(posts[0].args.text));
   assert.deepEqual(posted.filter((p) => p.name === "social.x.posts").map((p) => p.args), [{ mentions_of: "block0app", limit: 20 }, { mentions_of: "block0app", limit: 20 }]);
   assert.equal(t2.out.posted[0].url, "https://x.com/b/status/1");
+  assert.deepEqual([t2.state.orbio.platform, t2.state.orbio.username, t2.state.orbio.error], ["twitter", "block0app", null]);   // the connection check, kept
   const w = world({ sellers: 0, withdrawn: 500n });
   w.orbio.tool = async () => { throw new OrbioError("balance", "402"); };
   const t3 = await runTick({ ...w, apiKey: "k", state: t2.state, now: NOW + 7 * 3600e3, dryRun: false });
   assert.equal(t3.state.stoppedDay, "2026-10-01");
+  assert.match(t3.state.stoppedWhy, /^balance/);
   assert.ok(t3.out.held.some((h) => h.why === "post failed"));
 });
 
