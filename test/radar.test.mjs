@@ -54,6 +54,20 @@ test("positions: two wallets distributing old bags reads as exiting; sinceBlock 
   assert.doesNotMatch(verdict(rows[0]), /buy now|moon|ape|100x/i);
 });
 
+test("v3: partial sales, transfers and deposits cannot qualify as no-outflow convergence", () => {
+  for (const side of ["sell", "transfer", "deposit"]) {
+    const moves = [SW1, SW2].flatMap(w => [
+      { w, token: MEME, side: "buy", dir: "in", amt: 100, block: 1 },
+      { w, token: MEME, side, dir: "out", amt: 10, block: 2 },
+      { w, token: MEME, side: "buy", dir: "in", amt: 100, block: 3 },
+    ]);
+    const r = positions(moves.reverse(), meta)[0];
+    assert.equal(r.nHolding, 0);
+    assert.notEqual(r.signal, "converging");
+    assert.doesNotMatch(verdict(r), /have not sold|none bought/);
+  }
+});
+
 test("unknownCounterparties lists only unresolved non-smart, non-venue sides", () => {
   const t = decodeTransfers([log(MEME, A(77), SW1, 1, 1, "0x1"), log(MEME, AMM, SW1, 1, 1, "0x2"), log(MEME, POOL, SW2, 1, 1, "0x3"), log(MEME, SW1, SW2, 1, 1, "0x4")]);
   assert.deepEqual(unknownCounterparties(t, ctx), [A(77)]);

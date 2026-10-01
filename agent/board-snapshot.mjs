@@ -3,6 +3,8 @@
 // in the /api/board shape: { cooking, graduated, dex, stats }. Pure.
 import { KINDS } from "../alert-events.mjs";
 import { AGENT_KINDS } from "./agent-events.mjs";
+import { LIVE_MIN, MAX_READ_MIN, readFreshness, freshFlags } from "../public/read-freshness.js";
+export { LIVE_MIN, MAX_READ_MIN } from "../public/read-freshness.js";
 
 const FLAGS = ["snipers", "sniperHeldPct", "bundles", "bundleWallets", "bundleHeldPct", "top10Pct", "holders", "wallets", "insiderSellersNow", "insiderDumpNowPct", "earlyMovedOutNow", "earlyMovedOutPct"];
 
@@ -26,13 +28,11 @@ export function mergeReads(prev, tokens, { now = Date.now(), maxAgeH = 72 } = {}
 // re-read in that cycle. Rows older than maxReadMin are left off; the "right now" fields (wallets selling in the last
 // 30 min) only mean something close to the read, so past liveMin they are blanked and the row is marked stale.
 // `updated` is when the board was assembled; `observedAt` is the newest chain read on it.
-export const LIVE_MIN = 45, MAX_READ_MIN = 180;
-const NOW_FLAGS = ["insiderSellersNow", "insiderDumpNowPct", "earlyMovedOutNow", "earlyMovedOutPct"];
 export function boardSnapshot(reads, stats, { now = Date.now(), limit = 60, liveMin = LIVE_MIN, maxReadMin = MAX_READ_MIN } = {}) {
-  const rows = Object.values(reads || {}).filter((t) => now - t.readAt <= maxReadMin * 60e3)
+  const rows = Object.values(reads || {}).filter((t) => !readFreshness(t.readAt, now, { liveMin, maxReadMin }).expired)
     .map(({ launchedAgeH, ...t }) => {
-      const stale = now - t.readAt > liveMin * 60e3;
-      const flags = stale ? { ...t.flags, ...Object.fromEntries(NOW_FLAGS.map((k) => [k, null])) } : t.flags;
+      const { stale } = readFreshness(t.readAt, now, { liveMin, maxReadMin });
+      const flags = freshFlags(t.flags, stale);
       return { ...t, flags, stale, ageH: launchedAgeH == null ? null : +(launchedAgeH + (now - t.readAt) / 3.6e6).toFixed(1), section: t.graduated ? "graduated" : "cooking" };
     })
     .sort((a, b) => (b.mcapUsd || 0) - (a.mcapUsd || 0)).slice(0, limit);

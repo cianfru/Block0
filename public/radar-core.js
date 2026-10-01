@@ -119,7 +119,9 @@ export function positions(moves, walletMeta, { sinceBlock = 0 } = {}) {
       return { ...w, status, tier: meta.tier || "proven", tokensWon: meta.tokensWon ?? null, winRate: meta.winRate ?? null };
     }).sort((a, b) => b.lastBlock - a.lastBlock);
     if (!ws.length) continue;
-    const holding = ws.filter((w) => w.status === "buying" || w.status === "trimmed");
+    // Convergence promises no observed outflow, not an estimated remaining balance.
+    // Even a partial sale/deposit breaks that promise; a later rebuy does not erase it.
+    const holding = ws.filter((w) => w.status === "buying");
     const sellers = ws.filter((w) => w.status !== "buying");
     rows.push({ token: t.token, wallets: ws, nSellers: sellers.length, nHolding: holding.length,
       nSharp: holding.filter((w) => w.tier === "sharp").length, firstBlock: t.firstBlock, lastBlock: t.lastBlock, lastBuyBlock: t.lastBuyBlock,
@@ -138,7 +140,7 @@ export function verdict(row, { minutesAgo = null, mcapUsd = null } = {}) {
   const when = minutesAgo == null ? "" : minutesAgo < 1 ? " just now" : ` ${Math.round(minutesAgo)} min ago`;
   const at = mcapUsd ? ` · now ${$(mcapUsd)}` : "";
   if (row.signal === "converging") return `${who(row.nHolding, row.nSharp)} bought and ${row.nHolding === 1 ? "has" : "have"} not sold or moved it since${row.nSellers ? ` · ${row.nSellers} sold or moved out` : ""} · last buy${when}${at}`;
-  if (row.signal === "exiting") return `${row.nSellers} proven wallets sold or moved out · none bought in this window${when ? " · last" + when : ""}${at}`;
+  if (row.signal === "exiting") return `${row.nSellers} proven wallets sold or moved out · ${row.wallets.some((w) => w.buys) ? "no buyers without an observed outflow" : "none bought in this window"}${when ? " · last" + when : ""}${at}`;
   const w = row.wallets[0];
   return `${who(1, w?.tier === "sharp" ? 1 : 0)} ${w?.status === "buying" || w?.status === "trimmed" ? "bought" : w?.status === "moved" ? "moved it out" : "sold"}${when}${at}`;
 }
