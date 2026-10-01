@@ -23,8 +23,8 @@
   .alertsbar .ev:last-child{border-bottom:none}
   /* kind tag — a square-cornered mono label with a left accent bar (terminal style, not a pill) */
   .alertsbar .k{flex:0 0 auto;font-family:var(--mono);font-size:.64rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px 3px 9px;border-radius:3px;border-left:3px solid;background:rgba(255,255,255,.04)}
-  .alertsbar .k.bad{color:#ff2e4d;border-left-color:#ff2e4d;background:rgba(255,46,77,.09)}
-  .alertsbar .k.good{color:var(--mint);border-left-color:var(--mint);background:rgba(43,255,176,.09)}
+  .alertsbar .k.bad{color:#ff1f4b;border-left-color:#ff1f4b;background:rgba(255,31,75,.09)}
+  .alertsbar .k.good{color:var(--mint);border-left-color:var(--mint);background:rgba(61,255,110,.09)}
   .alertsbar .ev a.sym{font-weight:700;color:var(--tx)}
   .alertsbar .ev .hl{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
   .alertsbar .ev .ago{margin-left:auto;flex:0 0 auto;font-size:.72rem;color:var(--dim);font-variant-numeric:tabular-nums}
@@ -152,7 +152,7 @@ async function loadPicks(){ if(_picksLoading)return; _picksLoading=true;
   catch{ if(FILTER==="picks")$("#board").innerHTML='<div class="state">Picks unavailable — retrying…</div>'; }
   finally{ _picksLoading=false; } }
 const _money=(n)=>B0.mcT?B0.mcT(n):("$"+Math.round(n||0).toLocaleString());
-const _riskChip=(risk,label)=>{const c=risk<25?"var(--mint)":risk<45?"#ff9a1f":"#ff2e4d";return `<span class="chip" style="color:${c}">${B0.esc(label||("risk "+risk))}</span>`;};
+const _riskChip=(risk,label)=>{const c=risk<25?"var(--mint)":risk<45?"#ff7a00":"#ff1f4b";return `<span class="chip" style="color:${c}">${B0.esc(label||("risk "+risk))}</span>`;};
 function pickBlock(br){
   const p=br.pick, runner=br.runnerUp?br.candidates.find(c=>c.address===br.runnerUp):null;
   return `<div class="panel" style="padding:16px 18px;display:grid;gap:10px">
@@ -172,7 +172,7 @@ function pickBlock(br){
       <span>${(p.holders||0).toLocaleString()} holders</span>
       ${p.top10Pct!=null?`<span>top-10 ${p.top10Pct}%</span>`:""}
       <span>blueprint ${p.blueprint}/100</span>
-      ${p.bundles?`<span style="color:#ff2e4d">${p.bundles} bundle${p.bundles>1?"s":""}</span>`:""}
+      ${p.bundles?`<span style="color:#ff1f4b">${p.bundles} bundle${p.bundles>1?"s":""}</span>`:""}
       ${p.snipers?`<span style="color:#ff8f3b">${p.snipers} snipers</span>`:""}
     </div>
     ${runner?`<div class="micro" style="color:var(--dim)">runner-up · <a href="/token?address=${runner.address}" style="color:var(--dim)">$${B0.esc(runner.sym)}</a> · ${_money(runner.mcapUsd)}</div>`:""}

@@ -91,8 +91,8 @@
   .wa:hover{color:var(--tx)}
   .tg{font-size:.58rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:3px 6px;
       border-radius:4px;border:1px solid var(--line-2);color:var(--mute);margin-left:8px;white-space:nowrap}
-  .tg.snip{color:var(--amber);border-color:rgba(255,154,31,.34)}
-  .tg.bund{color:var(--magenta);border-color:rgba(169,139,255,.32)}
+  .tg.snip{color:var(--amber);border-color:rgba(255,122,0,.34)}
+  .tg.bund{color:var(--magenta);border-color:rgba(193,59,255,.32)}
   .net.up{color:var(--cyan)} .net.dn{color:var(--coral)}
   .hbar{display:block;height:5px;border-radius:3px;background:rgba(255,255,255,.09);min-width:2px}
   .hbar i{display:block;height:100%;border-radius:3px;background:linear-gradient(90deg,var(--lime),var(--cyan))}
@@ -276,7 +276,7 @@ function arrival(d) {
 
   const dots = w.map((p) => {
     const isB = bundled.has(String(p.a || "").toLowerCase()), isS = !!p.sniper;
-    const c = isB ? "#a98bff" : isS ? "#ff9a1f" : "#22e9ff";
+    const c = isB ? "#c13bff" : isS ? "#ff7a00" : "#00f0ff";
     const gone = !(p.bal > 0);
     const r = gone ? 2.5 : Math.max(3, Math.sqrt(p.bal / maxBal) * 13);
     const how = isB ? "bundled" : isS ? "sniper" : "open market";
@@ -293,9 +293,9 @@ function arrival(d) {
       ${dots}${ticks}
     </svg>
     <div class="arrleg">
-      <span><i style="background:#22e9ff"></i>arrived on the open market</span>
-      <span><i style="background:#ff9a1f"></i>sniper · within 3 blocks of the first trade</span>
-      <span><i style="background:#a98bff"></i>bundled · bought in the same block as others</span>
+      <span><i style="background:#00f0ff"></i>arrived on the open market</span>
+      <span><i style="background:#ff7a00"></i>sniper · within 3 blocks of the first trade</span>
+      <span><i style="background:#c13bff"></i>bundled · bought in the same block as others</span>
       <span>higher = larger holder · faded = has since exited</span>
     </div>
   </div>`;
@@ -332,7 +332,7 @@ function sparkline(candles) {
   const x = (i) => (i / (pts.length - 1)) * W;
   const y = (v) => pad + (1 - (v - lo) / Math.max(1e-12, hi - lo)) * (H - pad * 2);
   const line = pts.map((v, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join("");
-  const up = pts[pts.length - 1] >= pts[0], c = up ? "#22e9ff" : "#ff2e4d";
+  const up = pts[pts.length - 1] >= pts[0], c = up ? "#00f0ff" : "#ff1f4b";
   return `<svg class="spark" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">
     <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1">
       <stop offset="0" stop-color="${c}" stop-opacity=".22"/><stop offset="1" stop-color="${c}" stop-opacity="0"/>

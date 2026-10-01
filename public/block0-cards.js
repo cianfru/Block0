@@ -1,11 +1,11 @@
 /* Shared renderers for the Block0 pages — the token card (board + landing) and the leaderboard row — so the
    look never drifts between surfaces. Vanilla, no build step. */
 const B0 = (() => {
-  const HEX = (r) => r >= 66 ? "#ff2e4d" : r >= 45 ? "#ff9a1f" : r >= 25 ? "#22e9ff" : "#2bffb0";
+  const HEX = (r) => r >= 66 ? "#ff1f4b" : r >= 45 ? "#ff7a00" : r >= 25 ? "#00f0ff" : "#3dff6e";
   const mcT = (x) => !x ? "—" : x >= 1e6 ? "$" + (x / 1e6).toFixed(1) + "M" : x >= 1e3 ? "$" + Math.round(x / 1e3) + "K" : "$" + Math.round(x);
   const usd = (x) => { const n = Math.abs(x); const s = x < 0 ? "-" : ""; return !n ? "$0" : n >= 1e6 ? `${s}$${(n / 1e6).toFixed(2)}M` : n >= 1e3 ? `${s}$${(n / 1e3).toFixed(1)}K` : `${s}$${Math.round(n)}`; };
   const fmtAge = (h) => h == null ? "—" : h < 1 ? Math.round(h * 60) + "m" : h < 48 ? h.toFixed(1) + "h" : Math.round(h / 24) + "d";
-  const sev = (v) => v >= 66 ? "#ff2e4d" : v >= 45 ? "#ff9a1f" : v >= 25 ? "#22e9ff" : "#2bffb0";
+  const sev = (v) => v >= 66 ? "#ff1f4b" : v >= 45 ? "#ff7a00" : v >= 25 ? "#00f0ff" : "#3dff6e";
   const isNew = (r) => r.isNew || (r.firstSeenAt && Date.now() - r.firstSeenAt < 150000);
   // HTML-escape — token symbols/names come from on-chain metadata (permissionless), so they are attacker-controlled
   // and MUST be escaped anywhere they land in innerHTML. Shared as B0.esc so every page uses the same guard.
@@ -64,22 +64,22 @@ const B0 = (() => {
       meter("Selling now", p.dumping || 0, f.insiderSellersNow == null && r.stale ? "not current" : f.insiderSellersNow ? `${f.insiderSellersNow} selling` : "none"),
     ].join("");
     // DEX-discovered tokens carry a real venue (uniswap-v2/v3/v4 or a factory label); Pons tokens don't.
-    const DEXVEN = { "uniswap-v4": "#a98bff", "uniswap-v3": "#7aa2ff", "uniswap-v2": "#ff9a1f" };
+    const DEXVEN = { "uniswap-v4": "#c13bff", "uniswap-v3": "#7aa2ff", "uniswap-v2": "#ff7a00" };
     const isDex = r.section === "dex" || (!!r.venue && r.venue !== "pons");
     const venue = isDex
       ? `<span class="chip" style="color:${DEXVEN[r.venue] || "#c9a0ff"}"${r.factory ? ` title="factory ${r.factory}"` : ""}>${r.venue || "dex"}</span>`
         + ((r.venues && r.venues.length > 1) ? `<span class="chip" style="color:var(--mute)" title="also on ${r.venues.join(", ")}">+${r.venues.length - 1}</span>` : "")
-      : chip(r.section === "graduated" ? "graduated" : "launchpad · pons", "#22e9ff");
-    const CS = { "on-track": "#2bffb0", "behind": "#ff9a1f", "drifting": "#ff9a1f", "failing": "#ff2e4d" };
+      : chip(r.section === "graduated" ? "graduated" : "launchpad · pons", "#00f0ff");
+    const CS = { "on-track": "#3dff6e", "behind": "#ff7a00", "drifting": "#ff7a00", "failing": "#ff1f4b" };
     const bpChips = !isDex ? [
       r.blueprint != null ? chip(`blueprint ${r.blueprint} · ${r.blueprintLabel || ""}`) : "",
-      r.corridor ? chip(`corridor ${r.corridor.status}`, CS[r.corridor.status] || "#ff9a1f") : "",
+      r.corridor ? chip(`corridor ${r.corridor.status}`, CS[r.corridor.status] || "#ff7a00") : "",
     ].join("") : "";
     const curve = (r.progress != null) ? chip(`curve ${r.progress}%`) : "";
     const prec = r.path ? `<div class="precedent tnum">${(f.wallets || f.holders || 0).toLocaleString()} wallets → <b>${mcT(r.path.precedent)}</b> <span class="m">precedent mcap</span></div>` : "";
-    const al = r.alert ? `<p class="alert" style="color:${r.alert.tone === "good" ? "#2bffb0" : r.alert.tone === "warn" ? "#ff9a1f" : "#ff2e4d"}">${r.alert.tone === "bad" ? "▼ " : r.alert.tone === "good" ? "✓ " : "! "}${esc(r.alert.text)}</p>`
-      : f.insiderSellersNow ? `<p class="alert" style="color:#ff2e4d">▼ ${f.insiderSellersNow} early wallet${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
-        : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#2bffb0">✓ no snipers · no bundles</p>` : "";
+    const al = r.alert ? `<p class="alert" style="color:${r.alert.tone === "good" ? "#3dff6e" : r.alert.tone === "warn" ? "#ff7a00" : "#ff1f4b"}">${r.alert.tone === "bad" ? "▼ " : r.alert.tone === "good" ? "✓ " : "! "}${esc(r.alert.text)}</p>`
+      : f.insiderSellersNow ? `<p class="alert" style="color:#ff1f4b">▼ ${f.insiderSellersNow} early wallet${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
+        : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#3dff6e">✓ no snipers · no bundles</p>` : "";
     // BUNDLES are the loudest red flag on a launch — one actor wearing many wallets. Flag it hard, up top.
     // SERIAL OPERATOR — what else has this deployer launched, and what happened to it (launchpad data, no RPC)
     const dr = r.deployerRep;
@@ -121,7 +121,7 @@ const B0 = (() => {
   //      per-wallet PnL page (/wallet?a=) — our own reconstruction, not a third-party portfolio service. ----
   function leaderRow(w, rank /* explorerBase kept for signature compat, unused */) {
     const up = (w.pnl || w.realized) >= 0;
-    const col = up ? "#2bffb0" : "#ff2e4d";
+    const col = up ? "#3dff6e" : "#ff1f4b";
     const toks = (w.tokens || []).slice(0, 4).map((t) => `<span class="chip">${esc(t.sym)}${t.holding ? " ·hold" : ""}</span>`).join("");
     return `<a class="lb-row panel-hover" href="/wallet?a=${w.a}">
       <span class="lb-rank">${rank}</span>

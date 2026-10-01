@@ -448,9 +448,9 @@ dumping — places it against a study of past winners, and shows the wallet inte
 - **ONE repo, no parallel app** — hand-written `public/*.html` (+ shared `public/block0-cards.js` renderer + `block0.css`).
   **Palette (owner, 2026-10-01; stand apart from the black/green/white everyone uses):** calm neutral ink `#0a0a0d`
   ground, `#f2f2f5` text; BRAND = **fluo yellow `#fff200`** (`--brand`/`--grad`; `--uv`/`--lime` are aliases), with dark
-  ink text ON it. DATA colours never double as brand: `--mint #2bffb0` clean / good, `--cyan #22e9ff` flow, `--amber
-  #ff9a1f` (fluo orange) caution, `--coral #ff2e4d` (fluo red) selling / bad, `--magenta #a98bff` (soft violet)
-  bundled marks. A NEW "good" use takes `--mint`, never the brand. (An ultraviolet→pink brand was tried and dropped
+  ink text ON it. DATA colours are full highlighter fluo and never double as brand: `--mint #3dff6e` (fluo green) clean / good,
+  `--cyan #00f0ff` flow, `--amber #ff7a00` (fluo orange) caution, `--coral #ff1f4b` (fluo red) selling / bad,
+  `--magenta #c13bff` (fluo purple) bundles. Background glows mix yellow / purple / cyan, dim. A NEW "good" use takes `--mint`, never the brand. (An ultraviolet→pink brand was tried and dropped
   the same day: pink sat too close to the "selling" red and was heavy on the eyes.) Instrument Serif display + Inter
   body + mono data.
 - **Pages:** `/` landing · `/board` grid · `/token` dossier · `/leaderboard` proven wallets · `/wallet` per-wallet PnL ·
