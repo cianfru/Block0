@@ -1,7 +1,7 @@
 /* Block0 post-card renderer — shared by /desk and /post. Draws a card object (from /api/cards) onto a
    1080×1080 canvas, colourful and on-brand, using the page's loaded brand fonts. window.B0DESK.draw(canvas, card). */
 (function () {
-  const A = { lime: "#2bffb0", cyan: "#22e9ff", magenta: "#a98bff", amber: "#ff9a1f", coral: "#ff2e4d", dim: "#b5b5c0", mute: "#80808c", bg: "#0a0a0d" };
+  const A = { lime: "#3dff6e", cyan: "#00f0ff", magenta: "#c13bff", amber: "#ff7a00", coral: "#ff1f4b", dim: "#b5b5c0", mute: "#80808c", bg: "#0a0a0d" };
   const SERIF = '"Instrument Serif",Georgia,serif';
   const SANS = '"Inter",system-ui,sans-serif';
   const MONO = "ui-monospace,Menlo,monospace";

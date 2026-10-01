@@ -1,15 +1,15 @@
 /* Block0 shared design system — ported from the Lovable design (block0-glassscape): a dark ink ground with a faint grid
    and drifting orbs, Instrument Serif headings over Inter, glass panels. Palette (owner, 2026-10-01): the BRAND is
    FLUO YELLOW (--brand, --grad; --uv and --lime are kept as aliases so older rules still read as "the accent"); text on
-   it is dark ink. DATA colours carry meaning and never double as brand: --mint = clean/good, --cyan = flow,
-   --amber (fluo orange, despite the name) = caution, --coral (fluo red) = selling / bad, --magenta (soft violet) =
-   bundled marks. A new "good" use takes --mint; never the brand. */
+   it is dark ink. DATA colours are full highlighter fluo, carry meaning and never double as brand:
+   --mint (fluo green) = clean/good, --cyan (fluo cyan) = flow, --amber (fluo orange, despite the name) = caution,
+   --coral (fluo red) = selling / bad, --magenta (fluo purple) = bundles. A new "good" use takes --mint; never the brand. */
 :root{
   --bg:#0a0a0d; --tx:#f2f2f5; --dim:#b5b5c0; --mute:#80808c;
   --line:rgba(255,255,255,.09); --line-2:rgba(255,255,255,.16);
   --glass:rgba(255,255,255,.035);
   --uv:#fff200; --brand:#fff200; --grad:linear-gradient(100deg,#fff200 0%,#fff76a 100%); --lime:var(--brand);
-  --mint:#2bffb0; --cyan:#22e9ff; --magenta:#a98bff; --amber:#ff9a1f; --coral:#ff2e4d;
+  --mint:#3dff6e; --cyan:#00f0ff; --magenta:#c13bff; --amber:#ff7a00; --coral:#ff1f4b;
   --serif:"Instrument Serif",ui-serif,Georgia,serif;
   --sans:"Inter",ui-sans-serif,system-ui,sans-serif;
   --mono:ui-monospace,SFMono-Regular,Menlo,monospace;
@@ -36,9 +36,9 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
   -webkit-mask-image:radial-gradient(120% 100% at 50% 0%,#000 35%,transparent 92%);
   mask-image:radial-gradient(120% 100% at 50% 0%,#000 35%,transparent 92%)}
 .orb{position:absolute;border-radius:50%;filter:blur(120px);animation:orb 16s ease-in-out infinite}
-.orb.a{left:-10rem;top:-10rem;width:38rem;height:38rem;background:rgba(255,200,0,.035)}
-.orb.b{right:-14rem;top:18rem;width:34rem;height:34rem;background:rgba(255,242,0,0.088);animation-delay:-6s}
-.orb.c{bottom:-12rem;left:33%;width:30rem;height:30rem;background:rgba(34,233,255,.05);animation-delay:-11s}
+.orb.a{left:-10rem;top:-10rem;width:38rem;height:38rem;background:rgba(255,214,0,.045)}
+.orb.b{right:-14rem;top:18rem;width:34rem;height:34rem;background:rgba(193,59,255,.075);animation-delay:-6s}
+.orb.c{bottom:-12rem;left:33%;width:30rem;height:30rem;background:rgba(0,240,255,.06);animation-delay:-11s}
 @keyframes orb{0%,100%{transform:translate(0,0) scale(1)}50%{transform:translate(36px,-44px) scale(1.1)}}
 
 /* ---- panels / chips / labels ---- */
@@ -127,7 +127,7 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .alert{margin-top:8px;font-size:.76rem}
 /* smart-money positioning: proven-PnL wallets currently holding this token */
 .smart{margin-top:9px;display:flex;align-items:center;gap:7px;font-size:.78rem;color:var(--cyan);
-  border:1px solid rgba(34,233,255,.28);background:rgba(34,233,255,.07);border-radius:10px;padding:6px 10px}
+  border:1px solid rgba(0,240,255,.28);background:rgba(0,240,255,.07);border-radius:10px;padding:6px 10px}
 .smart .ic{width:1.05em;height:1.05em}
 .smart b{color:var(--tx);font-variant-numeric:tabular-nums}
 .smart .smb{color:var(--mute);font-size:.72rem;margin-left:2px}
@@ -243,17 +243,17 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 .ctag{font-size:.6rem;text-transform:uppercase;letter-spacing:.06em;color:var(--mute);border:1px solid rgba(255,255,255,.16);border-radius:5px;padding:1px 5px;margin-left:5px;vertical-align:middle;white-space:nowrap}
 
 /* ---- heavy bundle flag on a token card ---- */
-.tcard.bundled{border-color:rgba(255,46,77,.4);position:relative;overflow:hidden}
-.tcard.bundled::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--coral);border-radius:16px 0 0 16px;box-shadow:0 0 14px rgba(255,46,77,.6)}
-.bundleflag{display:flex;align-items:center;gap:8px;margin:12px 0 2px;padding:9px 12px;border-radius:11px;background:rgba(255,46,77,.13);border:1px solid rgba(255,46,77,.4);color:#ff8093;font-size:.8rem;line-height:1.35}
+.tcard.bundled{border-color:rgba(255,31,75,.4);position:relative;overflow:hidden}
+.tcard.bundled::before{content:"";position:absolute;left:0;top:0;bottom:0;width:3px;background:var(--coral);border-radius:16px 0 0 16px;box-shadow:0 0 14px rgba(255,31,75,.6)}
+.bundleflag{display:flex;align-items:center;gap:8px;margin:12px 0 2px;padding:9px 12px;border-radius:11px;background:rgba(255,31,75,.13);border:1px solid rgba(255,31,75,.4);color:#ff7d95;font-size:.8rem;line-height:1.35}
 .bundleflag .ic{font-size:16px;flex:0 0 auto;color:var(--coral)}
-.bundleflag b{color:#ff2e4d;font-weight:700}
+.bundleflag b{color:#ff1f4b;font-weight:700}
 /* serial-operator flag (deployer's other launches) — neutral by default, red when priors faded, lime when a prior graduated */
 .serialflag{display:flex;align-items:center;gap:8px;margin:10px 0 2px;padding:8px 12px;border-radius:11px;background:rgba(255,255,255,.04);border:1px solid var(--line-2);color:var(--dim);font-size:.78rem;line-height:1.35}
 .serialflag .ic{font-size:15px;flex:0 0 auto;color:var(--dim)}
 .serialflag b{color:var(--tx);font-weight:600}
-.serialflag.bad{background:rgba(255,46,77,.10);border-color:rgba(255,46,77,.35);color:#ff8093}.serialflag.bad b{color:#ff2e4d}.serialflag.bad .ic{color:var(--coral)}
-.serialflag.good{background:rgba(43,255,176,.08);border-color:rgba(43,255,176,.3);color:#8ff5cf}.serialflag.good b{color:var(--mint)}.serialflag.good .ic{color:var(--mint)}
+.serialflag.bad{background:rgba(255,31,75,.10);border-color:rgba(255,31,75,.35);color:#ff7d95}.serialflag.bad b{color:#ff1f4b}.serialflag.bad .ic{color:var(--coral)}
+.serialflag.good{background:rgba(61,255,110,.08);border-color:rgba(61,255,110,.3);color:#a6ffbe}.serialflag.good b{color:var(--mint)}.serialflag.good .ic{color:var(--mint)}
 
 /* ---- token-gated access overlay ---- */
 .gate-overlay{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(8,8,11,.72);backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px)}

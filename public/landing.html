@@ -70,10 +70,10 @@
   .hc-vlabel{font-family:var(--serif);font-size:1.55rem;line-height:1.05;display:block}
   .hc-vlabel.g{color:var(--mint)} .hc-vlabel.a{color:var(--amber)} .hc-vlabel.c{color:var(--coral)}
   .hc-bp{font-size:.82rem;color:var(--dim);margin-top:7px;display:block}
-  .hc-bundle{display:flex;align-items:center;gap:8px;margin-top:18px;padding:10px 13px;border-radius:11px;background:rgba(255,46,77,.14);border:1px solid rgba(255,46,77,.42);color:#ff8093;font-size:.82rem;position:relative}
-  .hc-bundle b{color:#ff2e4d;font-weight:700}
+  .hc-bundle{display:flex;align-items:center;gap:8px;margin-top:18px;padding:10px 13px;border-radius:11px;background:rgba(255,31,75,.14);border:1px solid rgba(255,31,75,.42);color:#ff7d95;font-size:.82rem;position:relative}
+  .hc-bundle b{color:#ff1f4b;font-weight:700}
   .hc-bundle .ic{color:var(--coral);font-size:16px}
-  .hc-bundle.ok{background:rgba(43,255,176,.08);border-color:rgba(43,255,176,.32);color:#8ff5cf}
+  .hc-bundle.ok{background:rgba(61,255,110,.08);border-color:rgba(61,255,110,.32);color:#a6ffbe}
   .hc-bundle.ok b{color:var(--mint)} .hc-bundle.ok .ic{color:var(--mint)}
   .hc-flags{display:grid;grid-template-columns:1fr 1fr;gap:1px;background:var(--line);border:1px solid var(--line);border-radius:13px;overflow:hidden;margin-top:20px;position:relative}
   .hc-flag{background:#0a0a0e;padding:11px 14px;display:flex;justify-content:space-between;align-items:center;gap:8px}
@@ -208,11 +208,11 @@ const esc=(s)=>String(s==null?"":s).replace(/[&<>"']/g,(m)=>({"&":"&amp;","<":"&
 const clip=(s,n)=>{s=String(s||"");return s.length>n?s.slice(0,n-1)+"…":s;};   // symbols are attacker-controlled, any length
 
 const SIGNALS=[
-  {n:"Snipers",i:"scope",c:"#ff2e4d",d:"Wallets that bought in the first blocks and still sit on the supply."},
-  {n:"Bundles",i:"cluster",c:"#ff2e4d",d:"One actor buying through a swarm of wallets in the same block."},
-  {n:"Concentration",i:"converge",c:"#ff9a1f",d:"How much of the token the top 10 wallets hold."},
-  {n:"Early wallets selling",i:"trenddown",c:"#ff2e4d",d:"Snipers and bundled wallets selling into the pool right now. Moving tokens to another wallet is shown apart, not counted as a sale."},
-  {n:"Holder growth",i:"users",c:"#22e9ff",d:"Real new wallets arriving, or a chart propped up by a few."},
+  {n:"Snipers",i:"scope",c:"#ff1f4b",d:"Wallets that bought in the first blocks and still sit on the supply."},
+  {n:"Bundles",i:"cluster",c:"#c13bff",d:"One actor buying through a swarm of wallets in the same block."},
+  {n:"Concentration",i:"converge",c:"#ff7a00",d:"How much of the token the top 10 wallets hold."},
+  {n:"Early wallets selling",i:"trenddown",c:"#ff1f4b",d:"Snipers and bundled wallets selling into the pool right now. Moving tokens to another wallet is shown apart, not counted as a sale."},
+  {n:"Holder growth",i:"users",c:"#00f0ff",d:"Real new wallets arriving, or a chart propped up by a few."},
   {n:"Proven wallets",i:"brain",c:"#fff200",d:"Wallets with closed, profitable trades on other launches, showing up again."},
 ];
 $("#signals").innerHTML=SIGNALS.map(s=>`<div class="sig"><div class="st"><span class="sic" style="color:${s.c}">${B0.ico(s.i)}</span>${s.n}</div><p>${s.d}</p></div>`).join("");
@@ -236,7 +236,7 @@ function cardHTML(r){
     </div>
     <a class="hc-cta" href="/token?address=${esc(r.address)}">Full read: holders, bundles, who is selling →</a>`;
 }
-function setAcc(el,risk){el.style.setProperty("--acc",risk>=66?"rgba(255,46,77,.16)":risk>=25?"rgba(255,154,31,.14)":"rgba(43,255,176,.16)");}
+function setAcc(el,risk){el.style.setProperty("--acc",risk>=66?"rgba(255,31,75,.16)":risk>=25?"rgba(255,122,0,.14)":"rgba(61,255,110,.16)");}
 function show(r,cap){ const card=$("#herocard"); card.style.opacity="0";
   setTimeout(()=>{ card.innerHTML=cardHTML(r); setAcc(card,r.risk||0); card.style.opacity="1"; window.B0CLOCK&&B0CLOCK.paint(); },170);
   if(cap) $("#hcap").textContent=cap; }
@@ -258,9 +258,9 @@ function rotate(i){ if(!DEMO.length||pinned) return; di=(i+DEMO.length)%DEMO.len
 function ticker(rows,stats){
   const hot=[],reads=[];
   for(const r of rows){ const f=r.flags||{}, s=esc(clip(r.sym,14));
-    if(f.insiderSellersNow>0) hot.push({t:`▼ ${f.insiderSellersNow} early wallet${f.insiderSellersNow>1?"s":""} selling ${s}`,c:"#ff2e4d"});
-    else if(f.bundles>0) hot.push({t:`⚠ ${s} · ${f.bundles} bundle${f.bundles>1?"s":""}`,c:"#ff9a1f"});
-    else if(r.risk<25) reads.push({t:`✓ ${s} reads clean · ${B0.mcT(r.mcapUsd)}`,c:"#2bffb0"});
+    if(f.insiderSellersNow>0) hot.push({t:`▼ ${f.insiderSellersNow} early wallet${f.insiderSellersNow>1?"s":""} selling ${s}`,c:"#ff1f4b"});
+    else if(f.bundles>0) hot.push({t:`⚠ ${s} · ${f.bundles} bundle${f.bundles>1?"s":""}`,c:"#ff7a00"});
+    else if(r.risk<25) reads.push({t:`✓ ${s} reads clean · ${B0.mcT(r.mcapUsd)}`,c:"#3dff6e"});
     else reads.push({t:`${s} · risk ${r.risk}`,c:"#b5b5c0"}); }
   const out=[...hot,...reads]; if(stats?.launchTotal) out.push({t:`${stats.launchTotal.toLocaleString()} launches on Pons so far`,c:"#b5b5c0"});
   if(!out.length) return;
