@@ -43,6 +43,8 @@ for (;;) {
     dryRun, publicUrl: env.PUBLIC_URL || "", forwardN, handle: env.AGENT_X_HANDLE || "",
     caps: { maxCreditPerDay: Number(env.AGENT_MAX_CREDIT_PER_DAY || 1.5), originalsPerDay: Number(env.AGENT_MAX_ORIGINALS_PER_DAY || 15) },
     log: (s) => console.log(new Date().toISOString(), s),
+    // in watch mode a cycle may use most of its interval; a one-shot run keeps the 8-minute default
+    opts: WATCH ? { timeBudgetMs: Math.max(60e3, every - 3 * 60e3) } : {},
   });
   state = r.state;
   persist(r.out);

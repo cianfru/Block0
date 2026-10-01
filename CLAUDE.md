@@ -37,7 +37,9 @@ reads). Block0 becomes an X account posting **reproducible on-chain facts** abou
   Tests `test/agent.test.mjs`. Reuses `detectEvents` (insider-dump) + `computeIntel` unchanged.
 - **Runner:** `.github/workflows/agent.yml` — one job every 6h that loops every 15 min (~5h40m), committing to the
   **`agent-data`** branch after each cycle (never main). The loop exists because the transfer store is in-memory and a
-  cold read costs ~20 s/token on the free node (measured: 24 reads = 8.4 min); inside one process later reads are deltas.
+  cold read costs ~20 s/token on the free node (a busy 2-day-old token: 36 s / 226 getLogs cold, 0.1 s warm). Reads run
+  3 at a time under a time budget (interval − 3 min); measured live: ~150 candidates converge to a full warm cycle in
+  ~4 min by the 3rd cycle (~30 min after the job starts). First live dry-run post: $CTRN insider-dump, 2026-10-01.
 - **Rails:** dry run unless repo variable `AGENT_DRY_RUN=0`. `smart-convergence`/`clean-launch` are LOGGED, never
   posted, until the radar REPORT says PASS. No metered chain fallback exists. Never touches board.mjs/STANDBY.
   Default 5 originals/day in CI (`AGENT_MAX_ORIGINALS_PER_DAY`), $1.50/day credit ceiling.

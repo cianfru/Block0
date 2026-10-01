@@ -14,7 +14,10 @@ import { plan, record, canReply, freshBudget } from "./budget.mjs";
 import { parseMention, resolveSymbol, selectMentions } from "./mentions.mjs";
 import { OrbioError } from "./orbio.mjs";
 
-export const DEFAULTS = { maxAgeH: 72, minMcap: 5000, maxProfiles: 25, timeBudgetMs: 8 * 60e3, keepDays: 7 };
+// maxProfiles is a ceiling, not the working limit — the time budget is. A token's FIRST read in a process is a full
+// history pull (a busy 2-day-old token: 36 s, 226 eth_getLogs on the free node); every later read is a delta
+// (0.1 s, 1 call). So a long-lived --watch process converges to re-reading every live candidate each cycle.
+export const DEFAULTS = { maxAgeH: 72, minMcap: 5000, maxProfiles: 150, timeBudgetMs: 8 * 60e3, concurrency: 3, keepDays: 7 };
 
 export function emptyState() {
   return { prevAgents: {}, lastFiredAgents: {}, prevBoard: {}, lastFiredBoard: {}, profiledAt: {}, perToken: {}, budget: null, answered: {}, mentionCursor: null, stoppedDay: null };
@@ -50,16 +53,23 @@ export async function runTick(deps) {
     .sort((x, y) => (agentByToken.has(y.address) - agentByToken.has(x.address)) || ((state.profiledAt[x.address] || 0) - (state.profiledAt[y.address] || 0)) || (y.mcapUsd || 0) - (x.mcapUsd || 0))
     .slice(0, o.maxProfiles);
 
-  // 4 · read each candidate (computeIntel on the free node); stop cleanly at the time budget
-  const tokens = [];
-  for (const t of cands) {
-    if (Date.now() - started > o.timeBudgetMs) { out.errors.push(`time budget hit after ${tokens.length}/${cands.length} reads`); break; }
-    try {
-      const r = await readToken(t);
-      state.profiledAt[t.address] = now;
-      tokens.push({ ...r, address: t.address, sym: t.sym || r.sym, mcapUsd: t.mcapUsd ?? r.mcapUsd, ageH: ageH(t), venue: agentByToken.has(t.address) ? "orbio-agent" : "pons" });
-    } catch (e) { out.errors.push(`read ${t.sym || t.address}: ${e.message}`); }
-  }
+  // 4 · read candidates (computeIntel on the free node), `concurrency` at a time; stop starting new reads at the
+  //     time budget (reads already in flight finish)
+  const tokens = [], queue = [...cands];
+  let budgetHit = false;
+  const worker = async () => {
+    while (queue.length) {
+      if (Date.now() - started > o.timeBudgetMs) { budgetHit = true; return; }
+      const t = queue.shift();
+      try {
+        const r = await readToken(t);
+        state.profiledAt[t.address] = now;
+        tokens.push({ ...r, address: t.address, sym: t.sym || r.sym, mcapUsd: t.mcapUsd ?? r.mcapUsd, ageH: ageH(t), venue: agentByToken.has(t.address) ? "orbio-agent" : "pons" });
+      } catch (e) { out.errors.push(`read ${t.sym || t.address}: ${e.message}`); }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.max(1, o.concurrency) }, worker));
+  if (budgetHit) out.errors.push(`time budget hit after ${tokens.length}/${cands.length} reads`);
   const be = detectEvents(state.prevBoard, tokens, { now, lastFired: state.lastFiredBoard, maxAgeH: o.maxAgeH, minMcap: o.minMcap });
   state.prevBoard = { ...state.prevBoard, ...be.next }; state.lastFiredBoard = be.lastFired;
   for (const e of be.events) { const t = tokens.find((x) => x.address === e.address); if (t) e.venue = t.venue; }
