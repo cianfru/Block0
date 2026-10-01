@@ -15,10 +15,18 @@ event lifecycle/follow-ups → watchlist → published editorial policy. Not a p
   verdict says "bought and has not sold or moved it since", never "holds". Logs dedupe on tx+logIndex. Known gap: a
   sale into a bonding curve pays native ETH (no log) and reads as a deposit unless a tracked wallet bought from that
   curve in the window.
-- **Forward test = protocol v2 (`tools/radar-protocol.mjs`, pure + tested):** event ids, own controls only, outcome
-  window starts the first full hour after detection, close7 needs the horizon's last 24 h covered, transient candle
-  failures retried. v1 rows kept, counted, never scored.
-- **Board rows carry `readAt`;** >45 min → "now" fields blanked (`stale`), >3 h → off the board.
+- **Forward test = protocol v3 (`tools/radar-protocol.mjs`, pure + tested; Codex follow-up PR #15, rationale in
+  `docs/review-followup-2026-10-01.md`):** event ids, own controls only, outcome window starts the first full hour after
+  detection, close7 needs the horizon's last 24 h covered, transient candle failures retried. v3 adds: convergence =
+  buyers with NO observed outflow of any size; a verdict also needs ≥30 paired closes and ≥80% close coverage in each
+  time split (each event: ≥80% of its own controls covered), else `verdict: null`. v1/v2 rows kept, never scored. v3
+  started at the 2026-10-02 ~02:00 UTC runner handover. ⚠ Watch close coverage at the first scores (~10-09): GT only
+  returns traded hours, so launches that die have no covered close — a 8/8 sample of graduated tokens was covered,
+  small pre-graduation ones are untested.
+- **Agent budget reserves the request cap (0.02 post, 0.005 mention read) before I/O**, refunds on settlement; replies
+  are published/failed/pending (`state.replyAttempts`), never resubmitted when uncertain.
+- **Freshness is one module (`public/read-freshness.js`)** for board + dossier: >45 min historical, >3 h not shown,
+  up to 10 min of visitor clock skew tolerated.
 - **`test.yml` runs the suite on every PR and push to main.**
 
 ## 🛑 PROJECT PARKED — 2026-09-10 (owner: "kill the whole thing… this project is going nowhere")

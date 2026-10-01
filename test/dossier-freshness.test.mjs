@@ -42,7 +42,7 @@ test("dossier: fresh -> historical -> expired in an already-open tab", async () 
 });
 
 test("dossier: a snapshot with no valid read time is never presented as current", async () => {
-  for (const readAt of [null, undefined, NOW + 1000]) {
+  for (const readAt of [null, undefined, NOW + 11 * 60e3]) {          // beyond the 10-min clock-skew allowance
     const p = page(readAt); await p.load();
     assert.match(p.root.innerHTML, /Read expired/);
     assert.equal(p.timer(), undefined);
