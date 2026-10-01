@@ -1,0 +1,57 @@
+# Block0 agent (tools/agent-tick.mjs --watch) — DRY RUN unless the repo variable AGENT_DRY_RUN is set to "0".
+# One job every 6 h that loops every 15 min for ~5h45m: the in-memory transfer store stays warm, so only the first
+# cycle pays full cold reads on the free node. Free while the repo is public. State + ledgers are committed to the
+# `agent-data` branch after every cycle — never main, so nothing here triggers a Railway deploy.
+# Secrets/vars (Settings → Secrets and variables → Actions): ORBIO_API_KEY (secret, needed only for posting and
+# mentions), vars AGENT_X_HANDLE, PUBLIC_URL, AGENT_DRY_RUN, AGENT_MAX_ORIGINALS_PER_DAY, AGENT_MAX_CREDIT_PER_DAY.
+# Never add RPC_URL / ALCHEMY_* here: token reads stay on the free native node.
+name: agent
+
+on:
+  schedule:
+    - cron: "11 */6 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: agent
+  cancel-in-progress: false
+
+jobs:
+  watch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 355
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Check out the agent-data branch (created on the first run)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          mkdir agent-data && cd agent-data
+          git init -q
+          git remote add origin "https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
+          if git fetch -q --depth 1 origin agent-data; then git checkout -q -b agent-data FETCH_HEAD; else git checkout -q --orphan agent-data; fi
+
+      - name: Radar forward-test status (for the "n=" footer)
+        run: git fetch -q --depth 1 origin radar-data && git show FETCH_HEAD:REPORT.txt > radar-report.txt || true
+
+      - name: Watch
+        env:
+          AGENT_DIR: agent-data
+          AGENT_GIT_COMMIT: "1"
+          AGENT_WATCH_MIN: "340"
+          AGENT_FORWARD_REPORT: radar-report.txt
+          AGENT_DRY_RUN: ${{ vars.AGENT_DRY_RUN || '1' }}
+          AGENT_X_HANDLE: ${{ vars.AGENT_X_HANDLE }}
+          PUBLIC_URL: ${{ vars.PUBLIC_URL }}
+          AGENT_MAX_ORIGINALS_PER_DAY: ${{ vars.AGENT_MAX_ORIGINALS_PER_DAY || '5' }}
+          AGENT_MAX_CREDIT_PER_DAY: ${{ vars.AGENT_MAX_CREDIT_PER_DAY || '1.5' }}
+          ORBIO_API_KEY: ${{ secrets.ORBIO_API_KEY }}
+        run: node tools/agent-tick.mjs --watch

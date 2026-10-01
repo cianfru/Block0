@@ -25,6 +25,40 @@ describes work that is now stopped.**
 `BACKGROUND_ON=1`. That is the whole switch. Nothing was deleted: every loop, test, tool and research module is
 intact and reachable. Restore the cron by uncommenting two lines in `rebuild-model.yml`.
 
+## 🤖 THE BLOCK0 AGENT ON ORBIO — v1 built, DRY RUN (owner, 2026-10-01)
+Spec: **`docs/orbio-agent.md`** (owner's brief + a header listing where v1 deliberately deviates). Orbio = an agent
+launchpad on Robinhood Chain built on Pons; an agent's creator fees fund its gateway balance (X posting, LLM, chain
+reads). Block0 becomes an X account posting **reproducible on-chain facts** about Pons/Orbio launches + answering
+@mentions with a token read. Never a call.
+- **Code:** `agent/` — `agent-events.mjs` (pure Orbio-economics transitions: principal-withdrawn, serial-owner,
+  cliff-24h, credit-idle, first-harvest), `format.mjs` (≤280, link + footer, `lint()` forbidden-word gate,
+  `UNVALIDATED` kinds), `budget.mjs` (caps/priority/credit ceiling), `mentions.mjs`, `orbio.mjs` (client; `max_cost`
+  always sent; 401/402 → stop for the day), `tick.mjs` (one injected cycle). CLI `tools/agent-tick.mjs [--watch]`.
+  Tests `test/agent.test.mjs`. Reuses `detectEvents` (insider-dump) + `computeIntel` unchanged.
+- **Runner:** `.github/workflows/agent.yml` — one job every 6h that loops every 15 min (~5h40m), committing to the
+  **`agent-data`** branch after each cycle (never main). The loop exists because the transfer store is in-memory and a
+  cold read costs ~20 s/token on the free node (a busy 2-day-old token: 36 s / 226 getLogs cold, 0.1 s warm). Reads run
+  3 at a time under a time budget (interval − 3 min); measured live: ~150 candidates converge to a full warm cycle in
+  ~4 min by the 3rd cycle (~30 min after the job starts). First live dry-run post: $CTRN insider-dump, 2026-10-01.
+- **Rails:** dry run unless repo variable `AGENT_DRY_RUN=0`. `smart-convergence`/`clean-launch` are LOGGED, never
+  posted, until the radar REPORT says PASS. No metered chain fallback exists. Never touches board.mjs/STANDBY.
+  Default 5 originals/day in CI (`AGENT_MAX_ORIGINALS_PER_DAY`), $1.50/day credit ceiling.
+- **Orbio API facts (live 2026-10-01):** `https://api.orbio.so/api/protocol/agents?sort=newest|cap&limit≤200&offset=`;
+  numbers are strings; USDG atoms = 6 decimals; `stake.stakedWei` = the 10-day-locked principal; `orbioMicroUsd` at
+  the root. 349 agents, all still locked (oldest 5.6 days) — the first cliffs open ~2026-10-05. Two live tokens are
+  both named TANK: always show the address.
+- **Owner-side to go live:** create the X handle, connect it in the Orbio dashboard, launch the agent token via the
+  vault, add `ORBIO_API_KEY` (secret) + `AGENT_X_HANDLE`/`PUBLIC_URL` (vars), review `dry-run.jsonl` ≥3 days, then set
+  `AGENT_DRY_RUN=0`. The mention-read tool's argument/response shape is unverified until a key exists — check the
+  first live run.
+
+### ⏭ PHASE 2 (on standby, owner 2026-10-01): REFLEX low-timeframe trend reads
+If the agent gets traction: port the Reflex engine's trend logic (separate repo; the brief references
+`backend/radar_delay.py` there) to **1h (primary) / 4h** candles from **GeckoTerminal** (DexScreener has no public
+OHLCV). Constraints already measured: GeckoTerminal ~3–12 calls/min → a watchlist of ~20–50 tokens, not every
+launch; a 2-day-old token has only 12 four-hour candles. Long/short reads go through a pre-registered forward test
+(same machinery as `tools/radar-log.mjs`) and are logged, not posted, until it passes.
+
 ## 📡 PIVOT: THE SMART-MONEY RADAR — zero cost, forward-tested (owner, 2026-09-30)
 Owner direction: stop pattern-matching tokens; show where the chain's proven wallets are, what they are doing, and
 flag launches where they converge. Keep it at $0. What exists now:
