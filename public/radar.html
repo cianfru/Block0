@@ -46,7 +46,7 @@
   .w .tier{font-size:10px;padding:2px 6px;border-radius:6px;border:1px solid currentColor}
   .tier.sharp{color:var(--lime)} .tier.proven{color:var(--cyan)}
   .w .rec{color:var(--mute);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-  .st{text-align:right;white-space:nowrap} .st.buying{color:var(--lime)} .st.trimmed{color:var(--amber)} .st.exited,.st.selling{color:var(--coral)}
+  .st{text-align:right;white-space:nowrap} .st.buying{color:var(--lime)} .st.trimmed{color:var(--amber)} .st.exited,.st.selling{color:var(--coral)} .st.moved{color:var(--dim)}
   .w a{color:var(--tx);text-decoration:none} .w a:hover{text-decoration:underline}
   .more{background:none;border:0;color:var(--mute);font:12px var(--sans);cursor:pointer;padding:6px 0 0}
   .c-links{display:flex;gap:14px;margin-top:8px;font-size:12px} .c-links a{color:var(--dim)}
@@ -62,7 +62,7 @@
 <header class="hd">
   <div class="hd-in">
     <a href="./" class="wordmark">block<b>0</b></a>
-    <nav class="nav"><a href="radar" class="on">Radar</a></nav>
+    <nav class="nav"><a href="board">Board</a><a href="radar" class="on">Radar</a><a href="token">Dossier</a><a href="methodology">Methodology</a></nav>
     <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span></div>
   </div>
 </header>
@@ -130,7 +130,7 @@ function row(r, now) {
       `<span class="rec">${esc(rec)}</span><span class="st ${esc(w.status)}">${esc(w.status)}${val ? " ≈" + esc(val) : ""} · ${esc(ago(now - state.at(w.lastBlock)))}</span></div>`;
   }).join("");
   const more = ws.length > 4 ? `<button class="more" data-t="${esc(r.token)}">${open.has(r.token) ? "show fewer" : `+${ws.length - 4} more wallets`}</button>` : "";
-  const line = verdict(r, { minutesAgo: (now - state.at(r.lastBlock)) / 60, mcapUsd: m.mcapUsd });
+  const line = verdict(r, { minutesAgo: (now - state.at(r.signal === "converging" && r.lastBuyBlock != null ? r.lastBuyBlock : r.lastBlock)) / 60, mcapUsd: m.mcapUsd });
   return `<article class="card ${esc(r.signal)}">
     <div class="c-top">${m.logo ? `<img class="logo" src="${esc(m.logo)}" alt="" loading="lazy">` : `<div class="logo"></div>`}
       <div class="c-id"><span class="c-sym">${esc(clip(m.sym || "new token", 24))}</span><span class="c-name">${esc(clip(m.name || "", 48))}</span><br><span class="c-addr" data-copy="${esc(r.token)}" title="copy address">${esc(r.token)}</span></div>
@@ -139,7 +139,7 @@ function row(r, now) {
     <div class="c-met"${m.sym ? "" : " hidden"}><span>mcap <b>${esc(usd(m.mcapUsd))}</b></span><span class="${thin ? "thin" : ""}">liquidity <b class="${thin ? "thin" : ""}">${esc(usd(m.liquidityUsd))}</b>${thin ? " · thin" : ""}</span>
       <span>pool age <b>${esc(pairAge)}</b></span><span>24h <b>${m.change24 == null ? "—" : esc((m.change24 > 0 ? "+" : "") + m.change24 + "%")}</b></span></div>
     <p class="c-verdict">${esc(line)}</p>${wal}${more}
-    <div class="c-links">${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">DexScreener ↗</a>` : ""}${HAS_API ? `<a href="token?address=${esc(r.token)}">Forensic dossier →</a>` : ""}</div>
+    <div class="c-links">${m.url ? `<a href="${esc(m.url)}" target="_blank" rel="noopener">DexScreener ↗</a>` : ""}<a href="token?address=${esc(r.token)}">Forensic dossier →</a></div>
   </article>`;
 }
 

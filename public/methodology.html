@@ -38,6 +38,9 @@
   ul{color:var(--dim);padding-left:20px;margin:8px 0} li{margin:5px 0}
   .tag{display:inline-block;font-size:.7rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;padding:3px 8px;border-radius:6px;border:1px solid var(--line);color:var(--dim);margin-right:6px}
   table{width:100%;border-collapse:collapse;margin:14px 0;font-size:.9rem}
+  @media(max-width:640px){table{display:block;overflow-x:auto}}
+  details.archive{margin:40px 0 10px;border:1px solid var(--line);border-radius:14px;padding:6px 18px 14px}
+  details.archive summary{cursor:pointer;padding:12px 0;font-weight:600;color:var(--dim)}
   th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-variant-numeric:tabular-nums}
   th{color:var(--dim);font-weight:600;font-size:.8rem;text-transform:uppercase;letter-spacing:.03em}
   td.n,th.n{text-align:right}
@@ -54,23 +57,50 @@
 <div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
 <header class="hd"><div class="hd-in">
   <a href="/" class="wordmark">block<b>0</b></a>
-  <nav class="nav"><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a><a href="/token">Dossier</a><a href="/methodology" class="on">Methodology</a><a href="/track-record">Track record</a></nav>
+  <nav class="nav"><a href="/board">Board</a><a href="/radar">Radar</a><a href="/token">Dossier</a><a href="/methodology" class="on">Methodology</a></nav>
   <div class="hd-r"><a class="chip chainchip" href="/board">← all launches</a></div>
 </div></header>
 <div class="wrap" style="max-width:900px;padding-top:32px">
 
   <h1>How Block0 <em>works</em></h1>
-  <div class="callout warn"><b>Historical research, not validated entry signals.</b> The study below uses a selected cohort and smoothed reconstructed inputs. Its statistics do not establish early-entry accuracy or executable returns. The <a href="/setups">new forward experiment</a> collects separate timestamped observations and publishes its <a href="/track-record">own record</a>.</div>
-  <p class="lede">Every score here is reconstructed from public Robinhood-Chain transfer data and is reproducible — no black box, no proprietary feed. This page is the whole method, and an honest measurement of how well it actually separates winners from the rest.</p>
-  <div class="callout"><b>Signal, not proof — never a buy recommendation.</b> Block0 is a forensic and pattern tool: it tells you whether a launch is <i>clean</i> and whether it <i>looks like</i> past winners looked. That is a position read, not a prediction, and certainly not financial advice.</div>
+  <p class="muted" style="margin-top:-6px">Updated 1 October 2026.</p>
+  <p class="lede">Block0 reads Robinhood Chain launches from their own transfer history on the public node and reports what happened: who bought first, who bought together, who holds the supply, who is selling, and what the deployer launched before. Every number is reproducible from public data. <b>It does not predict price</b> — and below is the record of the tests that tried to, and failed.</p>
+
+  <h2>What Block0 reads</h2>
+  <ul>
+    <li><b>Early wallets</b> — <i>snipers</i> (first buy within 3 blocks of the first pool trade) and <i>bundles</i> (several of them in the same block). This is a timing fact. It is consistent with insiders, but it does not prove who controls a wallet, so we say "early wallets", not "insiders".</li>
+    <li><b>Selling</b> means tokens sent <b>into a trading venue</b> — the token's pool or bonding curve, the chain's AMM, a known router. Tokens sent to another wallet or a contract are reported separately as <b>transferred out</b>: moving a bag is not a sale.</li>
+    <li><b>"Now"</b> means the 30 minutes before the read, timed from the chain head — not the token's last trade. A quiet token has nothing "now". Every board row and dossier shows when it was read; a row read more than 45 minutes ago no longer shows the "selling now" fields at all.</li>
+    <li><b>Concentration</b> — the share of the distributed supply held by the ten largest wallets (the curve, pools and routers excluded).</li>
+    <li><b>Deployer / owner</b> — what else the same wallet launched. For an Orbio agent, checked against every Orbio agent; for a Pons launch, against the launchpad's latest 100 launches and every graduated token.</li>
+    <li><b>Smart-money radar</b> — 738 wallets with closed, profitable round trips on two or more launches (contracts excluded), read live in your browser. A buy needs evidence of a trade (a known venue, or payment in the same transaction) and must be sent by the wallet itself; a wallet that sells or moves the tokens out stops counting. The radar sees only its window, so it says "bought and has not sold or moved it since", never "holds". The list is built from launches up to 2026-09-09 and ages.</li>
+  </ul>
+  <p class="muted">Where it reads from: the free public Robinhood Chain node, the Pons launchpad's own catalogue, the Orbio protocol API, and DexScreener / GeckoTerminal for price context. The Block0 agent re-reads every Pons and Orbio launch under 72 hours old (≥$5k, ≥5 holders) about every 15 minutes.</p>
+
+  <h2>What we tested — and what failed</h2>
+  <p>Every claim that Block0's reads could <i>predict</i> something was tested against history with the rule written before the result. None passed.</p>
+  <table>
+    <thead><tr><th>Question</th><th>Result</th></tr></thead>
+    <tbody>
+      <tr><td><b>Does the "most promising" ranker pick better launches?</b> Daily pick, 53 days, judged on return from entry.</td><td>No. It beat a random pick on how often a token later reached $1M, but <b>lost to random on return</b> (median 1.58× vs 2.96×): it picked tokens already part-way up.</td></tr>
+      <tr><td><b>Do the forensic flags warn of a wipeout?</b> Bundles, top-10 ≥60%, snipers ≥10%, risk ≥50, serial deployer — 627 graduated launches.</td><td>No flag passed. Apparent effects were explained by entry size. Only graduated launches were studied, so this does not test rugs before graduation.</td></tr>
+      <tr><td><b>Do launches in a "markup" state keep running?</b></td><td>The effect reversed out of sample (5 v 2 in discovery, 3 v 6 in validation). Stopped, as pre-committed.</td></tr>
+      <tr><td><b>Does smart-money convergence lead to better returns?</b> History.</td><td>Unanswerable from history: only 13 measurable events, and early prices disagree between sources. Now tested forward — below.</td></tr>
+    </tbody>
+  </table>
+  <p>So the reads on this site are <b>descriptive</b>: they tell you what a launch's holders did. They are not shown to tell you what its price will do.</p>
+
+  <h2>The one open test</h2>
+  <p>Whether proven wallets converging on a launch means anything is being measured <b>forward, in public</b>, with the rules fixed before the first event (<a href="https://github.com/cianfru/Block0/blob/main/tools/radar-protocol.mjs">tools/radar-protocol.mjs</a>). Every convergence is logged when it is seen, priced at that moment, next to up to four launches of similar size and age that no tracked wallet touched. Seven days later each is scored from market candles that start <i>after</i> detection, against <b>its own</b> controls only. No verdict before 30 scored events; the running report is <a href="https://github.com/cianfru/Block0/blob/radar-data/REPORT.txt">public</a>.</p>
+  <p class="muted">Protocol v2 (2026-10-01) replaced v1 after a code audit found that the first detector counted wallets that had already moved their tokens out, and that the scorer compared events with other events' controls. Every event v1 logged stays in the log, counted and not scored. <b>Until the report says PASS, the radar is unvalidated</b> — and the agent does not post convergence at all.</p>
 
   <h2>The risk verdict</h2>
-  <p>The headline <b>0–100 risk score</b> is a transparent weighted composite of five sub-scores, each computed from the token's own transfer history over its real distributed float (the bonding curve and known venues are excluded so their reserves don't read as a giant holder).</p>
+  <p>Cards and dossiers carry a <b>0–100 risk score</b>: a summary of the facts above, not a forecast — the tests above found it does not predict outcomes. It is a transparent weighted composite of five sub-scores, each computed from the token's own transfer history over its real distributed float (the bonding curve and known venues are excluded so their reserves don't read as a giant holder).</p>
   <table>
     <thead><tr><th>Sub-score</th><th>What it measures</th><th class="n">Weight*</th></tr></thead>
     <tbody>
       <tr><td><b>Concentration</b></td><td>Share of supply held by the top 10 wallets, above a healthy baseline</td><td class="n">26–38%</td></tr>
-      <tr><td><b>Dumping now</b></td><td>Insiders (snipers + bundles) net-selling in the live 30-min window</td><td class="n">20–26%</td></tr>
+      <tr><td><b>Selling now</b></td><td>Early wallets (snipers + bundles) net-selling into a venue in the 30 minutes before the read. Transfers to other wallets don't count.</td><td class="n">20–26%</td></tr>
       <tr><td><b>Bundles</b></td><td>Coordinated same-block buying at launch (one actor, many wallets)</td><td class="n">8–20%</td></tr>
       <tr><td><b>Coordination</b></td><td>A <b>hidden cluster</b> — wallets linked by hand-to-hand token moves (or a shared funder), holding a real slice. Catches the operator who splits into wallets that <i>avoid</i> the same-block bundle, then shuffles the token between them. Built from the token's own transfers, free.</td><td class="n">12–14%</td></tr>
       <tr><td><b>Snipers</b></td><td>Wallets that bought within 3 blocks of the first pool trade, and their held share</td><td class="n">8–12%</td></tr>
@@ -80,6 +110,8 @@
   <p class="muted">*Weights shift once a token graduates: concentration and live dumping matter more for an established coin, launch-mechanics (bundles) matter less. On top of the weighted mean sit <b>three disqualifying floors</b> — near-total concentration (top-10 ≥ 82–92%), two-plus insiders selling right now, or <b>a coordinated cluster that owns a real slice AND is distributing this minute</b>. Any one forces a high score regardless of everything else, because it single-handedly defines the risk and must not be offset by a clean sub-score elsewhere.</p>
   <p>Labels: <span class="tag" style="color:var(--lime)">Looks cleaner &lt;25</span><span class="tag" style="color:var(--cyan)">Mixed 25–44</span><span class="tag" style="color:var(--amber)">Caution 45–65</span><span class="tag" style="color:var(--coral)">High risk 66+</span></p>
 
+  <details class="archive"><summary>Archive · the 2026-09 winner study (parked, kept for the record)</summary>
+  <p class="muted">Everything in this section describes research that is parked. It is kept because it is the basis for the failed tests above, not because it is in use: nothing on the board or in the agent's posts uses the resemblance score, the corridor or the ladder.</p>
   <h2>Resemblance to past winners</h2>
   <p><b>These are two different questions, and we keep them apart.</b> The risk score above is a <i>fact we can check now</i> — how manipulated the launch looks. This second read is a <b>historical resemblance score (0–100)</b>: how closely a fresh launch matches the shape the biggest past winners had at the same age. It <b>guides attention — it is not a probability of success.</b> A launch can look clean and still fail; a messy one can still run. Validated discriminators, in order of weight:</p>
   <ul>
@@ -113,19 +145,22 @@
   <div id="valbox"><p class="muted">loading measurement…</p></div>
   <div class="callout warn"><b>Read this honestly.</b> The per-age table is <b>in-sample separation on a small cohort</b> (the chain is young). Winners are graded leave-one-out and the controls never shaped the band, and the <b>time split</b> below fits the band on earlier launches and grades only the later ones — the closest thing to out-of-sample a two-month-old chain allows. Early samples are sparse and weak; the table does not establish that waiting an hour produces a useful entry signal. Treat a very fresh launch's read as low-confidence by design, and the whole model as evidence that compounds as more launches settle, not a guarantee.</div>
 
+  </details>
+
   <h2>Limits — what this can't tell you</h2>
   <ul>
-    <li><b>Prices are reconstructed.</b> There's no oracle; price is implied from swap receipts and smoothed. Treat exact figures as estimates, not quotes.</li>
+    <li><b>Reads have an age.</b> The board is the agent's latest read of each launch, up to a few hours old; each row says when it was read.</li>
+    <li><b>Some sales are invisible as sales.</b> Selling into a bonding curve pays native ETH, which leaves no log. The radar can tell it is a sale only when a tracked wallet bought from the same curve in its window; otherwise it shows as tokens moved into a contract.</li>
+    <li><b>Prices are market context.</b> Market caps come from the launchpad and DexScreener; candles from GeckoTerminal, which only has hours with trades. None of them is part of a read.</li>
     <li><b>On-chain can't see intent.</b> A clean distribution can still be a slow rug; a messy one can still run. This reads structure, not the future.</li>
-    <li><b>The cohort is small and survivorship-shaped.</b> Winners are defined by having already got there and held it. More tokens tighten the corridor; they don't turn a pattern into a forecast.</li>
-    <li><b>Fresh is uncertain.</b> As measured above, the first half hour barely discriminates. Earliest is riskiest — that's inherent, not a bug.</li>
+    <li><b>The first half hour is noise.</b> A launch minutes old has too few transfers to read; cards label it "too early".</li>
   </ul>
 
-  <div class="foot">Block0 reconstructs everything from public Robinhood-Chain data and the Pons launchpad's own market data. It is a research and forensic tool — a position read, <b>signal not proof</b>, never a buy recommendation, and not financial advice. You are responsible for your own decisions.</div>
+  <div class="foot">Block0 reconstructs everything from public Robinhood-Chain data and the launchpads' own market data. It reports what happened on-chain — never a buy or sell recommendation, and not financial advice. You are responsible for your own decisions.</div>
 </div>
 <footer class="ft"><div class="ft-in"><div class="ft-top">
   <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p></div>
-  <div class="ft-cols"><div><p class="micro">Product</p><a href="/board">Board</a><a href="/leaderboard">Leaderboard</a></div><div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a></div></div>
+  <div class="ft-cols"><div><p class="micro">Product</p><a href="/board">Board</a><a href="/radar">Radar</a></div><div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a></div></div>
 </div><p class="fine">Not financial advice. You are responsible for your own decisions.</p></div></footer>
 
 <script>

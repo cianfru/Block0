@@ -53,13 +53,15 @@ const B0 = (() => {
     return `<svg class="ic${cls ? " " + cls : ""}" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true">${p}</svg>`;
   };
 
+  // when a static-board row was read ("4m ago"); a board is assembled every cycle, but not every token is re-read
+  const readAgo = (t) => { const m = Math.max(0, Math.round((Date.now() - t) / 60000)); return m < 1 ? "just now" : m < 60 ? m + "m ago" : Math.round(m / 60) + "h ago"; };
   function tokenCard(r, i) {
     const f = r.flags || {}, p = r.parts || {}, c = HEX(r.risk), tooEarly = r.ageH < 0.5;
     const meters = [
       meter("Snipers", p.snipers || 0, f.snipers ? `${f.snipers} · ${f.sniperHeldPct}% held` : "none"),
       meter("Bundles", p.bundles || 0, f.bundles ? `${f.bundles} · ${f.bundleHeldPct}% held` : "none"),
       meter("Concentration", p.concentration || 0, `top 10 · ${f.top10Pct}%`),
-      meter("Dumping now", p.dumping || 0, f.insiderSellersNow ? `${f.insiderSellersNow} selling` : "none"),
+      meter("Selling now", p.dumping || 0, f.insiderSellersNow == null && r.stale ? "not current" : f.insiderSellersNow ? `${f.insiderSellersNow} selling` : "none"),
     ].join("");
     // DEX-discovered tokens carry a real venue (uniswap-v2/v3/v4 or a factory label); Pons tokens don't.
     const DEXVEN = { "uniswap-v4": "#ff5cf0", "uniswap-v3": "#7aa2ff", "uniswap-v2": "#ffd23d" };
@@ -76,7 +78,7 @@ const B0 = (() => {
     const curve = (r.progress != null) ? chip(`curve ${r.progress}%`) : "";
     const prec = r.path ? `<div class="precedent tnum">${(f.wallets || f.holders || 0).toLocaleString()} wallets → <b>${mcT(r.path.precedent)}</b> <span class="m">precedent mcap</span></div>` : "";
     const al = r.alert ? `<p class="alert" style="color:${r.alert.tone === "good" ? "#c8ff4d" : r.alert.tone === "warn" ? "#ffd23d" : "#ff3b5c"}">${r.alert.tone === "bad" ? "▼ " : r.alert.tone === "good" ? "✓ " : "! "}${esc(r.alert.text)}</p>`
-      : f.insiderSellersNow ? `<p class="alert" style="color:#ff3b5c">▼ ${f.insiderSellersNow} insider${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
+      : f.insiderSellersNow ? `<p class="alert" style="color:#ff3b5c">▼ ${f.insiderSellersNow} early wallet${f.insiderSellersNow > 1 ? "s" : ""} selling now</p>`
         : (!f.snipers && !f.bundles) ? `<p class="alert" style="color:#c8ff4d">✓ no snipers · no bundles</p>` : "";
     // BUNDLES are the loudest red flag on a launch — one actor wearing many wallets. Flag it hard, up top.
     // SERIAL OPERATOR — what else has this deployer launched, and what happened to it (launchpad data, no RPC)
@@ -94,7 +96,7 @@ const B0 = (() => {
         <div class="top">${icon(r)}
           <div style="min-width:0">
             <div class="tsym">${esc(r.sym || "?")}${isNew(r) ? '<span class="newbadge">NEW</span>' : ""}</div>
-            <div class="micro" style="margin-top:3px">${mcT(r.mcapUsd)} mcap · ${fmtAge(r.ageH)} old</div>
+            <div class="micro" style="margin-top:3px">${mcT(r.mcapUsd)} mcap · ${fmtAge(r.ageH)} old${r.readAt ? ` · read ${readAgo(r.readAt)}` : ""}</div>
           </div>
           <div class="rscore"><span class="n" style="color:${c};text-shadow:0 0 26px ${c}66">${r.risk}</span><span class="l" style="color:${c}">${tooEarly ? "Too early" : r.label}</span></div>
         </div>

@@ -10,9 +10,10 @@
 import { detectEvents } from "../alert-events.mjs";
 import { normAgent, agentEvents } from "./agent-events.mjs";
 import { formatPost, formatReply, lint, UNVALIDATED } from "./format.mjs";
-import { plan, record, canReply, freshBudget } from "./budget.mjs";
+import { plan, record, canReply, freshBudget, DEFAULT_CAPS } from "./budget.mjs";
 import { parseMention, resolveSymbol, selectMentions } from "./mentions.mjs";
-import { OrbioError } from "./orbio.mjs";
+import { OrbioError, FREE, postOutcome, mentionsOf } from "./orbio.mjs";
+import { deployerReputation, compactRep } from "../deployer.mjs";
 
 // maxProfiles is a ceiling, not the working limit — the time budget is. A token's FIRST read in a process is a full
 // history pull (a busy 2-day-old token: 36 s, 226 eth_getLogs on the free node); every later read is a delta
@@ -20,15 +21,14 @@ import { OrbioError } from "./orbio.mjs";
 export const DEFAULTS = { maxAgeH: 72, minMcap: 5000, maxProfiles: 150, timeBudgetMs: 8 * 60e3, concurrency: 3, keepDays: 7 };
 
 export function emptyState() {
-  return { prevAgents: {}, lastFiredAgents: {}, prevBoard: {}, lastFiredBoard: {}, profiledAt: {}, perToken: {}, budget: null, answered: {}, mentionCursor: null, stoppedDay: null };
+  return { prevAgents: {}, lastFiredAgents: {}, prevBoard: {}, lastFiredBoard: {}, profiledAt: {}, perToken: {}, budget: null, answered: {}, stoppedDay: null };
 }
 
 export async function runTick(deps) {
-  const { orbio, pons, readToken, now = Date.now(), dryRun = true, publicUrl = "", forwardN = null, handle = "",
-    caps = {}, log = () => {} } = deps;
+  const { orbio, pons, readToken, now = Date.now(), dryRun = true, forwardN = null, caps = {}, log = () => {} } = deps;
   const o = { ...DEFAULTS, ...(deps.opts || {}) };
   const state = { ...emptyState(), ...(deps.state || {}) };
-  const out = { posted: [], dryRun: [], logged: [], held: [], replies: [], errors: [], tokens: [], stats: null };
+  const out = { posted: [], dryRun: [], logged: [], held: [], replies: [], errors: [], tokens: [], stats: null, account: null, events: [] };
   const started = Date.now();
 
   // 1 · Orbio agents (free) → economics events
@@ -48,6 +48,16 @@ export async function runTick(deps) {
   } catch (e) { out.errors.push("pons: " + e.message); }
   for (const a of agents) if (!universe.has(a.address)) universe.set(a.address, { address: a.address, sym: a.sym, mcapUsd: a.mcapUsd, launchedAt: a.launchedAt ? new Date(a.launchedAt * 1000).toISOString() : null, graduated: a.graduated });
   const ageH = (t) => (t.launchedAt ? (now - Date.parse(t.launchedAt)) / 3.6e6 : null);
+  // who launched it, and what else they launched. An Orbio agent's owner is checked against EVERY agent (complete);
+  // a Pons deployer only against the launches in view (latest 100 of the last 7 days + every graduated token).
+  const launchList = [...universe.values()];
+  const deployerOf = (t) => {
+    const ag = agentByToken.get(t.address);
+    if (ag?.owner) { const prior = agents.filter((x) => x.owner === ag.owner);
+      return { address: ag.owner, launched: prior.length, graduated: prior.filter((x) => x.graduated).length, faded: null, scope: "every Orbio agent" }; }
+    const r = compactRep(deployerReputation(launchList, t));
+    return r ? { ...r, scope: "the latest 100 Pons launches (7 days) and every graduated token" } : null;
+  };
 
   // 3 · candidates: young, not dust; Orbio agents first, then the least recently read (rotation under the cap)
   const cands = [...universe.values()].filter((t) => { const h = ageH(t); return h != null && h >= 0 && h <= o.maxAgeH && (t.mcapUsd || 0) >= o.minMcap; })
@@ -66,7 +76,7 @@ export async function runTick(deps) {
         const r = await readToken(t);
         state.profiledAt[t.address] = now;
         tokens.push({ ...r, address: t.address, sym: t.sym || r.sym, mcapUsd: t.mcapUsd ?? r.mcapUsd, ageH: ageH(t), venue: agentByToken.has(t.address) ? "orbio-agent" : "pons",
-          graduated: t.graduated ?? r.graduated, progress: t.progress ?? null });
+          graduated: t.graduated ?? r.graduated, progress: t.progress ?? null, name: t.name || null, logo: t.logo || null, deployer: deployerOf(t) });
       } catch (e) { out.errors.push(`read ${t.sym || t.address}: ${e.message}`); }
     }
   };
@@ -80,33 +90,55 @@ export async function runTick(deps) {
 
   // 5 · gate: unvalidated kinds are logged only; the rest go through caps + lint
   const all = [...be.events, ...ae.events];
+  out.events = all.map((e) => ({ at: now, kind: e.kind, address: e.address, sym: e.sym ?? null, headline: e.headline ?? null, validated: !UNVALIDATED.has(e.kind) }));
   for (const e of all.filter((x) => UNVALIDATED.has(x.kind))) out.logged.push({ ...e, why: "unvalidated kind — logged, not posted" });
   const stopped = state.stoppedDay === new Date(now).toISOString().slice(0, 10);
   const { post, hold } = plan(all.filter((x) => !UNVALIDATED.has(x.kind)), state.budget, { now, caps, perToken: state.perToken });
   out.held.push(...hold.map((h) => ({ ...h.ev, why: h.why })));
 
-  // 6 · publish (or record the dry run)
+  // 6 · the connected X account (free read; only with a key). Gives the platform name social.post wants, the handle
+  //     whose mentions we read, and today's remaining allowance. Logged every cycle, so the dry run doubles as the
+  //     connection check.
+  const stopDay = (e) => { if (e instanceof OrbioError && ["balance", "auth", "connect"].includes(e.code)) state.stoppedDay = new Date(now).toISOString().slice(0, 10); };
+  let acct = null;
+  if (deps.apiKey) {
+    try { acct = await orbio.xAccount(); out.account = acct; log(acct.platform ? `X account @${acct.username} (${acct.platform}) · ${acct.postsLeft ?? "?"} posts / ${acct.repliesLeft ?? "?"} replies left today` : `no X account connected in Orbio${acct.connectUrl ? " — connect at " + acct.connectUrl : ""}`); }
+    catch (e) { stopDay(e); out.errors.push("orbio accounts: " + e.message); }
+  }
+  const handle = (deps.handle || acct?.username || "").replace(/^@/, "");
+  const platform = acct?.platform || null;
+  const ceiling = caps.maxCreditPerDay ?? DEFAULT_CAPS.maxCreditPerDay;
+
+  // 7 · publish (or record the dry run)
+  let sent = 0;
   for (const ev of post) {
-    const text = formatPost(ev, { publicUrl, forwardN }), problems = lint(text);
+    const text = formatPost(ev, { forwardN }), problems = lint(text);
     if (problems.length) { out.held.push({ ...ev, text, why: "lint: " + problems.join(", ") }); continue; }
     if (dryRun) { out.dryRun.push({ at: now, kind: ev.kind, address: ev.address, text }); state.budget = record(state.budget, { now, credit: 0, address: ev.address }); state.perToken[ev.address] = now; continue; }
-    if (stopped) { out.held.push({ ...ev, text, why: "posting stopped for today (balance/auth)" }); continue; }
+    const block = stopped || state.stoppedDay === new Date(now).toISOString().slice(0, 10) ? "posting stopped for today (balance/auth/connection)"
+      : !platform ? "no X account connected in Orbio" : acct.postsLeft != null && sent >= acct.postsLeft ? "platform allowance" : null;
+    if (block) { out.held.push({ ...ev, text, why: block }); continue; }
     try {
-      const r = await orbio.tool("social.post", { platforms: ["x"], text }, "0.02");
-      state.budget = record(state.budget, { now, credit: 0.0187, address: ev.address }); state.perToken[ev.address] = now;
-      out.posted.push({ at: now, kind: ev.kind, address: ev.address, text, id: r?.id ?? r?.data?.id ?? null, url: r?.url ?? r?.data?.url ?? null });
+      const r = await orbio.tool("social.post", { platforms: [platform], text }, "0.02");
+      let o = postOutcome(r.result);
+      if (o.postId && !o.url && o.status !== "failed") { try { o = { ...o, ...postOutcome((await orbio.tool("social.post.status", { post_id: o.postId }, FREE)).result) }; } catch { /* the post stands; the link is a nicety */ } }
+      if (o.status === "failed") { out.held.push({ ...ev, text, why: "post failed: " + (o.error || "refused") }); continue; }
+      sent++;
+      state.budget = record(state.budget, { now, credit: r.credit ?? 0.0187, address: ev.address }); state.perToken[ev.address] = now;
+      out.posted.push({ at: now, kind: ev.kind, address: ev.address, text, ...o, running: r.running || undefined });
     } catch (e) {
-      if (e instanceof OrbioError && (e.code === "balance" || e.code === "auth")) state.stoppedDay = new Date(now).toISOString().slice(0, 10);
+      stopDay(e);
       out.errors.push("post: " + e.message); out.held.push({ ...ev, text, why: "post failed" });
     }
   }
 
-  // 7 · mentions (metered read → only with a key and a handle; never in dry run without a key)
-  if (handle && deps.apiKey && !stopped) {
+  // 8 · mentions — a metered read (≈0.00022 CREDIT per post returned), so only with a key, a connected handle and room
+  //     under the daily ceiling. Only mentions from the last 24 h are answered (a first run never replies to a backlog).
+  if (handle && deps.apiKey && state.stoppedDay !== new Date(now).toISOString().slice(0, 10) && freshBudget(state.budget, now).credit + 0.005 <= ceiling) {
     try {
-      const d = await orbio.tool("social.x.posts", { handle, mentions_of: handle, limit: 20, ...(state.mentionCursor ? { since_id: state.mentionCursor } : {}) }, "0.005");
-      const posts = (d?.posts || d?.data || []).map((p) => ({ id: String(p.id), author: p.author?.username || p.author || p.username || "", text: p.text || "" }));
-      if (posts.length) state.mentionCursor = posts.map((p) => p.id).sort().at(-1);
+      const d = await orbio.tool("social.x.posts", { mentions_of: handle, limit: 20 }, "0.005");
+      state.budget = record(state.budget, { now, kind: "read", credit: d.credit ?? 0.005 });   // unsettled → count the cap
+      const posts = mentionsOf(d.result).filter((p) => p.at == null || now - p.at < 86400e3);
       for (const p of selectMentions(posts, { selfHandle: handle, answered: state.answered, now })) {
         if (!canReply(state.budget, { now, caps })) break;
         const ask = parseMention(p.text);
@@ -122,16 +154,18 @@ export async function runTick(deps) {
           const ag = agentByToken.get(ask.address);
           const prior = ag ? agents.filter((x) => x.owner === ag.owner) : null;
           text = formatReply({ ...r, address: ask.address, sym: t.sym || r.sym, mcapUsd: t.mcapUsd ?? r.mcapUsd, ageH: ageH(t),
-            ownerRep: prior ? { launched: prior.length, graduated: prior.filter((x) => x.graduated).length } : null }, { publicUrl });
+            ownerRep: prior ? { launched: prior.length, graduated: prior.filter((x) => x.graduated).length } : null });
         }
         if (!text || lint(text).length) { state.answered[p.id] = { at: now, author: p.author, skipped: true }; continue; }
+        let credit = 0;
         if (dryRun) out.dryRun.push({ at: now, kind: "reply", replyTo: p.id, text });
-        else { await orbio.tool("social.post", { platforms: ["x"], text, reply_to: p.id }, "0.02"); out.replies.push({ at: now, replyTo: p.id, text }); }
-        state.budget = record(state.budget, { now, kind: "reply", credit: dryRun ? 0 : 0.0187 });
+        else if (!platform) break;
+        else { const r = await orbio.tool("social.post", { platforms: [platform], text, reply_to: p.id }, "0.02"); credit = r.credit ?? 0.0187; out.replies.push({ at: now, replyTo: p.id, text, ...postOutcome(r.result) }); }
+        state.budget = record(state.budget, { now, kind: "reply", credit });
         state.answered[p.id] = { at: now, author: p.author };
       }
     } catch (e) {
-      if (e instanceof OrbioError && (e.code === "balance" || e.code === "auth")) state.stoppedDay = new Date(now).toISOString().slice(0, 10);
+      stopDay(e);
       out.errors.push("mentions: " + e.message);
     }
   }

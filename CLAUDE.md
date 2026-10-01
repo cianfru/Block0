@@ -1,3 +1,26 @@
+## 🧭 THE PRODUCT — read `docs/product.md` first (owner: "we need to have a clear product", 2026-10-01)
+**Block0 tells you what materially changed in a Robinhood Chain launch, who caused it, and the on-chain evidence —
+never what to buy.** Dossier (explain one launch) · board + radar (find where something is happening) · agent on X
+(distribute the few changes that matter). All read one shared record (the agent's reads). Next: token timeline →
+event lifecycle/follow-ups → watchlist → published editorial policy. Not a predictor, not a pick list.
+
+## 🔎 CODE AUDIT 2026-10-01 — fixed on the branch (see commits "Facts:…", "Forward test protocol v2…")
+- **Vocabulary is now precise, keep it that way:** "early wallets" (snipers + bundles: a timing fact), never
+  "insiders". **Selling = tokens sent into a venue** (pool/curve/AMM/router); anything else is `earlyMovedOutNow`
+  "transferred out". **"Now" = the 30 min before the observation** (chain head via the store's calibration), never
+  before the token's last transfer — `analyzeTransfers()` in intel.mjs is the pure, tested core (`test/intel-analyze`).
+- **Radar (`public/radar-core.js`):** a buy needs trade evidence — a known venue, or a contract + payment in the same tx
+  (quote token sent, or native `value` on the wallet's own tx); a contract that delivered a paid buy is a venue for the
+  window. Free claims = "received", sends to other contracts = "deposit". Positions count transfers out ("moved"); the
+  verdict says "bought and has not sold or moved it since", never "holds". Logs dedupe on tx+logIndex. Known gap: a
+  sale into a bonding curve pays native ETH (no log) and reads as a deposit unless a tracked wallet bought from that
+  curve in the window.
+- **Forward test = protocol v2 (`tools/radar-protocol.mjs`, pure + tested):** event ids, own controls only, outcome
+  window starts the first full hour after detection, close7 needs the horizon's last 24 h covered, transient candle
+  failures retried. v1 rows kept, counted, never scored.
+- **Board rows carry `readAt`;** >45 min → "now" fields blanked (`stale`), >3 h → off the board.
+- **`test.yml` runs the suite on every PR and push to main.**
+
 ## 🛑 PROJECT PARKED — 2026-09-10 (owner: "kill the whole thing… this project is going nowhere")
 
 **Everything recurring is OFF. Read this section before touching anything else in this file; most of what follows
@@ -35,22 +58,40 @@ reads). Block0 becomes an X account posting **reproducible on-chain facts** abou
   `UNVALIDATED` kinds), `budget.mjs` (caps/priority/credit ceiling), `mentions.mjs`, `orbio.mjs` (client; `max_cost`
   always sent; 401/402 → stop for the day), `tick.mjs` (one injected cycle). CLI `tools/agent-tick.mjs [--watch]`.
   Tests `test/agent.test.mjs`. Reuses `detectEvents` (insider-dump) + `computeIntel` unchanged.
-- **Runner:** `.github/workflows/agent.yml` — one job every 6h that loops every 15 min (~5h40m), committing to the
-  **`agent-data`** branch after each cycle (never main). The loop exists because the transfer store is in-memory and a
-  cold read costs ~20 s/token on the free node (a busy 2-day-old token: 36 s / 226 getLogs cold, 0.1 s warm). Reads run
-  3 at a time under a time budget (interval − 3 min); measured live: ~150 candidates converge to a full warm cycle in
-  ~4 min by the 3rd cycle (~30 min after the job starts). First live dry-run post: $CTRN insider-dump, 2026-10-01.
+- **Runner:** `.github/workflows/agent.yml` — one job loops every 15 min for ~5h40m, then **starts its own successor**
+  (`gh workflow run`, needs `actions: write`). ⚠ GitHub's scheduler is NOT a clock on this repo: the 30-min radar cron
+  ran every ~4–6 h and the 6-h agent cron never fired once (measured 2026-10-01), so the crons are only restarts if
+  the chain breaks. No successor when the job ran <30 min (no crash loop) or the repo variable `RUNNER_CHAIN=0` (the
+  off switch, for both workflows). The loop exists because the transfer store is in-memory and a cold read costs
+  ~20 s/token on the free node (a busy 2-day-old token: 36 s / 226 getLogs cold, 0.1 s warm). Reads run 3 at a time
+  under a time budget (interval − 3 min); ~150 candidates converge to a full warm cycle by the 3rd cycle.
+  ⚠ Running Actions 24/7 as a bot is at the edge of GitHub's Actions terms (meant for the repo's CI/CD). Free and
+  working, but if GitHub objects the fallback is any always-on free VM running the same two commands.
+- **`agent-data` branch = ONE commit, force-pushed every cycle** (no history): `tokens/<addr>.json` dossiers churn every
+  15 min and would grow the repo by MBs/day. Ledgers (`dry-run.jsonl`, `posted.jsonl`, `events.jsonl`) are append-only
+  files, so nothing is lost. Also `board.json` (live board), `alerts.json` (every detected event, posted or not).
 - **Rails:** dry run unless repo variable `AGENT_DRY_RUN=0`. `smart-convergence`/`clean-launch` are LOGGED, never
   posted, until the radar REPORT says PASS. No metered chain fallback exists. Never touches board.mjs/STANDBY.
-  Default 5 originals/day in CI (`AGENT_MAX_ORIGINALS_PER_DAY`), $1.50/day credit ceiling.
+  Default 5 originals/day in CI (`AGENT_MAX_ORIGINALS_PER_DAY`), $1.50/day credit ceiling (mention reads count too).
 - **Orbio API facts (live 2026-10-01):** `https://api.orbio.so/api/protocol/agents?sort=newest|cap&limit≤200&offset=`;
   numbers are strings; USDG atoms = 6 decimals; `stake.stakedWei` = the 10-day-locked principal; `orbioMicroUsd` at
-  the root. 349 agents, all still locked (oldest 5.6 days) — the first cliffs open ~2026-10-05. Two live tokens are
-  both named TANK: always show the address.
-- **Owner-side to go live:** create the X handle, connect it in the Orbio dashboard, launch the agent token via the
-  vault, add `ORBIO_API_KEY` (secret) + `AGENT_X_HANDLE`/`PUBLIC_URL` (vars), review `dry-run.jsonl` ≥3 days, then set
-  `AGENT_DRY_RUN=0`. The mention-read tool's argument/response shape is unverified until a key exists — check the
-  first live run.
+  the root. Two live tokens are both named TANK: always show the address.
+  **Tools** (`POST /api/v1/tools/{name}`, docs `orbio.so/launchpad/docs.md`): a settled 200 is `{id, tool, result,
+  cost:{credit}}`; 202 = still running, never resubmit; 401 key · 402 balance · **409 = social account not connected**.
+  Platform name is **`"twitter"`** (read it from `social.accounts`, free, which also gives the handle + posts left).
+  **⚠ Orbio REFUSES any X post containing an http(s) link** (X bills it ~13×) and X auto-links bare domains — so posts
+  carry the contract ADDRESS, never a URL; `lint()` rejects links; block0.app goes in the X bio. Mentions:
+  `social.x.posts {mentions_of, limit}` → `result.tweets[] {id_str, full_text, user.screen_name, tweet_created_at}`;
+  `cursor` pages OLDER posts (there is no since_id) — dedupe is `state.answered`, and only mentions <24 h old are answered.
+- **Owner status (2026-10-01):** X handle created, connected in Orbio, `ORBIO_API_KEY` set. Token launch deliberately
+  postponed (owner: no token before there is a product). Go-live = fund the gateway balance with a small top-up,
+  review `dry-run.jsonl`, set `AGENT_DRY_RUN=0`. The agent logs `X account @… (twitter) · N posts left` every cycle
+  once the key is set — that line is the connection check.
+- **Static site (block0.app, Vercel, `public/vercel.json`):** no server. `/api/board`, `/api/alerts/feed` and
+  `/api/dossier/:addr` are rewrites to raw files on `agent-data`. The dossier page (`index.html` → `/token`) tries
+  `/api/token` (Node server) and falls back to the agent's file, or says the token is not covered (Pons/Orbio, <72 h,
+  ≥$5k, ≥5 holders). Price on the static dossier comes from GeckoTerminal directly (CORS-open). Server-only pages
+  (leaderboard, wallet, track-record, setups, desk/post/control) redirect; the board hides the server-only tabs.
 
 ### ⏭ PHASE 2 (on standby, owner 2026-10-01): REFLEX low-timeframe trend reads
 If the agent gets traction: port the Reflex engine's trend logic (separate repo; the brief references
@@ -79,8 +120,9 @@ flag launches where they converge. Keep it at $0. What exists now:
   price at detection + up to 4 matched Pons launches nobody smart touched; `--outcomes` scores both from
   GeckoTerminal candles after 7 days; `--report` applies the same bar as the replays, no verdict below 30 events.
   Convergence runs at dozens/day, so ~10 days of running gives the first verdict. **It runs on GitHub Actions**
-  (`.github/workflows/radar-log.yml`, every 30 min, `--once` over 90 min; free because the repo is PUBLIC — if it ever
-  goes private this starts costing minutes). The log + `REPORT.txt` live on the **`radar-data` branch**, never main (main
+  (`.github/workflows/radar-log.yml`: the live 60-s watch mode for ~5h40m, committing every 15 min, then the job starts
+  its successor — amended 2026-10-01 because the 30-min `--once` cron actually ran every ~4–6 h; free because the repo
+  is PUBLIC — if it ever goes private this starts costing minutes). The log + `REPORT.txt` live on the **`radar-data` branch**, never main (main
   deploys to Railway). Schedules only fire once the workflow is on main. **The radar is not validated until the report
   says PASS — say so on every surface.**
 

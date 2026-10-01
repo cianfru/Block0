@@ -2,7 +2,7 @@
 // discover-board worker can call it per token; also runnable as a CLI (node intel.mjs --addr=0x… --sym=X).
 import { rpc, PROVIDER, latestBlock, findDeployBlock, getTransferLogs, LOGS_RANGE } from "./rpc.mjs";
 import { detectPool, ROUTERS } from "./engine.mjs";
-import { getTransfers, estimateBlockAt, parseTs } from "./store.mjs";
+import { getTransfers, estimateBlockAt, parseTs, chainCalibration } from "./store.mjs";
 import { smartHolders } from "./smart-money.mjs";
 import { coordinationSignal } from "./graph.mjs";
 
@@ -169,12 +169,17 @@ export function blueprintMatch({ bundles = 0, top10Pct = 100, holders = 0, risk 
 }
 export const blueprintLabel = (m) => m >= 75 ? "STRONG FIT" : m >= 55 ? "PARTIAL FIT" : m >= 35 ? "WEAK FIT" : "OFF-BLUEPRINT";
 
-export async function computeIntel(addr, sym = "?", opts = {}) {
-  addr = addr.toLowerCase();
-  const t0ms = Date.now();
-  // Incremental store: pulls only the delta since last call and caches the deploy block (free on Alchemy).
-  const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool, launchedAt: opts.launchedAt, fromBlock: opts.fromBlock });
-  const ponsPool = (opts.pool || "").toLowerCase();
+// The forensic read of one token's transfer history — PURE (no RPC), so it is tested directly.
+//   ev        : [{ from, to, amt, block, ts }] in chain order
+//   obsTs     : the OBSERVATION time (chain head, unix s). "Right now" means the 30 minutes before it — never the 30
+//               minutes before the token's last transfer, which on a quiet token would keep an old sale "live" forever
+//               (audit F02). Defaults to the last transfer only when no clock is given.
+// A SALE is a transfer INTO a known venue (the pool, the bonding curve, the singleton AMM, a known router). Any other
+// outgoing transfer — to a second wallet, a CEX, a contract — is a MOVE, reported separately as "transferred out"
+// (audit F01). "Early wallets" = snipers (first buy ≤3 blocks after the first pool buy) + same-block bundles: a timing
+// fact, not proven affiliation.
+export function analyzeTransfers(ev, { ponsPool = "", poolStore = null, obsTs = null, graduated = false, whales = true } = {}) {
+  ponsPool = (ponsPool || "").toLowerCase();
   const detected = detectPool(ev); // highest-degree address = the bonding curve / trading contract
   const pool = ponsPool || poolStore || detected; // the venue we report
   // The bonding curve holds all UNDISTRIBUTED supply and touches every pre-graduation trade, so it is the
@@ -186,14 +191,19 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const isBuy = (e) => venues.has(e.from) || ROUTERS.has(e.from), isSell = (e) => venues.has(e.to) || ROUTERS.has(e.to);
   const isInfra = (a) => a === ZERO || a === DEAD || venues.has(a) || ROUTERS.has(a);
   const tsMax = Math.max(...ev.map((e) => e.ts || 0)), tsMin = Math.min(...ev.map((e) => e.ts || 1e18));
-  const RECENT = tsMax - 1800; // last 30 min = "now"
+  const now = obsTs != null && obsTs > 0 ? obsTs : tsMax;
+  const RECENT = now - 1800; // the 30 minutes before the observation = "now"
 
-  const W = new Map(); const g = (a) => { let w = W.get(a); if (!w) W.set(a, w = { a, bal: 0, bought: 0, sold: 0, first: null, firstBlk: null, recvRecent: 0, sentRecent: 0 }); return w; };
+  const W = new Map(); const g = (a) => { let w = W.get(a); if (!w) W.set(a, w = { a, bal: 0, bought: 0, sold: 0, first: null, firstBlk: null,
+    recvRecent: 0, sentRecent: 0, boughtRecent: 0, soldRecent: 0, movedOutRecent: 0, movedInRecent: 0 }); return w; };
   let firstPool = null, creator = null, buys = 0, sells = 0, buyR = 0, sellR = 0;
   for (const e of ev) {
+    const recent = e.ts > RECENT;
     if (isBuy(e) && firstPool == null) firstPool = e.block;
-    if (!isInfra(e.from)) { const w = g(e.from); w.bal -= e.amt; if (isSell(e)) { w.sold += e.amt; sells++; } if (e.ts > RECENT) { w.sentRecent += e.amt; if (isSell(e)) sellR += e.amt; } }
-    if (!isInfra(e.to)) { const w = g(e.to); w.bal += e.amt; if (isBuy(e)) { w.bought += e.amt; buys++; } if (w.first == null) { w.first = e.ts; w.firstBlk = e.block; } if (e.ts > RECENT) { w.recvRecent += e.amt; if (isBuy(e)) buyR += e.amt; } }
+    if (!isInfra(e.from)) { const w = g(e.from); w.bal -= e.amt; if (isSell(e)) { w.sold += e.amt; sells++; }
+      if (recent) { w.sentRecent += e.amt; if (isSell(e)) { sellR += e.amt; w.soldRecent += e.amt; } else if (!isInfra(e.to)) w.movedOutRecent += e.amt; } }
+    if (!isInfra(e.to)) { const w = g(e.to); w.bal += e.amt; if (isBuy(e)) { w.bought += e.amt; buys++; } if (w.first == null) { w.first = e.ts; w.firstBlk = e.block; }
+      if (recent) { w.recvRecent += e.amt; if (isBuy(e)) { buyR += e.amt; w.boughtRecent += e.amt; } else if (!isInfra(e.from)) w.movedInRecent += e.amt; } }
     if (e.from === ZERO && creator == null && !isInfra(e.to)) creator = e.to;
   }
   const holders = [...W.values()].filter((w) => w.bal > 1e-9);
@@ -207,38 +217,62 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   const top10 = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 10).reduce((s, w) => s + w.bal, 0);
   const creatorBal = creator ? Math.max(0, (W.get(creator)?.bal || 0)) : 0;
   const bundleSet = new Set(bundles.flatMap((b) => b.wallets));
-  const insiderSet = new Set([...sniperW.map((w) => w.a), ...bundleSet]);
-  let insiderDumpNow = 0, insiderSellers = 0;
-  for (const a of insiderSet) { const w = W.get(a); if (!w) continue; const net = w.recvRecent - w.sentRecent; if (net < 0) { insiderDumpNow += -net; insiderSellers++; } }
+  const earlySet = new Set([...sniperW.map((w) => w.a), ...bundleSet]);
+  // selling now = net tokens an early wallet SOLD INTO A VENUE in the window; moving out = net sent elsewhere
+  let soldNow = 0, sellers = 0, movedNow = 0, movers = 0;
+  for (const a of earlySet) { const w = W.get(a); if (!w) continue;
+    const sold = w.soldRecent - w.boughtRecent; if (sold > 0) { soldNow += sold; sellers++; }
+    const moved = w.movedOutRecent - w.movedInRecent; if (moved > 0) { movedNow += moved; movers++; } }
   const pct = (x) => +(x / held * 100).toFixed(1);
   const f_snipe = pct(sniperHeld), f_bundle = pct(bundleHeld), f_top10 = pct(top10), f_creator = pct(creatorBal);
-  const f_dumpNow = +(insiderDumpNow / held * 100).toFixed(2);
+  const f_dumpNow = +(soldNow / held * 100).toFixed(2), f_movedNow = +(movedNow / held * 100).toFixed(2);
   // Adversarial coordination — the hand-to-hand / funder cluster web (from the SAME transfers, no extra RPC). Catches
   // the operator who split into wallets that avoid the same-block bundle but still shuffle the token between themselves.
-  const coord = coordinationSignal(ev, { pool, venues: [...venues], window: 1800 });
+  const coord = coordinationSignal(ev, { pool, venues: [...venues], window: 1800, nowTs: now });
   // Risk = six interpretable sub-scores + three disqualifying floors — see computeRisk (shared with the backtest).
-  const grad = !!opts.graduated;
+  const grad = !!graduated;
   const { parts, risk, label, topFactor } = computeRisk({ f_snipe, f_bundle, f_top10, f_creator, f_dumpNow,
     f_coord: coord.hiddenPct, coordSellPct: coord.coordSellPct,
-    nBundles: bundles.length, nSnipers: sniperW.length, nSellers: insiderSellers, grad });
+    nBundles: bundles.length, nSnipers: sniperW.length, nSellers: sellers, grad });
   // momentum: recent buy vs sell + holder base + freshness (for ranking "what's heating up")
   const spanH = +((tsMax - tsMin) / 3600).toFixed(1);
   const netR = buyR - sellR;
   const momentum = Math.round(Math.max(-100, Math.min(100, (netR / held * 100) * 6 + (holders.length > 50 ? 10 : 0))));
 
-  const out = { sym, address: addr, pool, updated: Date.now(), latestBlock: latest, ageH: spanH, ms: Date.now() - t0ms,
+  const out = { pool, ageH: spanH, observedAt: now * 1000, lastTransferAt: tsMax > 0 ? tsMax * 1000 : null,
     risk, label, momentum, parts, topFactor, graduated: grad,
     flags: { snipers: sniperW.length, sniperHeldPct: f_snipe, bundles: bundles.length, bundleWallets: bundleSet.size, bundleHeldPct: f_bundle,
-      top10Pct: f_top10, holders: holders.length, wallets: [...W.values()].filter((w) => w.bought > 0).length, creatorPct: f_creator, insiderDumpNowPct: f_dumpNow, insiderSellersNow: insiderSellers,
+      top10Pct: f_top10, holders: holders.length, wallets: [...W.values()].filter((w) => w.bought > 0).length, creatorPct: f_creator,
+      insiderDumpNowPct: f_dumpNow, insiderSellersNow: sellers,           // early wallets that SOLD into a venue in the last 30 min
+      earlyMovedOutNow: movers, earlyMovedOutPct: f_movedNow,             // early wallets that sent tokens elsewhere (not a sale)
       coordPct: coord.coordPct, hiddenCoordPct: coord.hiddenPct, coordSellingPct: coord.coordSellPct, coordClusters: coord.nClusters,
       buysRecent: buys, sellsRecent: sells } };
-  if (opts.mcapUsd != null) { out.mcapUsd = Math.round(opts.mcapUsd); out.bucket = bucketOf(opts.mcapUsd); } // from Pons API — accurate, no receipts
-  else if (opts.mcap !== false) { const m = await computeMcap(addr, 3000, { supply: opts.supply ?? null }); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
-  if (opts.whales !== false) {
+  if (whales) {
     out.bundles = bundles.slice(0, 10);
-    out.whales = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 60).map((w) => ({ a: w.a, bal: +w.bal.toFixed(0), first: w.first, bought: +w.bought.toFixed(0), sold: +w.sold.toFixed(0), net: +(w.recvRecent - w.sentRecent).toFixed(0), sniper: w.sniper }));
+    out.whales = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 60).map((w) => ({ a: w.a, bal: +w.bal.toFixed(0), first: w.first, bought: +w.bought.toFixed(0), sold: +w.sold.toFixed(0),
+      net: +(w.recvRecent - w.sentRecent).toFixed(0), soldNow: +w.soldRecent.toFixed(0), movedOutNow: +w.movedOutRecent.toFixed(0), sniper: w.sniper }));
     out.tsMin = tsMin; out.tsMax = tsMax;
   }
+  return { out, holders };
+}
+
+// head block → unix seconds, from the same calibration that dates the native node's logs (store.mjs), so the
+// observation clock and every transfer's timestamp are on one scale
+async function headTs(latest) {
+  try { const c = await chainCalibration(latest); return Math.round(c.headTs + (latest - c.headBlock) * c.spb); }
+  catch { return Math.floor(Date.now() / 1000); }
+}
+
+export async function computeIntel(addr, sym = "?", opts = {}) {
+  addr = addr.toLowerCase();
+  const t0ms = Date.now();
+  // Incremental store: pulls only the delta since last call and caches the deploy block (free on Alchemy).
+  const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool, launchedAt: opts.launchedAt, fromBlock: opts.fromBlock });
+  const obsTs = opts.obsTs ?? await headTs(latest);
+  const { out: a, holders } = analyzeTransfers(ev, { ponsPool: opts.pool, poolStore, obsTs, graduated: opts.graduated, whales: opts.whales !== false });
+  const out = { sym, address: addr, ...a, updated: Date.now(), latestBlock: latest, ms: Date.now() - t0ms };
+  if (opts.mcapUsd != null) { out.mcapUsd = Math.round(opts.mcapUsd); out.bucket = bucketOf(opts.mcapUsd); } // from Pons API — accurate, no receipts
+  else if (opts.mcap !== false) { const m = await computeMcap(addr, 3000, { supply: opts.supply ?? null }); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }
   // SMART-MONEY POSITIONING: which proven-PnL wallets (from the leaderboard) currently hold this token. Pure set
   // membership over the holder map we already built — no extra RPC. Present on every token (cooking/dex/graduated).
   if (opts.smartSet && opts.smartSet.size) out.smart = smartHolders(holders, opts.smartSet, opts.smartMeta);

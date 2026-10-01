@@ -5,7 +5,16 @@
   "cleanUrls": true,
   "rewrites": [
     { "source": "/api/validation", "destination": "/data/validation.json" },
-    { "source": "/api/board", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/board.json" }
+    { "source": "/api/board", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/board.json" },
+    { "source": "/api/alerts/feed", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/alerts.json" },
+    { "source": "/api/dossier/:addr", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/tokens/:addr.json" }
+  ],
+  "redirects": [
+    { "source": "/leaderboard", "destination": "/radar", "permanent": false },
+    { "source": "/wallet", "destination": "/radar", "permanent": false },
+    { "source": "/track-record", "destination": "/radar", "permanent": false },
+    { "source": "/setups", "destination": "/radar", "permanent": false },
+    { "source": "/(desk|post|control)", "destination": "/", "permanent": false }
   ],
   "git": { "deploymentEnabled": { "radar-data": false, "agent-data": false } },
   "headers": [{ "source": "/smart-wallets.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] }]

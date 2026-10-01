@@ -37,9 +37,12 @@ export function buildGraph(transfers, opts = {}) {
   const isBuy = (e) => e.from === pool || e.from === AMM || ROUTERS.has(e.from);
   const isSell = (e) => e.to === pool || e.to === AMM || ROUTERS.has(e.to);
 
-  // recent-flow window is measured back from the latest transfer seen, so a stale token isn't all-flat
+  // recent-flow window: measured back from the observation time when the caller has one (opts.nowTs — the risk
+  // read's "selling now" must not stay "now" on a token that went quiet hours ago), else from the latest transfer
+  // (the bubble map's "last 24 h of activity" view)
   let maxTs = 0; for (const e of transfers) if (e.ts && e.ts > maxTs) maxTs = e.ts;
-  const cutoff = maxTs ? maxTs - windowSec : 0;
+  const anchor = opts.nowTs ?? maxTs;
+  const cutoff = anchor ? anchor - windowSec : 0;
 
   const W = new Map();
   const get = (a) => { let w = W.get(a); if (!w) W.set(a, w = { a, bal: 0, bought: 0, sold: 0, recIn: 0, recOut: 0, first: null, firstBlock: null, sniper: false }); return w; };
@@ -156,10 +159,10 @@ export function buildGraph(transfers, opts = {}) {
 //   coordPct     — biggest coordinated cluster's share of held supply (any link: same-block, hand-to-hand, or funder)
 //   hiddenPct    — biggest cluster linked by a HAND-TO-HAND transfer web: the operator that avoided same-block buying
 //   coordSellPct — biggest coordinated cluster that is DISTRIBUTING right now (the combined "insiders + selling" flag)
-export function coordinationSignal(transfers, { pool = "", venues = [], window = 1800, topN = 150 } = {}) {
+export function coordinationSignal(transfers, { pool = "", venues = [], window = 1800, topN = 150, nowTs = null } = {}) {
   const z = { coordPct: 0, hiddenPct: 0, coordSellPct: 0, nClusters: 0 };
   if (!transfers || transfers.length < 4) return z;
-  let g; try { g = buildGraph(transfers, { pool, extraInfra: venues, window, topN }); } catch { return z; }
+  let g; try { g = buildGraph(transfers, { pool, extraInfra: venues, window, topN, ...(nowTs ? { nowTs } : {}) }); } catch { return z; }
   const cl = g.clusters || [];
   if (!cl.length) return z;
   const maxPct = (arr) => arr.length ? Math.max(...arr.map((c) => c.pct)) : 0;

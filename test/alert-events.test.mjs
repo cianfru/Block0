@@ -15,7 +15,7 @@ test("insiders STARTING to sell fires once, then respects the cooldown", () => {
   const t0 = 1000;
   const s1 = detectEvents({}, [base()], { now: t0 }).next;
   const r = detectEvents(s1, [base({ flags: { ...base().flags, insiderSellersNow: 2, insiderDumpNowPct: 3.1 } })], { now: t0 + 1 });
-  assert.equal(r.events.length, 1); assert.equal(r.events[0].kind, "insider-dump"); assert.match(r.events[0].headline, /2 insider wallets/);
+  assert.equal(r.events.length, 1); assert.equal(r.events[0].kind, "insider-dump"); assert.match(r.events[0].headline, /2 early wallets sold into the pool/);
   // still selling next cycle → not a NEW transition, no re-fire
   const r2 = detectEvents(r.next, [base({ flags: { ...base().flags, insiderSellersNow: 2 } })], { now: t0 + 2, lastFired: r.lastFired });
   assert.equal(r2.events.length, 0);
