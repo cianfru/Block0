@@ -99,12 +99,17 @@ export async function runTick(deps) {
   // 6 · the connected X account (free read; only with a key). Gives the platform name social.post wants, the handle
   //     whose mentions we read, and today's remaining allowance. Logged every cycle, so the dry run doubles as the
   //     connection check.
-  const stopDay = (e) => { if (e instanceof OrbioError && ["balance", "auth", "connect"].includes(e.code)) state.stoppedDay = new Date(now).toISOString().slice(0, 10); };
+  const stopDay = (e) => { if (e instanceof OrbioError && ["balance", "auth", "connect"].includes(e.code)) { state.stoppedDay = new Date(now).toISOString().slice(0, 10); state.stoppedWhy = `${e.code}: ${e.message}`; } };
   let acct = null;
+  // The result is also kept in state.orbio (public on the agent-data branch), so the connection can be checked without
+  // reading job logs.
   if (deps.apiKey) {
-    try { acct = await orbio.xAccount(); out.account = acct; log(acct.platform ? `X account @${acct.username} (${acct.platform}) · ${acct.postsLeft ?? "?"} posts / ${acct.repliesLeft ?? "?"} replies left today` : `no X account connected in Orbio${acct.connectUrl ? " — connect at " + acct.connectUrl : ""}`); }
-    catch (e) { stopDay(e); out.errors.push("orbio accounts: " + e.message); }
-  }
+    try {
+      acct = await orbio.xAccount(); out.account = acct;
+      state.orbio = { checkedAt: now, platform: acct.platform, username: acct.username ?? null, postsLeft: acct.postsLeft ?? null, repliesLeft: acct.repliesLeft ?? null, error: null };
+      log(acct.platform ? `X account @${acct.username} (${acct.platform}) · ${acct.postsLeft ?? "?"} posts / ${acct.repliesLeft ?? "?"} replies left today` : `no X account connected in Orbio${acct.connectUrl ? " — connect at " + acct.connectUrl : ""}`);
+    } catch (e) { stopDay(e); out.errors.push("orbio accounts: " + e.message); state.orbio = { checkedAt: now, error: `${e.code || "error"}: ${e.message}` }; }
+  } else state.orbio = { checkedAt: now, error: "no ORBIO_API_KEY" };
   const handle = (deps.handle || acct?.username || "").replace(/^@/, "");
   const platform = acct?.platform || null;
   const ceiling = caps.maxCreditPerDay ?? DEFAULT_CAPS.maxCreditPerDay;
@@ -167,6 +172,7 @@ export async function runTick(deps) {
     } catch (e) {
       stopDay(e);
       out.errors.push("mentions: " + e.message);
+      state.orbio = { ...(state.orbio || {}), mentionsError: `${e.code || "error"}: ${e.message}`, mentionsErrorAt: now };
     }
   }
   for (const [id, a] of Object.entries(state.answered)) if (now - a.at > 7 * 86400e3) delete state.answered[id];
