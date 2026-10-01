@@ -1,6 +1,27 @@
 {
   "cleanUrls": true,
-  "rewrites": [{ "source": "/", "destination": "/radar" }],
-  "git": { "deploymentEnabled": { "radar-data": false, "agent-data": false } },
-  "headers": [{ "source": "/smart-wallets.json", "headers": [{ "key": "Cache-Control", "value": "public, max-age=3600" }] }]
+  "git": {
+    "deploymentEnabled": {
+      "radar-data": false,
+      "agent-data": false
+    }
+  },
+  "headers": [
+    {
+      "source": "/smart-wallets.json",
+      "headers": [
+        {
+          "key": "Cache-Control",
+          "value": "public, max-age=3600"
+        }
+      ]
+    }
+  ],
+  "redirects": [
+    {
+      "source": "/",
+      "destination": "/radar",
+      "permanent": false
+    }
+  ]
 }
