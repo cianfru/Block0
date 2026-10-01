@@ -1,0 +1,24 @@
+# The offline test suite on every pull request and every push to main. No secrets, no network calls by the tests:
+# a broken PR used to merge clean because no workflow ran on pull requests (CLAUDE.md).
+name: test
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm test
