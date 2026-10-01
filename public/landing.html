@@ -243,7 +243,8 @@ function show(r,cap){ const card=$("#herocard"); card.style.opacity="0";
 let ROWS=[], DEMO=[], di=0, dtimer=0, pinned=false;
 function pickDemo(rows){ // one clean, one middling, one with insiders selling — a launchpad reads live, not one colour
   // only launches with real activity: a minutes-old token with no holders reads "risk 0" because nothing has happened yet
-  const live=rows.filter(r=>(r.flags?.holders||0)>=25&&(r.ageH||0)>=0.5); if(live.length>=2) rows=live;
+  const live=rows.filter(r=>(r.flags?.holders||0)>=25&&(r.ageH||0)>=0.5);
+  rows=live.length>=2?live:rows.filter(r=>(r.flags?.holders||0)>0);
   const by=[...rows].sort((a,b)=>a.risk-b.risk), out=[], seen=new Set();
   const sell=[...rows].sort((a,b)=>(b.flags?.insiderSellersNow||0)-(a.flags?.insiderSellersNow||0)||b.risk-a.risk)[0];
   for(const r of [by[0],by[Math.floor(by.length/2)],sell]) if(r&&!seen.has(r.address)){seen.add(r.address);out.push(r);}
