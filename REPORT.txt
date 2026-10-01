@@ -1,4 +1,4 @@
-protocol v2 · events logged 38 · priced & under $1M 16 · peak scored 0 · end covered 0
+protocol v2 · events logged 41 · priced & under $1M 17 · peak scored 0 · end covered 0
 controls: 29 logged · 0 scored · events with no control 0 · events whose controls are not scored yet 0
 (54 events logged by the v1 detector are kept in the log and not scored — see tools/radar-protocol.mjs)
 no verdict yet: 0 scored events with scored controls of their own (the pre-registered minimum is 30)
