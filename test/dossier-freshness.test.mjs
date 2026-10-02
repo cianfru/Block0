@@ -14,7 +14,7 @@ function page(readAt) {
   const root = { innerHTML: "" };
   const d = { address, readAt, ageH: 2, sym: "TEST", risk: 30, flags: { holders: 50, insiderSellersNow: 2, insiderDumpNowPct: 4, earlyMovedOutNow: 1, earlyMovedOutPct: 3 }, whales: [] };
   const ctx = vm.createContext({
-    dossierView: (x) => dossierView(x, now), LIVE_MIN, MAX_READ_MIN, URLSearchParams,
+    dossierView: (x, at = now) => dossierView(x, at), LIVE_MIN, MAX_READ_MIN, URLSearchParams,
     Date: class extends Date { static now() { return now; } },
     location: { search: `?address=${address}` }, window: {},
     document: { querySelector: s => s === "#root" ? root : null, addEventListener() {} },
@@ -22,7 +22,7 @@ function page(readAt) {
     fetch: async url => url.startsWith("/api/dossier/") ? { ok: true, json: async () => structuredClone(d) } : { ok: false },
   });
   vm.runInContext(script, ctx);
-  return { root, ctx, load: () => vm.runInContext("load()", ctx), advance: ms => { now += ms; }, timer: () => timer };
+  return { root, ctx, load: () => vm.runInContext("load()", ctx), advance: ms => { now += ms; }, timer: () => timer, setReadAt: value => { d.readAt = value; } };
 }
 
 test("dossier: fresh -> historical -> expired in an already-open tab", async () => {
@@ -47,4 +47,52 @@ test("dossier: a snapshot with no valid read time is never presented as current"
     assert.match(p.root.innerHTML, /Read expired/);
     assert.equal(p.timer(), undefined);
   }
+});
+
+
+test("dossier: full 10-minute skew does not extend either freshness boundary", async () => {
+  const p = page(NOW + 10 * 60e3);
+  await p.load();
+  assert.match(p.root.innerHTML, /Who is moving it/);
+  assert.equal(p.timer().ms, LIVE_MIN * 60e3 + 1);
+
+  // Re-fetching the same snapshot before the transition must retain its normalized clock.
+  p.advance(10 * 60e3); await p.load();
+  assert.equal(p.timer().ms, 35 * 60e3 + 1);
+  p.advance(35 * 60e3); await p.load();
+  assert.match(p.root.innerHTML, /Who is moving it/);
+  assert.equal(p.timer().ms, 1);
+  p.advance(p.timer().ms); await p.timer().fn();
+  assert.match(p.root.innerHTML, /Historical read · not current/);
+  assert.doesNotMatch(p.root.innerHTML, /4\.00% of held supply sold|Who is moving it/);
+  assert.equal(p.timer().ms, (MAX_READ_MIN - LIVE_MIN) * 60e3);
+
+  p.advance(p.timer().ms - 1); await p.load();
+  assert.match(p.root.innerHTML, /Historical read · not current/);
+  assert.equal(p.timer().ms, 1);
+  p.advance(p.timer().ms); await p.timer().fn();
+  assert.match(p.root.innerHTML, /Read expired/);
+});
+
+test("dossier: exact 45- and 180-minute boundaries transition one millisecond later", async () => {
+  for (const minutes of [LIVE_MIN, MAX_READ_MIN]) {
+    const p = page(NOW - minutes * 60e3);
+    await p.load();
+    assert.match(p.root.innerHTML, minutes === LIVE_MIN ? /Who is moving it/ : /Historical read · not current/);
+    assert.equal(p.timer().ms, 1);
+    p.advance(1); await p.timer().fn();
+    assert.match(p.root.innerHTML, minutes === LIVE_MIN ? /Historical read · not current/ : /Read expired/);
+  }
+});
+
+
+test("dossier: a newer snapshot starts its own normalized freshness window", async () => {
+  const p = page(NOW + 10 * 60e3);
+  await p.load();
+  p.advance(p.timer().ms); await p.timer().fn();
+  assert.match(p.root.innerHTML, /Historical read · not current/);
+  p.setReadAt(NOW + 55 * 60e3 + 1);
+  await p.load();
+  assert.match(p.root.innerHTML, /4\.00% of held supply sold into the pool, last 30 min/);
+  assert.equal(p.timer().ms, LIVE_MIN * 60e3 + 1);
 });

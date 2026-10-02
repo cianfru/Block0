@@ -564,6 +564,7 @@ async function loadPrice() {
 
 let STATIC = false;
 let freshnessTimer = null;
+let freshnessClock = null;
 const ago = (t) => { const m = Math.max(1, Math.round((Date.now() - t) / 60000)); return m < 60 ? m + " min" : m < 2880 ? Math.round(m / 60) + " h" : Math.round(m / 1440) + " days"; };
 const notCovered = () => `<section class="sec" style="border-top:0">
   <p class="eyebrow">No read for this token</p>
@@ -598,13 +599,22 @@ async function load() {
       const s = await fetch(`/api/dossier/${ADDR}`).catch(() => null);
       if (!s || !s.ok) { $("#root").innerHTML = notCovered() + empty; return; }
       d = await s.json();
-      d = dossierView(d);
+      const now = Date.now();
+      d = dossierView(d, now);
+      // Normalize tolerated future reads once per snapshot. Retain that clock on reload so the
+      // same read cannot regain its skew allowance at the 45- or 180-minute transition.
+      if (Number.isFinite(d.ageMs)) {
+        if (!freshnessClock || freshnessClock.readAt !== d.readAt) {
+          freshnessClock = { readAt: d.readAt, normalizedAt: now - d.ageMs };
+        }
+        d = { ...dossierView({ ...d, readAt: freshnessClock.normalizedAt }, now), readAt: d.readAt };
+      }
       if (d.expired) { $("#root").innerHTML = unavailable("Read expired", "This read is over three hours old or has no valid timestamp. Current activity is unavailable.") + empty; return; }
       if (has(d.ageH) && d.readAt) d.ageH += (Date.now() - d.readAt) / 3.6e6;
       // An already-open tab must also stop calling an old read current. Only boundary refreshes;
       // no new chain polling or paid reads. Expired data is not rendered.
       const boundary = d.stale ? MAX_READ_MIN : LIVE_MIN;
-      freshnessTimer = setTimeout(load, Math.max(1, d.readAt + boundary * 60e3 + 1 - Date.now()));
+      freshnessTimer = setTimeout(load, Math.max(1, boundary * 60e3 + 1 - d.ageMs));
     }
     if (d.error) throw new Error(d.error);
     document.title = (symOf(d) ? "$" + symOf(d) : "Unnamed token") + " — Block0 dossier";
