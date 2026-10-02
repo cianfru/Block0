@@ -61,9 +61,10 @@ jobs:
         run: node tools/agent-tick.mjs --watch
 
       # Start the next job. Skipped when this one was cancelled, when it died within 30 min (a crash loop waits for
-      # the cron instead), or when RUNNER_CHAIN is "0".
+      # the cron instead), or when RUNNER_CHAIN is "0". (An unset variable is null, which GitHub coerces to 0 against
+      # '0' — hence the '1' default; without it the successor was silently skipped.)
       - name: Start the successor
-        if: (success() || failure()) && vars.RUNNER_CHAIN != '0'
+        if: (success() || failure()) && (vars.RUNNER_CHAIN || '1') != '0'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
