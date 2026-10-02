@@ -183,7 +183,7 @@
 <script src="/block0-cards.js"></script>
 <script src="/block0-gate.js"></script>
 <script type="module">
-import { dossierView, LIVE_MIN, MAX_READ_MIN } from "/read-freshness.js";
+import { dossierView, LIVE_MIN, MAX_READ_MIN, SKEW_MS } from "/read-freshness.js";
 /* ══════════════════════════════════════════════════════════════════════════════════════════════════════════
    THE DOSSIER.
 
@@ -601,11 +601,24 @@ async function load() {
       d = await s.json();
       const now = Date.now();
       d = dossierView(d, now);
-      // Normalize tolerated future reads once per snapshot. Retain that clock on reload so the
-      // same read cannot regain its skew allowance at the 45- or 180-minute transition.
+      // Persist each snapshot's normalized clock across full document reloads and token navigation.
+      // A new readAt gets its own key; returning to an older read must not reset its clock either.
       if (Number.isFinite(d.ageMs)) {
         if (!freshnessClock || freshnessClock.readAt !== d.readAt) {
-          freshnessClock = { readAt: d.readAt, normalizedAt: now - d.ageMs };
+          const key = `b0.freshness.${ADDR}.${d.readAt}`;
+          let normalizedAt = now - d.ageMs;
+          try {
+            const stored = localStorage.getItem(key);
+            const anchor = stored === null ? NaN : Number(stored);
+            if (Number.isFinite(anchor) && anchor > 0 && anchor <= now &&
+                anchor <= d.readAt && anchor >= d.readAt - SKEW_MS) normalizedAt = anchor;
+            localStorage.setItem(key, String(normalizedAt));
+          } catch {
+            // Without durable storage, use the earliest tolerated anchor: reloads cannot
+            // renew the skew allowance (at the cost of conservatively ageing some reads).
+            normalizedAt = d.readAt - SKEW_MS;
+          }
+          freshnessClock = { readAt: d.readAt, normalizedAt };
         }
         d = { ...dossierView({ ...d, readAt: freshnessClock.normalizedAt }, now), readAt: d.readAt };
       }
