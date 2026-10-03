@@ -202,7 +202,7 @@
 <script src="/block0-cards.js"></script>
 <script src="/follow.js"></script>
 <script type="module">
-import { dossierView, LIVE_MIN, MAX_READ_MIN } from "/read-freshness.js";
+import { dossierView, LIVE_MIN, MAX_READ_MIN, SKEW_MS } from "/read-freshness.js";
 /* ══════════════════════════════════════════════════════════════════════════════════════════════════════════
    THE DOSSIER.
 
@@ -628,6 +628,7 @@ async function loadTimeline() {
 
 let STATIC = false;
 let freshnessTimer = null;
+let freshnessClock = null;
 const ago = (t) => { const m = Math.max(1, Math.round((Date.now() - t) / 60000)); return m < 60 ? m + " min" : m < 2880 ? Math.round(m / 60) + " h" : Math.round(m / 1440) + " days"; };
 const notCovered = () => `<section class="sec" style="border-top:0">
   <p class="eyebrow">No read for this token</p>
@@ -665,13 +666,35 @@ async function load() {
         loadTimeline(); return;
       }
       d = await s.json();
-      d = dossierView(d);
+      const now = Date.now();
+      d = dossierView(d, now);
+      // Persist each snapshot's normalized clock across full document reloads and token navigation.
+      // A new readAt gets its own key; returning to an older read must not reset its clock either.
+      if (Number.isFinite(d.ageMs)) {
+        if (!freshnessClock || freshnessClock.readAt !== d.readAt) {
+          const key = `b0.freshness.${ADDR}.${d.readAt}`;
+          let normalizedAt = now - d.ageMs;
+          try {
+            const stored = localStorage.getItem(key);
+            const anchor = stored === null ? NaN : Number(stored);
+            if (Number.isFinite(anchor) && anchor > 0 && anchor <= now &&
+                anchor <= d.readAt && anchor >= d.readAt - SKEW_MS) normalizedAt = anchor;
+            localStorage.setItem(key, String(normalizedAt));
+          } catch {
+            // Without durable storage, use the earliest tolerated anchor: reloads cannot
+            // renew the skew allowance (at the cost of conservatively ageing some reads).
+            normalizedAt = d.readAt - SKEW_MS;
+          }
+          freshnessClock = { readAt: d.readAt, normalizedAt };
+        }
+        d = { ...dossierView({ ...d, readAt: freshnessClock.normalizedAt }, now), readAt: d.readAt };
+      }
       if (d.expired) { $("#root").innerHTML = unavailable("Read expired", "This read is over three hours old or has no valid timestamp. Current activity is unavailable.") + empty; return; }
       if (has(d.ageH) && d.readAt) d.ageH += (Date.now() - d.readAt) / 3.6e6;
       // An already-open tab must also stop calling an old read current. Only boundary refreshes;
       // no new chain polling or paid reads. Expired data is not rendered.
       const boundary = d.stale ? MAX_READ_MIN : LIVE_MIN;
-      freshnessTimer = setTimeout(load, Math.max(1, d.readAt + boundary * 60e3 + 1 - Date.now()));
+      freshnessTimer = setTimeout(load, Math.max(1, boundary * 60e3 + 1 - d.ageMs));
     }
     if (d.error) throw new Error(d.error);
     document.title = (symOf(d) ? "$" + symOf(d) : "Unnamed token") + " — Block0 dossier";
