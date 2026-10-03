@@ -97,7 +97,10 @@ function persist(out) {
   writeFileSync(join(DIR, "state.json"), JSON.stringify(state));
   writeFileSync(join(DIR, "board-reads.json"), JSON.stringify(reads));
   writeFileSync(join(DIR, "board.json"), JSON.stringify(boardSnapshot(reads, boardStats)));
-  writeFileSync(join(DIR, "alerts.json"), JSON.stringify(alertsFeed(read("alerts.json", null), out.events)));
+  // the feed: every detected event (flagged material or not) + follow-ups, newest first; the evidence stays on the timeline
+  const feed = [...out.events.map(({ detail: _d, owner: _o, ...e }) => e),
+    ...(out.followUps || []).map((f) => ({ id: f.id, at: f.at, kind: "follow-up", address: f.address, sym: f.sym, headline: f.headline, ref: f.ref, refHeadline: f.refHeadline, material: true, validated: true }))];
+  writeFileSync(join(DIR, "alerts.json"), JSON.stringify(alertsFeed(read("alerts.json", null), feed, { limit: 80 })));
   // a dossier per token on the board: rewritten when read this cycle, removed when the token leaves the board
   for (const t of out.tokens) { const d = reads[t.address] && dossierOf(t); if (d) writeFileSync(join(DIR, "tokens", t.address + ".json"), JSON.stringify(d)); }
   for (const f of readdirSync(join(DIR, "tokens"))) if (!reads[f.replace(/\.json$/, "")]) rmSync(join(DIR, "tokens", f));

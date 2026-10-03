@@ -7,7 +7,7 @@
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
 <title>Block0 — token dossier</title>
-<meta name="description" content="Every wallet behind a Robinhood Chain launch: who bought first, who is connected, who is adding and who is reducing. Reconstructed from transfer history.">
+<meta name="description" content="What changed in a Robinhood Chain launch, who caused it, and the on-chain evidence: a dated timeline, who bought first and together, who holds it and who is selling.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
@@ -36,6 +36,11 @@
   .addr{margin-top:7px;font-family:var(--mono);font-size:.76rem;color:var(--mute);cursor:pointer;
         border:0;background:none;padding:0;letter-spacing:.02em}
   .addr:hover{color:var(--dim)}
+  .idsub{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+  .followbtn{margin-top:7px;font:600 .74rem/1 var(--sans,Inter),sans-serif;padding:7px 12px;border-radius:999px;cursor:pointer;
+    border:1px solid var(--line-2,rgba(255,255,255,.16));background:transparent;color:var(--tx)}
+  .followbtn:hover{border-color:var(--brand)}
+  .followbtn.on{background:var(--brand);color:#0a0a0d;border-color:var(--brand)}
   .facts{display:flex;gap:26px;flex-wrap:wrap;margin-left:auto}
   .fact .k{font-size:.63rem;letter-spacing:.14em;text-transform:uppercase;color:var(--mute);font-weight:700}
   .fact .v{font-size:1.12rem;font-weight:700;font-variant-numeric:tabular-nums;margin-top:5px;letter-spacing:-.01em}
@@ -171,19 +176,12 @@
 <header class="hd">
   <div class="hd-in">
     <a href="/" class="wordmark">block<b>0</b></a>
-    <nav class="nav">
-      <a href="/board">Board</a>
-      <a href="/radar">Radar</a>
-      <a href="/token" class="on">Dossier</a>
-      <a href="/methodology">Methodology</a>
-    </nav>
+    <nav class="nav"><a href="/board">Live feed</a><a href="/token" class="on">Look up a launch</a><a href="/radar">Radar</a><a href="/methodology">How it works</a></nav>
     <div class="hd-r">
-      <a class="chip chainchip" href="/board">← all launches</a>
+      <a class="chip chainchip" href="/board">← live feed</a>
       <span class="chip blockclock"></span>
-      <button class="btn-connect" id="connect">Connect</button>
     </div>
   </div>
-  <div class="gatebar" id="gatebar" hidden></div>
 </header>
 <main class="wrap">
   <div id="root"><div class="state">Reading the chain…</div></div>
@@ -202,7 +200,7 @@
 </footer>
 
 <script src="/block0-cards.js"></script>
-<script src="/block0-gate.js"></script>
+<script src="/follow.js"></script>
 <script type="module">
 import { dossierView, LIVE_MIN, MAX_READ_MIN } from "/read-freshness.js";
 /* ══════════════════════════════════════════════════════════════════════════════════════════════════════════
@@ -378,7 +376,7 @@ function render(d) {
       <div class="sym">${sym ? "$" + esc(sym) : '<span style="color:var(--dim)">Unnamed token</span>'}
         ${d.name ? `<span class="nm">${esc(d.name)}</span>`
           : !sym ? '<span class="nm">not listed in the launchpad catalog</span>' : ""}</div>
-      ${d.address ? copyable(d.address, "addr") : ""}
+      <div class="idsub">${d.address ? copyable(d.address, "addr") : ""}${d.address && window.B0F ? window.B0F.button(d.address, sym) : ""}</div>
     </div>
     <div class="facts">
       <div class="fact"><div class="k">Market cap</div><div class="v">${mcap || UNK}</div></div>
@@ -678,6 +676,7 @@ async function load() {
     if (d.error) throw new Error(d.error);
     document.title = (symOf(d) ? "$" + symOf(d) : "Unnamed token") + " — Block0 dossier";
     render(d);
+    window.B0F && window.B0F.seen(ADDR, symOf(d));   // a followed launch: its changes up to now count as seen
     loadTimeline();
     loadPrice();
   } catch (e) {

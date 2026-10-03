@@ -6,30 +6,76 @@
 <link rel="icon" type="image/svg+xml" href="/favicon.svg">
 <link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
 <link rel="apple-touch-icon" href="/apple-touch-icon.png">
-<title>Block0 — Robinhood Chain launch radar</title>
+<title>Live feed — Block0</title>
+<meta name="description" content="Material changes in Robinhood Chain launches as Block0 detects them: early wallets selling, graduations, repeat owners, and what happened 24 hours later. Each with its on-chain evidence.">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
 <link rel="stylesheet" href="/block0.css">
 <style>
-  /* live alerts strip — the product a trader keeps open */
-  .alertsbar{margin:14px 0 4px;border:1px solid var(--line);border-radius:14px;background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.008));overflow:hidden}
-  .alertsbar .ah{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid var(--line);font-size:.78rem;color:var(--dim)}
-  .alertsbar .ah b{color:var(--tx);font-weight:600;letter-spacing:.02em}
-  .alertsbar .ah .cnt{margin-left:auto;font-variant-numeric:tabular-nums}
-  .alertsbar .ah a.tg{color:var(--lime);font-weight:600}
-  .alertsbar .al{display:grid;gap:0}
-  .alertsbar .ev{display:flex;align-items:center;gap:10px;padding:9px 14px;border-bottom:1px solid rgba(255,255,255,.04);font-size:.85rem;color:var(--tx)}
-  .alertsbar .ev:last-child{border-bottom:none}
-  /* kind tag — a square-cornered mono label with a left accent bar (terminal style, not a pill) */
-  .alertsbar .k{flex:0 0 auto;font-family:var(--mono);font-size:.64rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;padding:3px 8px 3px 9px;border-radius:3px;border-left:3px solid;background:rgba(255,255,255,.04)}
-  .alertsbar .k.bad{color:#ff1f4b;border-left-color:#ff1f4b;background:rgba(255,31,75,.09)}
-  .alertsbar .k.good{color:var(--mint);border-left-color:var(--mint);background:rgba(61,255,110,.09)}
-  .alertsbar .ev a.sym{font-weight:700;color:var(--tx)}
-  .alertsbar .ev .hl{color:var(--dim);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
-  .alertsbar .ev .ago{margin-left:auto;flex:0 0 auto;font-size:.72rem;color:var(--dim);font-variant-numeric:tabular-nums}
-  .alertsbar .empty{padding:12px 14px;font-size:.8rem;color:var(--dim)}
-  @media(max-width:560px){.alertsbar .ev .hl{display:none}}
+  .lf-hero{padding:46px 0 8px}
+  .lf-hero h1{font-size:clamp(2.1rem,4.6vw,3rem);line-height:1.05;margin:10px 0 0}
+  .lf-hero h1 em{font-style:italic;color:var(--brand)}
+  .lf-hero .sub{margin-top:12px;max-width:62ch;color:var(--dim);font-size:.95rem;line-height:1.55}
+  .lf-hero .stats{display:flex;flex-wrap:wrap;gap:8px;margin-top:16px}
+
+  .lf{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(0,1fr);gap:22px;align-items:start;margin-top:22px}
+  @media(max-width:900px){.lf{grid-template-columns:1fr}}
+  .lf h2{font-family:var(--sans);font-size:.7rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:0}
+  .lf h2 b{color:var(--brand);font-weight:800}
+  .bar{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;margin-bottom:12px}
+  .seg{display:inline-flex;border:1px solid var(--line);border-radius:10px;overflow:hidden}
+  .seg button{font:600 .74rem/1 var(--sans);padding:8px 12px;background:transparent;color:var(--dim);border:0;cursor:pointer}
+  .seg button.on{background:var(--brand);color:#0a0a0d}
+
+  /* the feed: one row per change, newest first */
+  .feed{display:grid;gap:8px}
+  .fi{display:block;position:relative;padding:13px 15px 13px 18px;border:1px solid var(--line);border-radius:12px;
+      background:linear-gradient(180deg,rgba(255,255,255,.035),rgba(255,255,255,.01));color:var(--tx);text-decoration:none;transition:border-color .15s}
+  .fi:hover{border-color:var(--line-2)}
+  .fi::before{content:"";position:absolute;left:0;top:10px;bottom:10px;width:3px;border-radius:2px;background:var(--cyan)}
+  .fi.bad::before{background:var(--coral)} .fi.good::before{background:var(--mint)} .fi.minor::before{background:var(--mute)}
+  .fi .top{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+  .fi .k{font-family:var(--mono);font-size:.62rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase;color:var(--cyan)}
+  .fi.bad .k{color:var(--coral)} .fi.good .k{color:var(--mint)} .fi.minor .k{color:var(--mute)}
+  .fi .sym{font-weight:700}
+  .fi .t{margin-left:auto;font-size:.72rem;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .fi .hl{margin-top:5px;font-size:.9rem;line-height:1.45;color:var(--dim)}
+  .fi .ref{margin-top:4px;font-size:.74rem;color:var(--mute)}
+  .fi .tag{font-size:.56rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;border-radius:4px;border:1px solid var(--line);color:var(--mute)}
+  .fi .tag.warn{color:var(--amber);border-color:rgba(255,122,0,.34)}
+  .more{margin-top:10px;width:100%;min-height:40px;border:1px dashed var(--line);border-radius:12px;background:transparent;color:var(--dim);font:500 .8rem var(--sans);cursor:pointer}
+
+  /* the side: what you follow, and how to read the feed */
+  .side{display:grid;gap:16px}
+  .box{border:1px solid var(--line);border-radius:14px;padding:16px;background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01))}
+  .fw{display:grid;gap:10px;margin-top:12px}
+  .fw a{display:block;color:var(--tx);text-decoration:none;padding:10px 12px;border-radius:10px;border:1px solid var(--line)}
+  .fw a:hover{border-color:var(--line-2)}
+  .fw .r1{display:flex;align-items:center;gap:8px}
+  .fw .n{margin-left:auto;font-size:.62rem;font-weight:800;padding:3px 7px;border-radius:999px;background:var(--brand);color:#0a0a0d}
+  .fw .r2{font-size:.78rem;color:var(--dim);margin-top:4px;line-height:1.45}
+  .fw .r3{font-size:.68rem;color:var(--mute);margin-top:3px}
+  .empty{font-size:.82rem;color:var(--mute);line-height:1.6;margin-top:10px}
+  .defs{margin:10px 0 0;padding:0;list-style:none;display:grid;gap:9px;font-size:.8rem;color:var(--dim);line-height:1.5}
+  .defs b{color:var(--tx);font-weight:600}
+
+  /* launches being read */
+  .lgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:12px;margin-top:14px}
+  .lc{display:flex;flex-direction:column;gap:10px;padding:15px;border:1px solid var(--line);border-radius:14px;color:var(--tx);text-decoration:none;
+      background:linear-gradient(180deg,rgba(255,255,255,.04),rgba(255,255,255,.01));transition:border-color .15s}
+  .lc:hover{border-color:var(--line-2)}
+  .lc .h{display:flex;align-items:baseline;gap:8px}
+  .lc .s{font-weight:700;font-size:1.02rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .lc .m{margin-left:auto;font-size:.72rem;color:var(--mute);white-space:nowrap;font-variant-numeric:tabular-nums}
+  .lc .f{display:grid;grid-template-columns:1fr 1fr;gap:6px 12px;font-size:.76rem;color:var(--dim);font-variant-numeric:tabular-nums}
+  .lc .f b{color:var(--tx);font-weight:600}
+  .lc .f .bad{color:var(--coral)} .lc .f .warn{color:var(--amber)}
+  .lc .last{font-size:.76rem;color:var(--dim);border-top:1px solid var(--line);padding-top:9px;line-height:1.45}
+  .lc .last i{font-style:normal;color:var(--mute)}
+  .lc.sel{border-color:rgba(255,31,75,.45)}
+  .ctl{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:12px}
+  .ctl .search{margin-top:0;flex:1 1 260px}
 </style>
 <script src="/blockclock.js" defer></script>
 <script src="/track.js" defer></script>
@@ -40,63 +86,65 @@
 <header class="hd">
   <div class="hd-in">
     <a href="/" class="wordmark">block<b>0</b></a>
-    <nav class="nav">
-      <a href="/board" class="on">Board</a>
-      <a href="/radar">Radar</a>
-      <a href="/token">Dossier</a>
-      <a href="/methodology">Methodology</a>
-    </nav>
-    <div class="hd-r">
-      <span class="chip chainchip">Robinhood Chain</span><span class="chip blockclock"></span>
-      <button class="btn-connect" id="connect">Connect</button>
-    </div>
+    <nav class="nav"><a href="/board" class="on">Live feed</a><a href="/token">Look up a launch</a><a href="/radar">Radar</a><a href="/methodology">How it works</a></nav>
+    <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span><span class="chip blockclock"></span></div>
   </div>
-  <div class="gatebar" id="gatebar" hidden></div>
 </header>
 
 <main class="wrap">
-  <section class="sec">
-    <div class="sec-head">
-      <div>
-        <p class="micro eye">the board</p>
-        <h1>Every launch, graded at a glance</h1>
+  <section class="lf-hero">
+    <p class="micro eye">live feed · pons &amp; orbio launches</p>
+    <h1>What changed, <em>as it happens.</em></h1>
+    <p class="sub">Every launch under 72 hours old is read from its own transfers about every 15 minutes. When something material
+      changes, it shows up here with who did it; the evidence is on the launch's timeline. Facts, never a call.</p>
+    <div class="stats" id="stats"><span class="chip">reading…</span></div>
+  </section>
+
+  <div class="lf">
+    <section>
+      <div class="bar">
+        <h2>Changes <b>· newest first</b></h2>
+        <div class="seg" id="seg"><button data-v="material" class="on">Material</button><button data-v="all">Everything detected</button></div>
       </div>
-      <div class="statchips" id="statchips"><span class="chip">scanning…</span></div>
-    </div>
+      <div class="feed" id="feed"><div class="state">Loading the feed…</div></div>
+      <button class="more" id="more" hidden>Show more</button>
+    </section>
 
-    <div class="alertsbar" id="alertsbar">
-      <div class="ah"><b>⚡ Live alerts</b><span>early wallets selling · owner and principal moves · repeat owners — detected on every read</span><span class="cnt" id="acnt"></span><a class="tg" id="atg" hidden target="_blank" rel="noopener">Get them on Telegram →</a></div>
-      <div class="al" id="alist"><div class="empty">Watching the board…</div></div>
-    </div>
-    <input class="search" id="q" placeholder="Search name, symbol, or paste a contract address" autocomplete="off">
-    <div class="filters" id="tabs">
-      <button class="on" data-f="picks">◆ Structure</button>
-      <button data-f="cooking">About to graduate</button>
-      <button data-f="smart"><svg class="ic" viewBox="0 0 24 24" width="1em" height="1em" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" aria-hidden="true"><circle cx="12" cy="12" r="8"/><circle cx="12" cy="12" r="2.6" fill="currentColor" stroke="none"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3"/></svg> Smart money</button>
-      <button data-f="blueprint">Blueprint fit</button>
-      <button data-f="graduated">Graduated</button>
-      <button data-f="dex">DEX listings</button>
-      <button data-f="heating">Heating</button>
-      <button data-f="safe">Safest</button>
-      <button data-f="avoid">Avoid</button>
-    </div>
+    <aside class="side">
+      <div class="box">
+        <h2>Following <b id="fcount"></b></h2>
+        <div id="follow"><p class="empty">Follow a launch from its page and its changes collect here. Saved in this browser only.</p></div>
+      </div>
+      <div class="box">
+        <h2>How to read the feed</h2>
+        <ul class="defs">
+          <li><b>Early wallets</b> bought within 3 blocks of the first pool buy, or together in one block. A timing fact, not proof they are insiders.</li>
+          <li><b>Selling</b> means tokens sent into the pool or curve. Sending to another wallet is shown apart, as "moved out".</li>
+          <li><b>Material</b>: ≥2 early wallets or ≥5% of wallet-held supply sold on a launch worth ≥$25k, a repeat owner (≥5 earlier launches, none graduated), a graduation, and what happened 24 h later.</li>
+          <li><b>Not validated</b>: logged for the open <a href="/radar" style="color:var(--brand)">forward test</a>, never posted.</li>
+        </ul>
+      </div>
+    </aside>
+  </div>
 
-    <div id="board"><div class="state">Loading the board — the first scan takes a moment…</div></div>
-
-    <p class="caveat">Signal, not proof — never a buy recommendation. Ranked cleanest-first inside each bucket; a launch under ~30 minutes old is a measured coin-flip and is labelled <em>too early to call</em>. <b>Risk</b> is a transparent composite of concentration, snipers, bundles and live insider-dumping, reconstructed from public Robinhood-Chain data. Not financial advice. <a href="/methodology">How it works &amp; how well it works →</a></p>
+  <section class="sec" id="launches">
+    <div class="bar"><h2>Launches being read <b id="lcount"></b></h2></div>
+    <div class="ctl">
+      <input class="search" id="q" placeholder="Search a symbol, or paste a contract address" autocomplete="off" spellcheck="false">
+      <div class="seg" id="sort"><button data-s="new" class="on">Newest</button><button data-s="mcap">Market cap</button><button data-s="holders">Holders</button><button data-s="sell">Selling now</button></div>
+    </div>
+    <div class="lgrid" id="lgrid"><div class="state">Loading…</div></div>
+    <p class="caveat">On-chain facts about each launch, read from public data and reproducible. Not financial advice and never a buy or sell recommendation. <a href="/methodology">How it works →</a></p>
   </section>
 </main>
 
 <footer class="ft">
   <div class="ft-in">
     <div class="ft-top">
-      <div>
-        <a href="/" class="wordmark">block<b>0</b></a>
-        <p class="tag">Signal, not proof — never a buy recommendation. Every number is reconstructed from public chain data and is reproducible.</p>
-      </div>
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">What changed in a Robinhood Chain launch, who caused it, and the on-chain evidence. Never what to buy.</p></div>
       <div class="ft-cols">
-        <div><p class="micro">Product</p><a href="/board">Board</a><a href="/radar">Smart-money radar</a><a href="/token">Token dossier</a></div>
-        <div><p class="micro">Trust</p><a href="/methodology">Methodology</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+        <div><p class="micro">Product</p><a href="/board">Live feed</a><a href="/token">Look up a launch</a><a href="/radar">Radar</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">How it works</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
       </div>
     </div>
     <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
@@ -104,129 +152,112 @@
 </footer>
 
 <script src="/block0-cards.js"></script>
-<script src="/block0-gate.js"></script>
+<script src="/follow.js"></script>
 <script>
-const $=(s)=>document.querySelector(s);
-function go(e){e.preventDefault();const v=$("#q").value.trim();if(/^0x[0-9a-fA-F]{40}$/.test(v))location.href="/token?address="+v;return false;}
-let SEARCH="";
-let LAST=null, FILTER="picks";
-function section(rows){return `<div class="grid">${rows.map((r,i)=>B0.tokenCard(r,i)).join("")}</div>`;}
-function render(){
-  const b=LAST; if(!b||((!b.cooking||!b.cooking.length)&&(!b.graduated||!b.graduated.length))){
-    $("#board").innerHTML='<div class="state">'+(b&&b.scanning?"Scanning the launch universe — the first pass takes a moment…":"Waiting for the first scan…")+'</div>';return;}
-  const cooking=(b.cooking||[]).slice(), grad=(b.graduated||[]).slice(), dexl=(b.dex||[]).slice();
-  if(SEARCH){
-    const q=SEARCH.toLowerCase();
-    const hits=cooking.concat(grad,dexl).filter(r=>((r.sym||"").toLowerCase().includes(q)||(r.name||"").toLowerCase().includes(q)));
-    $("#board").innerHTML=hits.length?section(hits):`<div class="state">No tracked launch matches "${SEARCH}". Paste a full contract address to scan any token directly.</div>`;
-    return;}
-  if(FILTER==="cooking"){$("#board").innerHTML=section(cooking.sort((a,b)=>(b.progress||0)-(a.progress||0)));return;}
-  if(FILTER==="blueprint"){
-    const rows=cooking.slice().sort((a,b)=>(b.blueprint||0)-(a.blueprint||0));
-    $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Fresh launches ranked by how well they fit the <b style="color:var(--tx)">winner fingerprint</b> from the biggest graduations — no bundles, a float that opens up, a clean settled score, real adoption. A pattern, not a promise.</p>'+section(rows);return;}
-  if(FILTER==="dex"){
-    $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Tokens listed <b style="color:var(--tx)">directly on the chain\'s AMMs</b> (Uniswap v2 · v3 · v4, every factory), not via the Pons launchpad — discovered on-chain by creation signature and verdicted by the same engine. Live from block one. Cleanest first.</p>'+
-      (dexl.length?section(dexl.sort((a,b)=>a.risk-b.risk)):'<div class="state">No DEX listings verdicted yet — the discovery pass runs alongside the board scan.</div>');
-    return;}
-  if(FILTER==="smart"){
-    const conv=cooking.concat(grad,dexl).filter(r=>r.smart&&r.smart.count>=1).sort((a,b)=>(b.smart.count-a.smart.count)||(a.risk-b.risk));
-    const anyConv=conv.some(r=>r.smart.count>=2);
-    $("#board").innerHTML='<p class="caveat" style="margin:0 0 4px">Tokens where <b style="color:var(--tx)">proven-PnL wallets</b> are currently positioned — the ones who\'ve actually made money on this chain. <b style="color:var(--lime)">Two or more converging</b> on the same token is the high-confidence read. Reconstructed from on-chain holdings; confidence signal, not a recommendation.</p>'+
-      (conv.length?section(conv):'<div class="state">No smart-money positions surfaced yet — the leaderboard builds first, then every verdict is tagged.</div>');
-    return;}
-  if(FILTER==="picks"){ if(!PICKS){ $("#board").innerHTML='<div class="state">Reading the board by market-cap bracket…</div>'; loadPicks(); } else { $("#board").innerHTML=renderPicks(PICKS); } return; }
-  if(FILTER==="graduated"){$("#board").innerHTML=grad.length?section(grad.sort((a,b)=>(b.mcapUsd||0)-(a.mcapUsd||0))):'<div class="state">No graduated tokens yet.</div>';return;}
-  let all=cooking.concat(grad,dexl);
-  if(FILTER==="all") all.sort((a,b)=>(b.mcapUsd||0)-(a.mcapUsd||0));
-  if(FILTER==="heating") all.sort((a,b)=>(b.momentum||0)-(a.momentum||0));
-  if(FILTER==="safe") all.sort((a,b)=>a.risk-b.risk);
-  if(FILTER==="avoid") all=all.filter(r=>r.risk>=45).sort((a,b)=>b.risk-a.risk);
-  $("#board").innerHTML=section(all);
-}
-$("#tabs").addEventListener("click",(e)=>{const t=e.target.closest("button");if(!t)return;FILTER=t.dataset.f;document.querySelectorAll("#tabs button").forEach(x=>x.classList.toggle("on",x===t));render();});
+const $ = (s) => document.querySelector(s), esc = B0.esc;
+const ago = (t) => { const s = Math.max(0, (Date.now() - t) / 1000); return s < 90 ? "just now" : s < 3600 ? Math.round(s / 60) + "m ago" : s < 86400 ? Math.round(s / 3600) + "h ago" : Math.round(s / 86400) + "d ago"; };
+const symOf = (e) => (e.sym && e.sym !== "?" ? e.sym : String(e.address || "").slice(0, 8) + "…");
+// routine Orbio fee mechanics and other info kinds are recorded but are not "material" (agent/materiality.mjs)
+const ROUTINE = new Set(["principal-withdrawn", "cliff-24h", "first-harvest", "credit-idle"]);
+// rows written before 2026-10-03 carry no flag: apply the same bar to what their headline states
+const legacyMaterial = (e) => {
+  if (ROUTINE.has(e.kind) || e.validated === false) return false;
+  const h = e.headline || "", num = (re) => Number((h.match(re) || [])[1] || 0);
+  if (e.kind === "insider-dump") { const pct = num(/· ([\d.]+)% of/); return num(/^(\d+) early wallets?/) >= 2 || (pct >= 5 && pct <= 100); }
+  if (e.kind === "serial-owner") return num(/launched (\d+) agents/) >= 5;
+  return true;
+};
+const isMaterial = (e) => e.material ?? legacyMaterial(e);
+// a share above 100% is the pre-2026-10-03 denominator bug, not a fact: drop the number rather than show it
+const cleanHeadline = (h) => String(h || "").replace(/ · ([\d.]+)% of held supply/, (m, x) => (Number(x) > 100 ? "" : m));
+const LABEL = { "insider-dump": "early wallets selling", "serial-owner": "repeat owner", graduated: "graduated", "follow-up": "24h later",
+  "principal-withdrawn": "fee stake withdrawn", "cliff-24h": "lock ending", "credit-idle": "credit unused", "first-harvest": "first fees",
+  "smart-convergence": "tracked wallets converging", "clean-launch": "clean launch" };
 
-// ── Most promising by market-cap bracket (LLM-ranked over our on-chain facts; deterministic without a key) ──
-let PICKS=null,_picksLoading=false;
-async function loadPicks(){ if(_picksLoading)return; _picksLoading=true;
-  try{ const p=await fetch("/api/picks").then(r=>r.json()); PICKS=p; if(FILTER==="picks")$("#board").innerHTML=renderPicks(p); }
-  catch{ if(FILTER==="picks")$("#board").innerHTML='<div class="state">Picks unavailable — retrying…</div>'; }
-  finally{ _picksLoading=false; } }
-const _money=(n)=>B0.mcT?B0.mcT(n):("$"+Math.round(n||0).toLocaleString());
-const _riskChip=(risk,label)=>{const c=risk<25?"var(--mint)":risk<45?"#ff7a00":"#ff1f4b";return `<span class="chip" style="color:${c}">${B0.esc(label||("risk "+risk))}</span>`;};
-function pickBlock(br){
-  const p=br.pick, runner=br.runnerUp?br.candidates.find(c=>c.address===br.runnerUp):null;
-  return `<div class="panel" style="padding:16px 18px;display:grid;gap:10px">
-    <div style="display:flex;align-items:center;justify-content:space-between;gap:10px">
-      <span class="micro eye">${B0.esc(br.label)}</span>
-      <span class="micro" style="color:var(--dim)">${br.candidateCount} candidate${br.candidateCount>1?"s":""}</span>
-    </div>
-    <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-      <a href="/token?address=${p.address}" style="font-size:1.15rem;font-weight:700;color:var(--tx)">$${B0.esc(p.sym)}</a>
-      <span class="chip tnum">${_money(p.mcapUsd)}</span>
-      ${_riskChip(p.risk,p.riskLabel)}
-      ${p.smartMoney?`<span class="chip" style="color:var(--lime)">${p.smartMoney} smart-money</span>`:""}
-      ${p.viaLlm?`<span class="chip" title="reason written by a model over our on-chain facts" style="color:#9a9af5">✦ analyst</span>`:""}
-    </div>
-    <p style="margin:0;color:var(--tx);font-size:.92rem;line-height:1.5">${B0.esc(p.why)}</p>
-    <div style="display:flex;gap:14px;flex-wrap:wrap;font-size:.8rem;color:var(--dim)">
-      <span>${(p.holders||0).toLocaleString()} holders</span>
-      ${p.top10Pct!=null?`<span>top-10 ${p.top10Pct}%</span>`:""}
-      <span>blueprint ${p.blueprint}/100</span>
-      ${p.bundles?`<span style="color:#ff1f4b">${p.bundles} bundle${p.bundles>1?"s":""}</span>`:""}
-      ${p.snipers?`<span style="color:#ff8f3b">${p.snipers} snipers</span>`:""}
-    </div>
-    ${runner?`<div class="micro" style="color:var(--dim)">runner-up · <a href="/token?address=${runner.address}" style="color:var(--dim)">$${B0.esc(runner.sym)}</a> · ${_money(runner.mcapUsd)}</div>`:""}
-  </div>`;
-}
-function renderPicks(p){
-  if(!p||!p.brackets||!p.brackets.length) return '<div class="state">'+((p&&p.computing)?"Reading the board by bracket…":"No launches to rank yet — the first scan is still running.")+'</div>';
-  const intro=`<p class="caveat" style="margin:0 0 4px">Structural comparison at every <b style="color:var(--tx)">stage of the winners' path</b> — in each stage, the highest structural score in this bracket; predictive value is unproven: clean risk, a float that opens up, real adoption, proven wallets present. ${p.llmUsed?'Plain-language reason written by a model over our numbers — it never invents a token or a figure.':'Ranked by our transparent promise score.'} Signal, not proof — never a buy recommendation.</p>`;
-  return intro+`<div style="display:grid;gap:14px;grid-template-columns:repeat(auto-fill,minmax(300px,1fr))">${p.brackets.map(pickBlock).join("")}</div>`;
-}
-$("#q").addEventListener("input",(e)=>{const v=e.target.value.trim();SEARCH=/^0x[0-9a-fA-F]{0,40}$/.test(v)?"":v;$("#tabs").style.opacity=SEARCH?".4":"1";render();});
-$("#q").addEventListener("keydown",(e)=>{if(e.key==="Enter")go(e);});
-B0GATE.mount({gated:true}); // real EVM wallet read; gate is open until a token is configured server-side
-async function load(){try{
-  const b=await fetch("/api/board").then(r=>r.json());LAST=b;
-  const nc=(b.cooking||[]).length,ng=(b.graduated||[]).length,s=b.stats||{};
-  const sc=$("#statchips");
-  if(!nc&&!ng){sc.innerHTML=`<span class="chip">${b.scanning?"scanning universe…":"waiting for first scan…"}</span>`;render();return;}
-  sc.innerHTML=
-    (s.launchTotal?`<span class="chip tnum">${s.launchTotal.toLocaleString()} launches</span>`:"")+
-    (STATIC?`<span class="chip tnum">${nc+ng} on the board</span>${b.observedAt?`<span class="chip tnum">latest read ${Math.max(1,Math.round((Date.now()-b.observedAt)/60000))} min ago</span>`:""}`
-      :`<span class="chip tnum">${s.activeTotal||nc} active</span><span class="chip tnum">${s.graduatedTotal||ng} graduated</span>`);
-  render();
-}catch(e){$("#statchips").innerHTML='<span class="chip">board unavailable — retrying…</span>';}}
-// The static site (block0.app) has no server: the board is the Block0 agent's latest read of every live launch, and
-// the views that need the server (structure picks, smart-money tags, blueprint fit, DEX listings) are not offered.
-let STATIC=false;
-function staticMode(){
-  FILTER="all";
-  document.querySelectorAll("#tabs button").forEach(b=>{ if(["picks","smart","blueprint","dex"].includes(b.dataset.f)) b.remove(); else b.classList.remove("on"); });
-  const a=document.createElement("button"); a.dataset.f="all"; a.textContent="All live launches"; a.className="on"; $("#tabs").prepend(a);
-  $("#board").innerHTML='<div class="state">Loading the live board…</div>';
-}
-(async()=>{
-  try{ STATIC=!(await fetch("/api/status")).ok; }catch{ STATIC=true; }
-  if(STATIC) staticMode();
-  load(); if(!STATIC) loadPicks(); setInterval(load,STATIC?60000:20000);
-  loadAlerts(); setInterval(loadAlerts,STATIC?60000:30000);
-})();
+let EVENTS = [], VIEW = "material", SHOWN = 20, ROWS = [], SORT = "new", Q = "";
 
-// ── live alerts strip (polls the public feed; no third party) ──
-const KLAB={"insider-dump":"early wallets selling","smart-convergence":"smart money","clean-launch":"clean launch","principal-withdrawn":"fee stake withdrawn","serial-owner":"repeat owner","cliff-24h":"lock ending","credit-idle":"credit idle","first-harvest":"first harvest"};
-const ago=(t)=>{const s=Math.max(0,(Date.now()-t)/1000);return s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":s<86400?Math.round(s/3600)+"h":Math.round(s/86400)+"d";};
-async function loadAlerts(){try{
-  const d=await fetch("/api/alerts/feed?n=8").then(r=>r.json());
-  const ev=(d.events||[]).slice(0,8);
-  if(d.telegram){const a=$("#atg");a.href=d.telegram;a.hidden=false;}
-  let seen=0;try{seen=Number(localStorage.getItem("b0_alerts_seen")||0);}catch{}
-  const fresh=ev.filter(e=>e.at>seen).length;
-  $("#acnt").textContent=ev.length?(fresh?fresh+" new · ":"")+ev.length+" recent":"";
-  $("#alist").innerHTML=ev.length?ev.map(e=>`<div class="ev"><span class="k ${B0.esc(e.sev)}">${B0.esc(KLAB[e.kind]||e.label||e.kind)}</span><a class="sym" href="/token?address=${B0.esc(e.address)}">${B0.esc(e.sym&&e.sym!=="?"?e.sym:String(e.address||"").slice(0,8)+"…")}</a><span class="hl">${B0.esc(e.headline||"")}${e.validated===false?' <span title="Logged, not posted: the forward test has not validated this signal">· not validated</span>':""}</span><span class="ago">${ago(e.at)} ago</span></div>`).join(""):'<div class="empty">No alerts yet — they fire the moment insiders start selling, proven wallets converge, or a clean launch clears the bar.</div>';
-  try{ if(ev.length) localStorage.setItem("b0_alerts_seen",String(ev[0].at)); }catch{}
-}catch{}}
+function feedRow(e) {
+  const minor = !isMaterial(e);
+  const cls = minor ? "minor" : e.kind === "graduated" ? "good" : e.sev === "bad" ? "bad" : "";
+  return `<a class="fi ${cls}" href="/token?address=${esc(e.address)}">
+    <div class="top"><span class="k">${esc(LABEL[e.kind] || e.label || e.kind)}</span><span class="sym">$${esc(symOf(e))}</span>
+      ${e.validated === false ? '<span class="tag warn">not validated · not posted</span>' : minor ? '<span class="tag">timeline only</span>' : ""}
+      <span class="t">${ago(e.at)}</span></div>
+    ${e.ref ? `<div class="ref">update on: ${esc(e.refHeadline || "an earlier change")}</div>` : ""}
+    <div class="hl">${esc(cleanHeadline(e.headline))}</div></a>`;
+}
+function renderFeed() {
+  const list = EVENTS.filter((e) => VIEW === "all" || isMaterial(e));
+  $("#feed").innerHTML = list.length ? list.slice(0, SHOWN).map(feedRow).join("")
+    : `<div class="box empty" style="margin:0">${VIEW === "material" ? 'No material change in the latest record. Switch to "Everything detected" to see the routine events too.' : "Nothing detected yet."}</div>`;
+  $("#more").hidden = list.length <= SHOWN;
+}
+$("#seg").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; VIEW = b.dataset.v; SHOWN = 20;
+  document.querySelectorAll("#seg button").forEach((x) => x.classList.toggle("on", x === b)); renderFeed(); });
+$("#more").addEventListener("click", () => { SHOWN += 20; renderFeed(); });
 
+// ── launches being read ──
+const n = (x) => (x == null ? "—" : Number(x).toLocaleString("en-US"));
+const lastFor = (a) => EVENTS.find((e) => e.address === a && isMaterial(e));
+function card(r) {
+  const f = r.flags || {}, sel = f.insiderSellersNow > 0 && !r.stale, last = lastFor(r.address);
+  return `<a class="lc${sel ? " sel" : ""}" href="/token?address=${esc(r.address)}">
+    <div class="h"><span class="s">$${esc(symOf(r))}</span><span class="m">${B0.mcT(r.mcapUsd)} · ${B0.fmtAge(r.ageH)}${r.graduated ? " · graduated" : ""}</span></div>
+    <div class="f">
+      <span><b>${n(f.holders)}</b> holders</span>
+      <span>top 10 hold <b class="${f.top10Pct >= 55 ? "warn" : ""}">${f.top10Pct == null ? "—" : Math.round(f.top10Pct) + "%"}</b></span>
+      <span>early wallets hold <b>${f.sniperHeldPct == null ? "—" : f.sniperHeldPct + "%"}</b></span>
+      <span>${f.bundles ? `<b class="bad">${f.bundles} bundle${f.bundles > 1 ? "s" : ""}</b>` : "no bundles"}</span>
+      <span style="grid-column:1/-1">${r.stale ? "selling now: read too old to say" : sel ? `<b class="bad">${f.insiderSellersNow} early wallet${f.insiderSellersNow > 1 ? "s" : ""} selling now</b>` : "no early wallet selling now"}</span>
+    </div>
+    <div class="last">${last ? `<i>${ago(last.at)}:</i> ${esc(cleanHeadline(last.headline) || LABEL[last.kind] || "")}` : `<i>No material change recorded</i>`}
+      ${r.readAt ? `<br><i>read ${ago(r.readAt)}</i>` : ""}</div></a>`;
+}
+function renderLaunches() {
+  let rows = ROWS.slice();
+  if (Q) rows = rows.filter((r) => (r.sym || "").toLowerCase().includes(Q) || (r.name || "").toLowerCase().includes(Q));
+  const key = { new: (r) => -(r.ageH ?? 1e9), mcap: (r) => r.mcapUsd || 0, holders: (r) => r.flags?.holders || 0, sell: (r) => (r.stale ? 0 : r.flags?.insiderSellersNow || 0) * 1e12 + (r.mcapUsd || 0) }[SORT];
+  rows.sort((a, b) => key(b) - key(a));
+  $("#lgrid").innerHTML = rows.length ? rows.map(card).join("") : `<div class="state">${Q ? `No launch being read matches "${esc(Q)}". Paste a full address to open its page.` : "No launch is being read right now."}</div>`;
+}
+$("#sort").addEventListener("click", (e) => { const b = e.target.closest("button"); if (!b) return; SORT = b.dataset.s;
+  document.querySelectorAll("#sort button").forEach((x) => x.classList.toggle("on", x === b)); renderLaunches(); });
+$("#q").addEventListener("input", (e) => { const v = e.target.value.trim(); Q = /^0x/i.test(v) ? "" : v.toLowerCase(); renderLaunches(); });
+$("#q").addEventListener("keydown", (e) => { const v = e.target.value.trim(); if (e.key === "Enter" && /^0x[0-9a-fA-F]{40}$/.test(v)) location.href = "/token?address=" + v.toLowerCase(); });
+
+// ── following: each followed launch's changes since it was last opened ──
+async function renderFollow() {
+  const list = window.B0F ? B0F.list() : [];
+  $("#fcount").textContent = list.length ? "· " + list.length : "";
+  if (!list.length) { $("#follow").innerHTML = '<p class="empty">Follow a launch from its page (☆ Follow) and its changes collect here. Saved in this browser only.</p>'; return; }
+  const tls = await Promise.all(list.map((f) => fetch(`/api/timeline/${f.address}`).then((r) => (r.ok ? r.json() : null)).catch(() => null)));
+  const rows = list.map((f, i) => {
+    const entries = ((tls[i] && tls[i].entries) || []).filter((e) => e.kind !== "coverage");
+    const fresh = entries.filter((e) => e.at > (f.seenAt || 0)).length, last = entries[0], row = ROWS.find((r) => r.address === f.address);
+    return { f, fresh, last, row, sym: f.sym || tls[i]?.sym || row?.sym };
+  }).sort((a, b) => b.fresh - a.fresh || (b.last?.at || 0) - (a.last?.at || 0));
+  $("#follow").innerHTML = `<div class="fw">${rows.map(({ f, fresh, last, row, sym }) => `<a href="/token?address=${esc(f.address)}">
+      <div class="r1"><b>$${esc(sym || f.address.slice(0, 8) + "…")}</b>${row ? `<span style="font-size:.72rem;color:var(--mute)">${B0.mcT(row.mcapUsd)}</span>` : ""}${fresh ? `<span class="n">${fresh} new</span>` : ""}</div>
+      <div class="r2">${last ? esc(last.headline || LABEL[last.kind] || "") : "No change recorded yet."}</div>
+      <div class="r3">${last ? ago(last.at) : ""}${row ? "" : `${last ? " · " : ""}not being read now`}</div></a>`).join("")}</div>`;
+}
+document.addEventListener("b0follow", renderFollow);
+
+async function load() {
+  const [b, a] = await Promise.all([fetch("/api/board").then((r) => r.json()).catch(() => null), fetch("/api/alerts/feed").then((r) => r.json()).catch(() => null)]);
+  EVENTS = ((a && a.events) || []).slice().sort((x, y) => y.at - x.at);
+  ROWS = b ? [...(b.cooking || []), ...(b.graduated || [])].filter((r) => r && r.address) : [];
+  const day = EVENTS.filter((e) => Date.now() - e.at < 86400e3), mat = day.filter(isMaterial).length;
+  $("#stats").innerHTML = b || a ? [
+    `<span class="chip tnum">${ROWS.length} launches being read</span>`,
+    b?.observedAt ? `<span class="chip tnum">latest read ${ago(b.observedAt)}</span>` : "",
+    `<span class="chip tnum">${mat} material change${mat === 1 ? "" : "s"} in 24 h</span>`,
+    b?.stats?.launchTotal ? `<span class="chip tnum">${b.stats.launchTotal.toLocaleString()} launches on Pons so far</span>` : "",
+  ].join("") : '<span class="chip">The feed is unavailable right now — retrying.</span>';
+  $("#lcount").textContent = ROWS.length ? "· " + ROWS.length : "";
+  renderFeed(); renderLaunches(); renderFollow();
+}
+load(); setInterval(load, 60000);
 </script>
 </body>
 </html>

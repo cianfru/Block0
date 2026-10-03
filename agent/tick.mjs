@@ -118,7 +118,7 @@ export async function runTick(deps) {
   // every detected event, with the numbers and evidence it fired on; `fate` (what the agent did with it) is set below
   out.events = all.map((e) => ({ id: e.id, at: now, kind: e.kind, address: e.address, sym: e.sym ?? null, headline: e.headline ?? null,
     validated: !UNVALIDATED.has(e.kind), mcapUsd: e.mcapUsd ?? null, holders: e.holders ?? null, risk: e.risk ?? null, ageH: e.ageH ?? null,
-    owner: e.owner ?? null, agentId: e.agentId ?? null, detail: e.detail ?? null, fate: null, why: null }));
+    owner: e.owner ?? null, agentId: e.agentId ?? null, detail: e.detail ?? null, material: !UNVALIDATED.has(e.kind) && !notMaterial(e), fate: null, why: null }));
   for (const e of all.filter((x) => UNVALIDATED.has(x.kind))) out.logged.push({ ...e, why: "unvalidated kind — logged, not posted" });
   // everything goes on the timeline; only material events are offered to the posting gate
   const offer = [];
