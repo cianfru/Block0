@@ -11,11 +11,14 @@
 // a null field never fires (null = unavailable, never zero). Amounts are BigInt-exact — wei never touches a float
 // until it is formatted.
 export const AGENT_KINDS = {
-  "principal-withdrawn": { sev: "bad", icon: "▼", label: "creator withdrew staked principal" },
+  // routine: the staked half of claimed fees, withdrawn once its lock ends (agent/materiality.mjs) — info, not a flag
+  "principal-withdrawn": { sev: "info", icon: "◇", label: "creator withdrew unlocked fee stake" },
   "serial-owner": { sev: "bad", icon: "▲", label: "repeat owner, no graduations" },
   "cliff-24h": { sev: "info", icon: "◷", label: "principal lock ends within 24h" },
   "credit-idle": { sev: "info", icon: "◌", label: "fee credit unused" },
   "first-harvest": { sev: "info", icon: "◆", label: "first $100 of fees converted" },
+  // not Orbio-specific: any Pons launch seen on the curve and later listed as graduated (detected in agent/tick.mjs)
+  graduated: { sev: "info", icon: "◆", label: "graduated" },
 };
 
 const DEF = { cooldownMs: 6 * 3600e3, idleCooldownMs: 7 * 86400e3, idleMinUsd: 500, idleMinAgeD: 7, harvestUsd: 100, serialMin: 3 };
@@ -50,7 +53,7 @@ export function agentEvents(prev, agents, opts = {}) {
     if (lastFired[k] && now - lastFired[k] < cooldown) return;
     lastFired[k] = now;
     events.push({ id: `${kind}:${a.address}:${now}`, kind, sev: AGENT_KINDS[kind].sev, at: now, agentId: a.id, address: a.address,
-      sym: a.sym, mcapUsd: a.mcapUsd, ageH: a.ageH, venue: "orbio-agent", detail, headline });
+      sym: a.sym, mcapUsd: a.mcapUsd, ageH: a.ageH, venue: "orbio-agent", owner: a.owner || null, detail, headline });
   };
   const usd = (n) => (n == null ? "" : n >= 1e3 ? ` (≈$${(n / 1e3).toFixed(n >= 1e4 ? 0 : 1)}k)` : ` (≈$${Math.round(n)})`);
 
@@ -71,7 +74,8 @@ export function agentEvents(prev, agents, opts = {}) {
     const w0 = big(was.withdrawn), w1 = a.withdrawnWei;
     if (w0 != null && w1 != null && w1 > w0 && (w0 === 0n || w1 * 10n >= w0 * 11n)) {
       const amt = orbio(w1 - w0);
-      fire("principal-withdrawn", a, { withdrawnOrbio: amt, totalWithdrawnOrbio: orbio(w1) },
+      fire("principal-withdrawn", a, { withdrawnOrbio: amt, totalWithdrawnOrbio: orbio(w1), stakedOrbio: a.stakedWei != null ? orbio(a.stakedWei) : null,
+        withdrawnUsd: orbioUsd != null ? +(amt * orbioUsd).toFixed(2) : null },
         `creator withdrew ${Math.round(amt).toLocaleString("en-US")} staked ORBIO${usd(orbioUsd != null ? amt * orbioUsd : null)}`);
     }
     if (cliffNow && !was.cliffDone) {

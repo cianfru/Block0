@@ -4,6 +4,21 @@ never what to buy.** Dossier (explain one launch) · board + radar (find where s
 (distribute the few changes that matter). All read one shared record (the agent's reads). Next: token timeline →
 event lifecycle/follow-ups → watchlist → published editorial policy. Not a predictor, not a pick list.
 
+## 🕒 TIMELINE + WHAT THE AGENT POSTS (2026-10-03, product step 1–2)
+- **Timeline** (`agent/timeline.mjs`, pure): every detected event (posted or not) + follow-ups + a coverage marker, with
+  evidence (selling wallets · amount · block, owner wallet, source). One file per launch on `agent-data/timelines/`,
+  kept 30 days after its last entry, served at `/api/timeline/:addr`; dossier section "What changed". First run seeds
+  from the old ledgers (marked backfilled; the first detector's "insider" rows are left out). `events.jsonl` now logs
+  EVERY event with its `fate` (posted · dry-run · held · logged).
+- **Materiality** (`agent/materiality.mjs`): only material events are offered for posting — sales by ≥2 early wallets or
+  ≥5% of wallet-held supply on ≥$25k launches, repeat owners with ≥5 earlier launches, graduations. **Fee-stake
+  withdrawals are routine** (stakedWei = half the claimed fees, withdrawn by every creator after the lock): timeline
+  only, sev info. The selling % is now of wallet-held supply BEFORE the sales (≤100%; a live headline read 312429251%).
+- **Follow-ups** (`agent/followups.mjs`): 24 h after a material event — did those exact wallets sell out (balances via
+  `computeIntel({watch})`), mcap/holders then → now — on the timeline and threaded as a reply to the original post.
+- **Graduation** is a detector event (tick: seen on the curve → listed graduated; cold start only learns).
+- **Daily digest** (`agent/digest.mjs`): one post per UTC day after 17:00, counts over the last 24 h.
+
 ## 🔎 CODE AUDIT 2026-10-01 — fixed on the branch (see commits "Facts:…", "Forward test protocol v2…")
 - **Vocabulary is now precise, keep it that way:** "early wallets" (snipers + bundles: a timing fact), never
   "insiders". **Selling = tokens sent into a venue** (pool/curve/AMM/router); anything else is `earlyMovedOutNow`

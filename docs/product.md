@@ -17,9 +17,9 @@ Three surfaces over **one shared record** of observations (the agent's reads, ev
 
 | Surface | Job | Today |
 |---|---|---|
-| **Dossier** (`/token`) | Explain one launch: who bought first and together, who holds it, who is selling or moving it, what the deployer did before. | Live on block0.app for every launch the agent reads. |
-| **Board + radar** (`/board`, `/radar`) | Find the launches where something is happening. | Live. The radar runs in the browser. |
-| **Agent on X** | Distribute the few changes worth someone's attention, with the address so anyone can check them. | Dry run. Goes live after a reviewed dry-run sample. |
+| **Dossier** (`/token`) | Explain one launch: its timeline of changes with evidence, who bought first and together, who holds it, who is selling or moving it, what the owner did before. | Live; timeline + Follow (2026-10-03). |
+| **Live feed** (`/board`) + radar | Find the launches where something is happening: material changes newest first, the launches you follow, every launch being read. | Live (2026-10-03). The radar runs in the browser. |
+| **Agent on X** | Distribute the few material changes, with the address so anyone can check them; the 24 h follow-up threaded underneath; one daily digest. | Dry run. Goes live after a reviewed dry-run sample. |
 
 ## What it is not
 - **Not a predictor.** Every edge test failed or was inconclusive (`/methodology`). Risk scores are summaries of facts,
@@ -36,13 +36,14 @@ Kept deliberately to three families the data supports today:
 3. **Follow-ups** to earlier events (planned — below).
 
 ## Next to build, in order
-1. **Token timeline.** Each launch's dossier gains a dated list of its events, from the shared record, each with its
-   evidence (transactions, amounts, read time).
-2. **Event lifecycle + follow-ups.** An event is observed → updated → reversed/corrected. "Two tracked wallets entered"
-   later becomes "both have since sold" on the same entry, and the agent posts the follow-up.
-3. **Watchlist.** Follow a launch; changes to it are shown first (browser-local to start, no accounts).
+1. ~~Token timeline~~ — built 2026-10-03 (`agent/timeline.mjs`, dossier "What changed").
+2. ~~Event lifecycle + follow-ups~~ — built 2026-10-03: 24 h follow-ups (`agent/followups.mjs`) on the timeline and
+   threaded under the original post; materiality bar (`agent/materiality.mjs`); graduations; daily digest.
+3. ~~Watchlist~~ — built 2026-10-03: Follow on the launch page, "Following" on the live feed (browser-local, `public/follow.js`).
 4. **Editorial policy, published before any token launch:** identical treatment of Block0's own token, disclosed
    relationships, no favourable treatment for funding, no sensational wording.
+5. Next candidates: an explorer link per evidence row once a reliable explorer indexes the chain; transaction hashes on
+   evidence (needs the tx hash kept per transfer); a "was this useful" control on feed items.
 
 ## How we know it works
 Usefulness, not prediction: repeat visits, followed launches, evidence clicks, "was this useful" on alerts, and — as

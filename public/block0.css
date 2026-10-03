@@ -58,11 +58,16 @@ h1,h2,h3{font-family:var(--serif);font-weight:400;letter-spacing:-.01em;margin:0
 
 /* ---- header / nav ---- */
 .hd{display:block;position:sticky;top:0;z-index:50;border-bottom:1px solid var(--line);background:rgba(8,8,11,.8);backdrop-filter:blur(20px);padding:0}
-.hd-in{display:flex;align-items:center;gap:16px;height:56px;max-width:1120px;margin:0 auto;padding:0 20px}
+.hd-in{display:flex;flex-wrap:wrap;align-items:center;gap:0 16px;min-height:56px;max-width:1120px;margin:0 auto;padding:0 20px}
+.hd-in>.wordmark{line-height:56px}
+@media(min-width:768px){.hd-in{flex-wrap:nowrap}}
 .wordmark{font-family:var(--serif);font-size:1.35rem;line-height:1;letter-spacing:-.02em}
 .wordmark b{font-style:italic;font-weight:400;background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent;padding-right:.06em}
-.nav{display:none;align-items:center;gap:2px}
-@media(min-width:768px){.nav{display:flex}}
+/* phones: the nav drops to its own scrollable row under the wordmark (most traffic comes from X, on a phone) */
+.nav{display:flex;align-items:center;gap:2px;order:3;flex:1 0 100%;overflow-x:auto;scrollbar-width:none;margin:0 -8px;padding-bottom:6px}
+.nav::-webkit-scrollbar{display:none}
+.nav a{white-space:nowrap}
+@media(min-width:768px){.nav{order:0;flex:0 1 auto;margin:0;padding:0;overflow:visible}}
 .nav a{border-radius:10px;padding:8px 12px;font-size:.82rem;color:var(--dim);transition:background .15s,color .15s}
 .nav a:hover,.nav a.on{color:var(--tx);background:rgba(255,255,255,.05)}
 .hd-r{margin-left:auto;display:flex;align-items:center;gap:8px}

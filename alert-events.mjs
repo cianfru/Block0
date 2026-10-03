@@ -56,8 +56,9 @@ export function detectEvents(prev, tokens, opts = {}) {
     // early wallets (snipers/bundles) STARTED selling — verified sales into a venue, not transfers (intel.mjs)
     if (cur.sellers >= 1 && was.sellers === 0) {
       const pct = t.flags?.insiderDumpNowPct;
-      fire("insider-dump", t, { sellers: cur.sellers, pct: pct ?? null, top10Pct: t.flags?.top10Pct ?? null },
-        `${cur.sellers} early wallet${cur.sellers > 1 ? "s" : ""} sold into the pool in the last 30 min${pct ? ` · ${pct}% of held supply` : ""}`);
+      // the evidence travels with the event: which wallets, how much, the block of each one's latest sale
+      fire("insider-dump", t, { sellers: cur.sellers, pct: pct ?? null, top10Pct: t.flags?.top10Pct ?? null, wallets: (t.earlySellersNow || []).slice(0, 8), block: t.latestBlock ?? null },
+        `${cur.sellers} early wallet${cur.sellers > 1 ? "s" : ""} sold into the pool in the last 30 min${pct ? ` · ${pct}% of wallet-held supply` : ""}`);
     }
     // smart money CONSENSUS — several proven wallets BOUGHT within a tight window (record-weighted) and the cluster is
     // fresh. This replaces the flat "≥2 now hold it": bags bought days apart are a position, not an event.

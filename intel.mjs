@@ -178,7 +178,7 @@ export const blueprintLabel = (m) => m >= 75 ? "STRONG FIT" : m >= 55 ? "PARTIAL
 // outgoing transfer — to a second wallet, a CEX, a contract — is a MOVE, reported separately as "transferred out"
 // (audit F01). "Early wallets" = snipers (first buy ≤3 blocks after the first pool buy) + same-block bundles: a timing
 // fact, not proven affiliation.
-export function analyzeTransfers(ev, { ponsPool = "", poolStore = null, obsTs = null, graduated = false, whales = true } = {}) {
+export function analyzeTransfers(ev, { ponsPool = "", poolStore = null, obsTs = null, graduated = false, whales = true, watch = null } = {}) {
   ponsPool = (ponsPool || "").toLowerCase();
   const detected = detectPool(ev); // highest-degree address = the bonding curve / trading contract
   const pool = ponsPool || poolStore || detected; // the venue we report
@@ -201,13 +201,13 @@ export function analyzeTransfers(ev, { ponsPool = "", poolStore = null, obsTs = 
     const recent = e.ts > RECENT;
     if (isBuy(e) && firstPool == null) firstPool = e.block;
     if (!isInfra(e.from)) { const w = g(e.from); w.bal -= e.amt; if (isSell(e)) { w.sold += e.amt; sells++; }
-      if (recent) { w.sentRecent += e.amt; if (isSell(e)) { sellR += e.amt; w.soldRecent += e.amt; } else if (!isInfra(e.to)) w.movedOutRecent += e.amt; } }
+      if (recent) { w.sentRecent += e.amt; if (isSell(e)) { sellR += e.amt; w.soldRecent += e.amt; w.sellBlk = e.block; } else if (!isInfra(e.to)) { w.movedOutRecent += e.amt; w.moveBlk = e.block; w.movedTo = e.to; } } }
     if (!isInfra(e.to)) { const w = g(e.to); w.bal += e.amt; if (isBuy(e)) { w.bought += e.amt; buys++; } if (w.first == null) { w.first = e.ts; w.firstBlk = e.block; }
       if (recent) { w.recvRecent += e.amt; if (isBuy(e)) { buyR += e.amt; w.boughtRecent += e.amt; } else if (!isInfra(e.from)) w.movedInRecent += e.amt; } }
     if (e.from === ZERO && creator == null && !isInfra(e.to)) creator = e.to;
   }
   const holders = [...W.values()].filter((w) => w.bal > 1e-9);
-  const held = holders.reduce((s, w) => s + w.bal, 0) || 1;
+  const heldRaw = holders.reduce((s, w) => s + w.bal, 0), held = heldRaw || 1;
   for (const w of W.values()) w.sniper = w.firstBlk != null && firstPool != null && w.firstBlk <= firstPool + 3 && w.bought > 0;
   const byBlk = new Map(); for (const w of W.values()) if (w.sniper) { if (!byBlk.has(w.firstBlk)) byBlk.set(w.firstBlk, []); byBlk.get(w.firstBlk).push(w); }
   const bundles = [...byBlk.entries()].filter(([, l]) => l.length >= 2).map(([blk, l]) => ({ blk, n: l.length, wallets: l.map((w) => w.a), held: l.reduce((s, w) => s + Math.max(0, w.bal), 0) }));
@@ -219,13 +219,17 @@ export function analyzeTransfers(ev, { ponsPool = "", poolStore = null, obsTs = 
   const bundleSet = new Set(bundles.flatMap((b) => b.wallets));
   const earlySet = new Set([...sniperW.map((w) => w.a), ...bundleSet]);
   // selling now = net tokens an early wallet SOLD INTO A VENUE in the window; moving out = net sent elsewhere
-  let soldNow = 0, sellers = 0, movedNow = 0, movers = 0;
+  // the evidence behind both counts: which early wallets, how much, and the block of their latest such transfer
+  let soldNow = 0, sellers = 0, movedNow = 0, movers = 0; const sellerRows = [], moverRows = [];
   for (const a of earlySet) { const w = W.get(a); if (!w) continue;
-    const sold = w.soldRecent - w.boughtRecent; if (sold > 0) { soldNow += sold; sellers++; }
-    const moved = w.movedOutRecent - w.movedInRecent; if (moved > 0) { movedNow += moved; movers++; } }
+    const sold = w.soldRecent - w.boughtRecent; if (sold > 0) { soldNow += sold; sellers++; sellerRows.push({ a, amt: +sold.toFixed(0), block: w.sellBlk ?? null, bal: +Math.max(0, w.bal).toFixed(0) }); }
+    const moved = w.movedOutRecent - w.movedInRecent; if (moved > 0) { movedNow += moved; movers++; moverRows.push({ a, amt: +moved.toFixed(0), block: w.moveBlk ?? null, to: w.movedTo ?? null }); } }
   const pct = (x) => +(x / held * 100).toFixed(1);
   const f_snipe = pct(sniperHeld), f_bundle = pct(bundleHeld), f_top10 = pct(top10), f_creator = pct(creatorBal);
-  const f_dumpNow = +(soldNow / held * 100).toFixed(2), f_movedNow = +(movedNow / held * 100).toFixed(2);
+  // sold tokens left the wallets, so measure them against what the wallets held BEFORE the sales (held + sold): a
+  // share that cannot pass 100%. (Against `held` alone, a launch whose wallets sold almost everything back read
+  // "312429251.95% of held supply" in a live headline, 2026-10-02.)
+  const f_dumpNow = +(soldNow / ((heldRaw + soldNow) || 1) * 100).toFixed(2), f_movedNow = +(movedNow / held * 100).toFixed(2);
   // Adversarial coordination — the hand-to-hand / funder cluster web (from the SAME transfers, no extra RPC). Catches
   // the operator who split into wallets that avoid the same-block bundle but still shuffle the token between themselves.
   const coord = coordinationSignal(ev, { pool, venues: [...venues], window: 1800, nowTs: now });
@@ -249,10 +253,14 @@ export function analyzeTransfers(ev, { ponsPool = "", poolStore = null, obsTs = 
       buysRecent: buys, sellsRecent: sells } };
   if (whales) {
     out.bundles = bundles.slice(0, 10);
+    out.earlySellersNow = sellerRows.sort((x, y) => y.amt - x.amt).slice(0, 10);
+    out.earlyMoversNow = moverRows.sort((x, y) => y.amt - x.amt).slice(0, 10);
     out.whales = holders.slice().sort((a, b) => b.bal - a.bal).slice(0, 60).map((w) => ({ a: w.a, bal: +w.bal.toFixed(0), first: w.first, bought: +w.bought.toFixed(0), sold: +w.sold.toFixed(0),
       net: +(w.recvRecent - w.sentRecent).toFixed(0), soldNow: +w.soldRecent.toFixed(0), movedOutNow: +w.movedOutRecent.toFixed(0), sniper: w.sniper }));
     out.tsMin = tsMin; out.tsMax = tsMax;
   }
+  // balances of specific wallets a follow-up asked about (agent/followups.mjs): 0 for a wallet that holds nothing
+  if (watch && watch.length) out.watched = Object.fromEntries(watch.map((a) => [a, +Math.max(0, W.get(String(a).toLowerCase())?.bal || 0).toFixed(0)]));
   return { out, holders };
 }
 
@@ -269,7 +277,7 @@ export async function computeIntel(addr, sym = "?", opts = {}) {
   // Incremental store: pulls only the delta since last call and caches the deploy block (free on Alchemy).
   const { ev, pool: poolStore, latest } = await getTransfers(addr, 18, { pool: opts.pool, launchedAt: opts.launchedAt, fromBlock: opts.fromBlock });
   const obsTs = opts.obsTs ?? await headTs(latest);
-  const { out: a, holders } = analyzeTransfers(ev, { ponsPool: opts.pool, poolStore, obsTs, graduated: opts.graduated, whales: opts.whales !== false });
+  const { out: a, holders } = analyzeTransfers(ev, { ponsPool: opts.pool, poolStore, obsTs, graduated: opts.graduated, whales: opts.whales !== false, watch: opts.watch || null });
   const out = { sym, address: addr, ...a, updated: Date.now(), latestBlock: latest, ms: Date.now() - t0ms };
   if (opts.mcapUsd != null) { out.mcapUsd = Math.round(opts.mcapUsd); out.bucket = bucketOf(opts.mcapUsd); } // from Pons API — accurate, no receipts
   else if (opts.mcap !== false) { const m = await computeMcap(addr, 3000, { supply: opts.supply ?? null }); out.priceUsd = m.price; out.mcapUsd = Math.round(m.mcap); out.mcapSamples = m.samples; out.bucket = bucketOf(m.mcap); }

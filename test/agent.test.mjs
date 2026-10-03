@@ -156,8 +156,10 @@ test("tick: dry run records posts, publishes nothing, and never touches the park
   const t1 = await runTick({ ...world({ posted }), now: NOW, dryRun: true });          // seed
   assert.equal(t1.out.dryRun.length, 0);
   const t2 = await runTick({ ...world({ sellers: 2, withdrawn: 300n, posted }), state: t1.state, now: NOW + 900e3, dryRun: true });
-  assert.deepEqual(t2.out.dryRun.map((r) => r.kind).sort(), ["insider-dump"]);           // one post per token per 6h: dump outranks withdrawal
-  assert.ok(t2.out.held.some((h) => h.kind === "principal-withdrawn" && h.why === "token posted within 6h"));
+  assert.deepEqual(t2.out.dryRun.map((r) => r.kind).sort(), ["insider-dump"]);
+  // routine fee-stake withdrawal: on the timeline, never offered for posting (agent/materiality.mjs)
+  assert.ok(t2.out.logged.some((h) => h.kind === "principal-withdrawn" && /timeline only/.test(h.why)));
+  assert.deepEqual(t2.out.events.map((e) => [e.kind, e.fate]).sort(), [["insider-dump", "dry-run"], ["principal-withdrawn", "logged"]]);
   assert.equal(posted.length, 0);                                                        // nothing reached Orbio
   assert.equal(t2.state.profiledAt[A(2)], undefined);                                     // 9-day-old token never read
   if (board) assert.equal(board.STANDBY, standbyBefore);
@@ -166,16 +168,17 @@ test("tick: dry run records posts, publishes nothing, and never touches the park
 test("tick: live mode posts to the connected platform with max_cost; a 402 stops posting for the day", async () => {
   const posted = [];
   const t1 = await runTick({ ...world({ posted }), apiKey: "k", now: NOW, dryRun: false });
-  const t2 = await runTick({ ...world({ sellers: 1, posted }), apiKey: "k", state: t1.state, now: NOW + 900e3, dryRun: false });
+  const t2 = await runTick({ ...world({ sellers: 2, posted }), apiKey: "k", state: t1.state, now: NOW + 900e3, dryRun: false });
   const posts = posted.filter((p) => p.name === "social.post");
   assert.equal(posts.length, 1); assert.deepEqual(posts[0].args.platforms, ["twitter"]);    // the name social.accounts gave
   assert.ok(!/https?:/.test(posts[0].args.text));
   assert.deepEqual(posted.filter((p) => p.name === "social.x.posts").map((p) => p.args), [{ mentions_of: "block0app", limit: 20 }, { mentions_of: "block0app", limit: 20 }]);
   assert.equal(t2.out.posted[0].url, "https://x.com/b/status/1");
   assert.deepEqual([t2.state.orbio.platform, t2.state.orbio.username, t2.state.orbio.error], ["twitter", "block0app", null]);   // the connection check, kept
-  const w = world({ sellers: 0, withdrawn: 500n });
+  const quiet = await runTick({ ...world({ sellers: 0, posted: [] }), apiKey: "k", state: t2.state, now: NOW + 6.75 * 3600e3, dryRun: false });
+  const w = world({ sellers: 2 });
   w.orbio.tool = async () => { throw new OrbioError("balance", "402"); };
-  const t3 = await runTick({ ...w, apiKey: "k", state: t2.state, now: NOW + 7 * 3600e3, dryRun: false });
+  const t3 = await runTick({ ...w, apiKey: "k", state: quiet.state, now: NOW + 7 * 3600e3, dryRun: false });
   assert.equal(t3.state.stoppedDay, "2026-10-01");
   assert.match(t3.state.stoppedWhy, /^balance/);
   assert.ok(t3.out.held.some((h) => h.why === "post failed"));
@@ -185,7 +188,7 @@ test("tick: live mode with no connected X account holds every post and calls not
   const posted = [];
   const w = (o) => world({ ...o, posted, account: { platform: null, connectUrl: "u" } });
   const t1 = await runTick({ ...w({}), apiKey: "k", now: NOW, dryRun: false });
-  const t2 = await runTick({ ...w({ sellers: 1 }), apiKey: "k", state: t1.state, now: NOW + 900e3, dryRun: false });
+  const t2 = await runTick({ ...w({ sellers: 2 }), apiKey: "k", state: t1.state, now: NOW + 900e3, dryRun: false });
   assert.equal(posted.length, 0);
   assert.ok(t2.out.held.some((h) => h.why === "no X account connected in Orbio"));
 });
@@ -261,5 +264,83 @@ test("alerts feed: newest first, capped, severity + label from the kind tables, 
   assert.deepEqual(f.events.map((e) => [e.kind, e.sev, e.validated]), [["insider-dump", "bad", true], ["smart-convergence", "good", false]]);
   f = alertsFeed(f, [ev("principal-withdrawn", 2)], { limit: 2 });
   assert.deepEqual(f.events.map((e) => e.kind), ["principal-withdrawn", "insider-dump"]);
-  assert.equal(f.events[0].label, "creator withdrew staked principal");
+  assert.equal(f.events[0].label, "creator withdrew unlocked fee stake");
+});
+
+test("materiality: small sales, short owner histories and routine fee withdrawals stay on the timeline", async () => {
+  const { notMaterial } = await import("../agent/materiality.mjs");
+  const dump = (o) => ({ kind: "insider-dump", mcapUsd: 80000, detail: { sellers: 1, pct: 0.5 }, ...o });
+  assert.match(notMaterial(dump()), /1 wallet/);
+  assert.equal(notMaterial(dump({ detail: { sellers: 2, pct: 0.5 } })), null);
+  assert.equal(notMaterial(dump({ detail: { sellers: 1, pct: 12 } })), null);
+  assert.match(notMaterial(dump({ mcapUsd: 9000, detail: { sellers: 4, pct: 30 } })), /posting floor/);
+  assert.match(notMaterial({ kind: "serial-owner", detail: { prior: 3 } }), /fewer than 5/);
+  assert.equal(notMaterial({ kind: "serial-owner", detail: { prior: 11 } }), null);
+  for (const k of ["principal-withdrawn", "cliff-24h", "first-harvest", "credit-idle"]) assert.match(notMaterial({ kind: k }), /timeline only/);
+});
+
+test("follow-ups: a material sale is re-checked 24 h later — which wallets sold out, mcap then → now — threaded in dry run", async () => {
+  const seller = "0x" + "e".repeat(40);
+  const w = (o) => {
+    const x = world(o);
+    x.readToken = async (t, opt = {}) => ({ sym: t.sym, risk: 30, earlySellersNow: o.sellers ? [{ a: seller, amt: 900, block: 7, bal: 100 }] : [],
+      watched: opt.watch ? Object.fromEntries(opt.watch.map((a) => [a, 0])) : undefined,
+      flags: { insiderSellersNow: o.sellers, insiderDumpNowPct: 6, top10Pct: 38, holders: o.holders ?? 300, bundles: 0 } });
+    return x;
+  };
+  const t1 = await runTick({ ...w({ sellers: 0 }), now: NOW, dryRun: true });
+  const t2 = await runTick({ ...w({ sellers: 2 }), state: t1.state, now: NOW + 900e3, dryRun: true });
+  const ev = t2.out.events.find((e) => e.kind === "insider-dump");
+  assert.equal(ev.fate, "dry-run");
+  assert.ok(t2.state.follow[ev.id]);
+  assert.equal(t2.state.follow[ev.id].wallets[0], seller);
+  const early = await runTick({ ...w({ sellers: 2 }), state: t2.state, now: NOW + 3 * 3600e3, dryRun: true });
+  assert.equal(early.out.followUps.length, 0);                                      // not due
+  const t3 = await runTick({ ...w({ sellers: 0, holders: 250 }), state: early.state, now: NOW + 900e3 + 24 * 3600e3, dryRun: true });
+  assert.equal(t3.out.followUps.length, 1);
+  const fu = t3.out.followUps[0];
+  assert.match(fu.headline, /the early wallet that sold has since sold out/);
+  assert.match(fu.headline, /market cap \$80k → \$80k · holders 300 → 250/);
+  assert.equal(fu.ref, ev.id);
+  const reply = t3.out.dryRun.find((r) => r.kind === "follow-up");
+  assert.equal(reply.replyTo, ev.id);
+  assert.match(reply.text, /^↻ \$T1 — 24h later/);
+  assert.deepEqual(lint(reply.text), []);
+  assert.equal(t3.state.follow[ev.id], undefined);                                  // closed once written
+});
+
+test("graduation: fires once when a launch seen on the curve is listed graduated; a cold start only learns", async () => {
+  const w = (graduated) => { const x = world(); const fa = x.pons.fetchActive;
+    x.pons.fetchActive = async (...a) => { const r = await fa(...a); return { ...r, items: r.items.map((t) => ({ ...t, graduated: t.address === A(1) ? graduated : false })) }; };
+    return x; };
+  const cold = await runTick({ ...w(true), now: NOW, dryRun: true });
+  assert.ok(!cold.out.events.some((e) => e.kind === "graduated"));                  // never seen on the curve: no backlog
+  const t1 = await runTick({ ...w(false), now: NOW, dryRun: true });
+  const t2 = await runTick({ ...w(true), state: t1.state, now: NOW + 900e3, dryRun: true });
+  const g = t2.out.events.find((e) => e.kind === "graduated");
+  assert.ok(g);
+  assert.match(g.headline, /^left the bonding curve · 5h after launch · 300 holders · top 10 wallets hold 38%/);
+  assert.equal(g.fate, "dry-run");
+  const t3 = await runTick({ ...w(true), state: t2.state, now: NOW + 1800e3, dryRun: true });
+  assert.ok(!t3.out.events.some((e) => e.kind === "graduated"));
+});
+
+test("digest: once per UTC day after 17:00, counts from the agent's own record, lint-clean", async () => {
+  const { digestDue, digestStats, formatDigest, remember } = await import("../agent/digest.mjs");
+  const at = Date.UTC(2026, 9, 3, 18);
+  assert.equal(digestDue(null, Date.UTC(2026, 9, 3, 16)), false);
+  assert.equal(digestDue(null, at), true);
+  assert.equal(digestDue("2026-10-03", at), false);
+  const recent = remember([{ at: at - 2 * 86400e3, kind: "graduated", address: "old" }], [
+    { at, kind: "insider-dump", address: "a" }, { at, kind: "insider-dump", address: "a" }, { at, kind: "graduated", address: "b" }, { at, kind: "serial-owner", address: "c" }], at);
+  assert.equal(recent.length, 4);                                                    // the 2-day-old one is dropped
+  const s = digestStats({ recent, now: at, launches: [{ ageH: 2, orbio: true }, { ageH: 5 }, { ageH: 30 }],
+    reads: [{ sym: "AA", address: "0x" + "1".repeat(40), ageH: 3, flags: { holders: 900 } }, { sym: "BB", ageH: 40, flags: { holders: 5000 } }] });
+  assert.deepEqual([s.launches, s.orbio, s.graduated, s.sells, s.sellTokens, s.serial, s.top.sym], [2, 1, 1, 2, 1, 1, "AA"]);
+  const text = formatDigest(s, { cleanSym });
+  assert.match(text, /2 new launches \(1 Orbio agent\) · 1 graduated/);
+  assert.match(text, /2 early-wallet sell-offs on 1 launch · 1 launch by repeat owners, none graduated/);
+  assert.match(text, /Most holders: \$AA \(900\)\n0x1{40}/);
+  assert.match(formatDigest({ ...s, launches: 999, orbio: 999, sells: 9999, sellTokens: 999, serial: 999, top: { ...s.top, sym: "X".repeat(40), holders: 1e6 } }, { cleanSym }), /Facts, not advice\.$/);
+  assert.deepEqual(lint(text), []);
 });

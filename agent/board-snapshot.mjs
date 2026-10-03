@@ -45,7 +45,7 @@ export function boardSnapshot(reads, stats, { now = Date.now(), limit = 60, live
 // newest first, whether or not it was posted — the board shows facts as they happen; posting is rationed separately.
 // Unvalidated kinds carry validated:false so the page can say so. Pure.
 export function alertsFeed(prev, events, { limit = 30 } = {}) {
-  const meta = (k) => KINDS[k] || AGENT_KINDS[k] || {};
+  const meta = (k) => KINDS[k] || AGENT_KINDS[k] || (k === "follow-up" ? { sev: "info", label: "24h later" } : {});
   const fresh = (events || []).map((e) => ({ ...e, sev: meta(e.kind).sev || "info", label: meta(e.kind).label || e.kind }));
   return { updated: Date.now(), telegram: null, events: [...fresh, ...((prev && prev.events) || [])].slice(0, limit) };
 }
