@@ -1,6 +1,6 @@
 // Posting gate — pure. Caps per hour / UTC day, one post per token per 6h, a daily $CREDIT ceiling, and a fixed
 // priority order when more events want to go out than the caps allow. State is plain JSON the caller persists.
-export const PRIORITY = ["insider-dump", "principal-withdrawn", "serial-owner", "smart-convergence", "clean-launch", "cliff-24h", "credit-idle", "first-harvest"];
+export const PRIORITY = ["insider-dump", "serial-owner", "graduated", "principal-withdrawn", "smart-convergence", "clean-launch", "cliff-24h", "credit-idle", "first-harvest"];
 export const POST_MAX_COST = 0.02, MENTION_MAX_COST = 0.005;
 export const DEFAULT_CAPS = { originalsPerDay: 15, originalsPerHour: 3, repliesPerDay: 40, perTokenMs: 6 * 3600e3, maxCreditPerDay: 1.5, postCost: POST_MAX_COST };
 

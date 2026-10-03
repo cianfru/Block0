@@ -9,7 +9,10 @@
 //   • dry run is the default — only AGENT_DRY_RUN=0 publishes.
 import { detectEvents } from "../alert-events.mjs";
 import { normAgent, agentEvents } from "./agent-events.mjs";
-import { formatPost, formatReply, lint, UNVALIDATED } from "./format.mjs";
+import { formatPost, formatReply, lint, cleanSym, UNVALIDATED } from "./format.mjs";
+import { digestDue, remember, digestStats, formatDigest } from "./digest.mjs";
+import { notMaterial } from "./materiality.mjs";
+import { openFollowUps, watchList, writeFollowUp, formatFollowUp, followUpEntry } from "./followups.mjs";
 import { plan, record, canReply, canSpend, settle, freshBudget, POST_MAX_COST, MENTION_MAX_COST } from "./budget.mjs";
 import { parseMention, resolveSymbol, selectMentions } from "./mentions.mjs";
 import { OrbioError, FREE, postOutcome, mentionsOf } from "./orbio.mjs";
@@ -21,14 +24,14 @@ import { deployerReputation, compactRep } from "../deployer.mjs";
 export const DEFAULTS = { maxAgeH: 72, minMcap: 5000, maxProfiles: 150, timeBudgetMs: 8 * 60e3, concurrency: 3, keepDays: 7 };
 
 export function emptyState() {
-  return { prevAgents: {}, lastFiredAgents: {}, prevBoard: {}, lastFiredBoard: {}, profiledAt: {}, perToken: {}, budget: null, answered: {}, replyAttempts: {}, stoppedDay: null };
+  return { prevAgents: {}, lastFiredAgents: {}, prevBoard: {}, lastFiredBoard: {}, profiledAt: {}, perToken: {}, budget: null, answered: {}, replyAttempts: {}, stoppedDay: null, follow: {} };
 }
 
 export async function runTick(deps) {
   const { orbio, pons, readToken, now = Date.now(), dryRun = true, forwardN = null, caps = {}, log = () => {} } = deps;
   const o = { ...DEFAULTS, ...(deps.opts || {}) };
   const state = { ...emptyState(), ...(deps.state || {}) };
-  const out = { posted: [], dryRun: [], logged: [], held: [], replies: [], errors: [], tokens: [], stats: null, account: null, events: [] };
+  const out = { posted: [], dryRun: [], logged: [], held: [], replies: [], errors: [], tokens: [], stats: null, account: null, events: [], followUps: [] };
   const started = Date.now();
 
   // 1 · Orbio agents (free) → economics events
@@ -59,9 +62,11 @@ export async function runTick(deps) {
     return r ? { ...r, scope: "the latest 100 Pons launches (7 days) and every graduated token" } : null;
   };
 
-  // 3 · candidates: young, not dust; Orbio agents first, then the least recently read (rotation under the cap)
-  const cands = [...universe.values()].filter((t) => { const h = ageH(t); return h != null && h >= 0 && h <= o.maxAgeH && (t.mcapUsd || 0) >= o.minMcap; })
-    .sort((x, y) => (agentByToken.has(y.address) - agentByToken.has(x.address)) || ((state.profiledAt[x.address] || 0) - (state.profiledAt[y.address] || 0)) || (y.mcapUsd || 0) - (x.mcapUsd || 0))
+  // 3 · candidates: young, not dust; launches with a follow-up due within the hour first (it needs their wallets'
+  //     balances), then Orbio agents, then the least recently read (rotation under the cap)
+  const watch = watchList(state.follow, now);
+  const cands = [...universe.values()].filter((t) => { const h = ageH(t); return watch[t.address] || (h != null && h >= 0 && h <= o.maxAgeH && (t.mcapUsd || 0) >= o.minMcap); })
+    .sort((x, y) => (!!watch[y.address] - !!watch[x.address]) || (agentByToken.has(y.address) - agentByToken.has(x.address)) || ((state.profiledAt[x.address] || 0) - (state.profiledAt[y.address] || 0)) || (y.mcapUsd || 0) - (x.mcapUsd || 0))
     .slice(0, o.maxProfiles);
 
   // 4 · read candidates (computeIntel on the free node), `concurrency` at a time; stop starting new reads at the
@@ -73,7 +78,7 @@ export async function runTick(deps) {
       if (Date.now() - started > o.timeBudgetMs) { budgetHit = true; return; }
       const t = queue.shift();
       try {
-        const r = await readToken(t);
+        const r = await readToken(t, watch[t.address] ? { watch: watch[t.address] } : undefined);
         state.profiledAt[t.address] = now;
         tokens.push({ ...r, address: t.address, sym: t.sym || r.sym, mcapUsd: t.mcapUsd ?? r.mcapUsd, ageH: ageH(t), venue: agentByToken.has(t.address) ? "orbio-agent" : "pons",
           graduated: t.graduated ?? r.graduated, progress: t.progress ?? null, name: t.name || null, logo: t.logo || null, deployer: deployerOf(t) });
@@ -88,12 +93,38 @@ export async function runTick(deps) {
   // forget tokens not read for a week (state stays small)
   for (const a of Object.keys(state.profiledAt)) if (now - state.profiledAt[a] > o.keepDays * 86400e3) { delete state.profiledAt[a]; delete state.prevBoard[a]; }
 
+  // 4b · graduation: a launch seen on the bonding curve and now listed graduated. A cold start (no memory of which
+  //      launches were on the curve) only learns, so a backlog of old graduations can never fire.
+  const ge = [], cold = state.ungrad == null, ungrad = { ...(state.ungrad || {}) };
+  for (const t of universe.values()) {
+    if (!t.address) continue;
+    if (!t.graduated) { ungrad[t.address] = now; continue; }
+    if (ungrad[t.address] && !cold) {
+      const r = tokens.find((x) => x.address === t.address), f = r?.flags || {}, h = ageH(t);
+      const facts = [h != null && `${h < 48 ? Math.round(h) + "h" : Math.round(h / 24) + "d"} after launch`, f.holders != null && `${f.holders.toLocaleString("en-US")} holders`,
+        f.top10Pct != null && `top 10 wallets hold ${Math.round(f.top10Pct)}%`, f.sniperHeldPct != null && `early wallets hold ${Math.round(f.sniperHeldPct)}%`].filter(Boolean);
+      ge.push({ id: `graduated:${t.address}:${now}`, kind: "graduated", sev: "info", at: now, address: t.address, sym: t.sym ?? r?.sym ?? null,
+        mcapUsd: t.mcapUsd ?? null, ageH: h, holders: f.holders ?? null, risk: r?.risk ?? null, venue: agentByToken.has(t.address) ? "orbio-agent" : "pons",
+        detail: { holders: f.holders ?? null, top10Pct: f.top10Pct ?? null, earlyHeldPct: f.sniperHeldPct ?? null, bundles: f.bundles ?? null },
+        headline: `left the bonding curve${facts.length ? " · " + facts.join(" · ") : " and now trades on the AMM pool"}` });
+    }
+    delete ungrad[t.address];
+  }
+  for (const [a, at] of Object.entries(ungrad)) if (now - at > o.keepDays * 86400e3) delete ungrad[a];
+  state.ungrad = ungrad;
+
   // 5 · gate: unvalidated kinds are logged only; the rest go through caps + lint
-  const all = [...be.events, ...ae.events];
-  out.events = all.map((e) => ({ at: now, kind: e.kind, address: e.address, sym: e.sym ?? null, headline: e.headline ?? null, validated: !UNVALIDATED.has(e.kind) }));
+  const all = [...be.events, ...ae.events, ...ge];
+  // every detected event, with the numbers and evidence it fired on; `fate` (what the agent did with it) is set below
+  out.events = all.map((e) => ({ id: e.id, at: now, kind: e.kind, address: e.address, sym: e.sym ?? null, headline: e.headline ?? null,
+    validated: !UNVALIDATED.has(e.kind), mcapUsd: e.mcapUsd ?? null, holders: e.holders ?? null, risk: e.risk ?? null, ageH: e.ageH ?? null,
+    owner: e.owner ?? null, agentId: e.agentId ?? null, detail: e.detail ?? null, fate: null, why: null }));
   for (const e of all.filter((x) => UNVALIDATED.has(x.kind))) out.logged.push({ ...e, why: "unvalidated kind — logged, not posted" });
+  // everything goes on the timeline; only material events are offered to the posting gate
+  const offer = [];
+  for (const e of all.filter((x) => !UNVALIDATED.has(x.kind))) { const why = notMaterial(e); if (why) out.logged.push({ ...e, why }); else offer.push(e); }
   const stopped = state.stoppedDay === new Date(now).toISOString().slice(0, 10);
-  const { post, hold } = plan(all.filter((x) => !UNVALIDATED.has(x.kind)), state.budget, { now, caps, perToken: state.perToken });
+  const { post, hold } = plan(offer, state.budget, { now, caps, perToken: state.perToken });
   out.held.push(...hold.map((h) => ({ ...h.ev, why: h.why })));
 
   // 6 · the connected X account (free read; only with a key). Gives the platform name social.post wants, the handle
@@ -136,7 +167,7 @@ export async function runTick(deps) {
   for (const ev of post) {
     const text = formatPost(ev, { forwardN }), problems = lint(text);
     if (problems.length) { out.held.push({ ...ev, text, why: "lint: " + problems.join(", ") }); continue; }
-    if (dryRun) { out.dryRun.push({ at: now, kind: ev.kind, address: ev.address, text }); state.budget = record(state.budget, { now, credit: 0, address: ev.address }); state.perToken[ev.address] = now; continue; }
+    if (dryRun) { out.dryRun.push({ at: now, id: ev.id, kind: ev.kind, address: ev.address, text }); state.budget = record(state.budget, { now, credit: 0, address: ev.address }); state.perToken[ev.address] = now; continue; }
     const block = stopped || state.stoppedDay === new Date(now).toISOString().slice(0, 10) ? "posting stopped for today (balance/auth/connection)"
       : !platform ? "no X account connected in Orbio" : acct.postsLeft != null && sent >= acct.postsLeft ? "platform allowance"
       : !canSpend(state.budget, POST_MAX_COST, { now, caps }) ? "credit ceiling" : null;
@@ -150,10 +181,67 @@ export async function runTick(deps) {
       let o = postOutcome(r.result);
       if (o.postId && !o.url && o.status !== "failed") { try { o = { ...o, ...postOutcome((await orbio.tool("social.post.status", { post_id: o.postId }, FREE)).result) }; } catch { /* the post stands; the link is a nicety */ } }
       if (o.status === "failed") { out.held.push({ ...ev, text, why: "post failed: " + (o.error || "refused") }); continue; }
-      out.posted.push({ at: now, kind: ev.kind, address: ev.address, text, ...o, running: r.running || undefined });
+      out.posted.push({ at: now, id: ev.id, kind: ev.kind, address: ev.address, text, ...o, running: r.running || undefined });
     } catch (e) {
       stopDay(e);
       out.errors.push("post: " + e.message); out.held.push({ ...ev, text, why: "post failed" });
+    }
+  }
+
+  // what happened to each event: posted, a dry-run post, held (with why), or logged only (unvalidated kind)
+  const fate = new Map();
+  for (const e of out.logged) fate.set(e.id, ["logged", e.why]);
+  for (const e of out.held) fate.set(e.id, ["held", e.why]);
+  for (const e of out.dryRun) if (e.id) fate.set(e.id, ["dry-run", null]);
+  for (const e of out.posted) fate.set(e.id, ["posted", e.url || null]);
+  for (const e of out.events) [e.fate, e.why] = fate.get(e.id) || ["held", null];
+
+  // 7b · follow-ups: open one for each material event; write (and thread) the ones that are due
+  state.follow = openFollowUps(state.follow, out.events, { now, posted: Object.fromEntries(out.posted.filter((p) => p.postId).map((p) => [p.id, p.postId])) });
+  for (const f of Object.values(state.follow).filter((x) => x.due <= now).sort((a, b) => a.due - b.due)) {
+    const read = tokens.find((x) => x.address === f.address), u = universe.get(f.address), ag = agentByToken.get(f.address);
+    const mine = ag?.owner ? agents.filter((x) => x.owner === ag.owner) : null;
+    const cur = { mcapUsd: u?.mcapUsd ?? ag?.mcapUsd ?? read?.mcapUsd ?? null, holders: read?.flags?.holders ?? null,
+      graduated: u?.graduated ?? ag?.graduated ?? null, watched: read?.watched ?? null,
+      ownerLaunched: mine ? mine.length : null, ownerGraduated: mine ? mine.filter((x) => x.graduated).length : null };
+    const w = writeFollowUp(f, cur, { now });
+    if (w.wait) continue;
+    delete state.follow[f.id];
+    if (!w.headline) { out.errors.push(`follow-up ${f.sym || f.address}: ${w.why}`); continue; }
+    const text = formatFollowUp(f, w.headline);
+    const fu = { ...followUpEntry(f, w.headline, cur, now), address: f.address, sym: f.sym, text, posted: null };
+    out.followUps.push(fu);
+    // threaded under the original: only when the original went out (or would have, in dry run)
+    if (lint(text).length || !(f.fate === "posted" || (dryRun && f.fate === "dry-run"))) continue;
+    if (dryRun) { out.dryRun.push({ at: now, kind: "follow-up", replyTo: f.id, address: f.address, text }); state.budget = record(state.budget, { now, kind: "reply", credit: 0 }); continue; }
+    if (!f.postId || !platform || !canReply(state.budget, { now, caps }) || state.stoppedDay === new Date(now).toISOString().slice(0, 10)) continue;
+    try {
+      state.budget = record(state.budget, { now, kind: "reply", credit: POST_MAX_COST });
+      const r = await orbio.tool("social.post", { platforms: [platform], text, reply_to: f.postId }, String(POST_MAX_COST));
+      state.budget = settle(state.budget, POST_MAX_COST, r, now);
+      const o = postOutcome(r.result);
+      if (o.status !== "failed") { fu.posted = o.url || o.postId || "pending"; out.posted.push({ at: now, id: fu.id, kind: "follow-up", address: f.address, text, ...o }); }
+    } catch (e) { stopDay(e); out.errors.push("follow-up post: " + e.message); }
+  }
+  for (const [id, f] of Object.entries(state.follow)) if (now - f.due > 3 * 86400e3) delete state.follow[id];
+
+  // 7c · the daily digest: counts over the last 24 h, once per UTC day
+  state.recent = remember(state.recent, out.events, now);
+  if (digestDue(state.digestDay, now)) {
+    state.digestDay = new Date(now).toISOString().slice(0, 10);
+    const s = digestStats({ recent: state.recent, now, reads: tokens,
+      launches: [...universe.values()].map((t) => ({ ageH: ageH(t), orbio: agentByToken.has(t.address) })) });
+    const text = formatDigest(s, { cleanSym });
+    out.digest = { at: now, stats: s, text };
+    if (dryRun) { out.dryRun.push({ at: now, kind: "digest", text }); state.budget = record(state.budget, { now, credit: 0 }); }
+    else if (platform && !lint(text).length && canSpend(state.budget, POST_MAX_COST, { now, caps }) && state.stoppedDay !== state.digestDay) {
+      try {
+        state.budget = record(state.budget, { now, credit: POST_MAX_COST });
+        const r = await orbio.tool("social.post", { platforms: [platform], text }, String(POST_MAX_COST));
+        state.budget = settle(state.budget, POST_MAX_COST, r, now);
+        const o = postOutcome(r.result);
+        if (o.status !== "failed") out.posted.push({ at: now, kind: "digest", text, ...o });
+      } catch (e) { stopDay(e); out.errors.push("digest post: " + e.message); }
     }
   }
 

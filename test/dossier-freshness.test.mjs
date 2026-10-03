@@ -28,14 +28,14 @@ function page(readAt) {
 test("dossier: fresh -> historical -> expired in an already-open tab", async () => {
   const p = page(NOW);
   await p.load();
-  assert.match(p.root.innerHTML, /4\.00% of held supply sold into the pool, last 30 min/);
+  assert.match(p.root.innerHTML, /4\.00% of wallet-held supply sold into the pool, last 30 min/);
   assert.equal(typeof p.ctx.window.go, "function");
   assert.equal(p.timer().ms, 45 * 60e3 + 1);
   p.advance(p.timer().ms); await p.timer().fn();
   assert.match(p.root.innerHTML, /Historical read · not current/);
   assert.match(p.root.innerHTML, /Who was moving it/);
   assert.match(p.root.innerHTML, /Not current — read older than 45 min/);
-  assert.doesNotMatch(p.root.innerHTML, /4\.00% of held supply sold|Who is moving it/);
+  assert.doesNotMatch(p.root.innerHTML, /4\.00% of wallet-held supply sold|Who is moving it/);
   p.advance(p.timer().ms); await p.timer().fn();
   assert.match(p.root.innerHTML, /Read expired/);
   assert.doesNotMatch(p.root.innerHTML, /Early wallets selling|What the chain shows/);

@@ -80,6 +80,27 @@
   .fl.add .bar i{background:var(--cyan)}
 
   /* ── wallet table ─────────────────────────────────────────────────────── */
+  /* ── timeline: what changed, newest first, each with its evidence ─────── */
+  .tl{list-style:none;margin:0;padding:0;position:relative}
+  .tl:before{content:"";position:absolute;left:5px;top:8px;bottom:8px;width:1px;background:var(--line)}
+  .tl li{position:relative;padding:0 0 22px 26px}
+  .tl li:last-child{padding-bottom:0}
+  .tl .pin{position:absolute;left:0;top:5px;width:11px;height:11px;border-radius:50%;background:var(--cyan);box-shadow:0 0 0 3px var(--bg,#0a0a0d)}
+  .tl li.bad .pin{background:var(--coral)} .tl li.good .pin{background:var(--mint)} .tl li.mark .pin{background:var(--mute)}
+  .tl .when{font-family:var(--mono);font-size:.7rem;color:var(--mute)}
+  .tl .lab{font-size:.63rem;font-weight:800;letter-spacing:.13em;text-transform:uppercase;margin-left:8px;color:var(--cyan)}
+  .tl li.bad .lab{color:var(--coral)} .tl li.good .lab{color:var(--mint)} .tl li.mark .lab{color:var(--mute)}
+  .tl .hl{font-size:.98rem;line-height:1.45;margin-top:5px}
+  .tl .cx{font-size:.74rem;color:var(--mute);margin-top:4px;font-variant-numeric:tabular-nums}
+  .tl details{margin-top:8px}
+  .tl summary{cursor:pointer;font-size:.72rem;color:var(--dim);list-style:none}
+  .tl summary::-webkit-details-marker{display:none}
+  .tl summary:before{content:"+ ";color:var(--brand)} .tl details[open] summary:before{content:"− "}
+  .tl .evd{margin-top:8px;font-size:.78rem;color:var(--dim);line-height:1.6}
+  .tl .evd table{border-collapse:collapse;margin:6px 0;font-variant-numeric:tabular-nums}
+  .tl .evd td{padding:3px 14px 3px 0;border-top:1px solid var(--line)}
+  .tl .unval{font-size:.58rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;margin-left:8px;
+    border:1px solid rgba(255,122,0,.34);color:var(--amber);border-radius:4px}
   .tbl{width:100%;border-collapse:collapse;font-size:.86rem}
   .tbl th{text-align:left;font-size:.62rem;letter-spacing:.13em;text-transform:uppercase;color:var(--mute);
           font-weight:700;padding:0 12px 11px;border-bottom:1px solid var(--line)}
@@ -396,7 +417,7 @@ function render(d) {
     ["Bundles", f.bundles, has(f.bundleWallets) ? `${f.bundleWallets} wallets buying in one block` : "wallets unknown", "bad"],
     ["Linked clusters", f.coordClusters, has(f.coordPct) ? `${pct(f.coordPct)} of supply in linked wallets` : "share unknown", "warn"],
     ["Early wallets selling", f.insiderSellersNow,
-      d.stale ? "Not current — read older than 45 min" : has(f.insiderDumpNowPct) ? `${pct(f.insiderDumpNowPct, 2)} of held supply sold into the pool, last 30 min` : "amount unknown", "bad"],
+      d.stale ? "Not current — read older than 45 min" : has(f.insiderDumpNowPct) ? `${pct(f.insiderDumpNowPct, 2)} of wallet-held supply sold into the pool, last 30 min` : "amount unknown", "bad"],
     ...(has(f.earlyMovedOutNow) ? [["Early wallets moving out", f.earlyMovedOutNow,
       d.stale ? "Not current — read older than 45 min" : has(f.earlyMovedOutPct) ? `${pct(f.earlyMovedOutPct, 2)} sent to other wallets, last 30 min — not a sale` : "amount unknown", "warn"]] : []),
   ].map(([k, v, s, cls]) => `<div class="m"><div class="k">${k}</div>
@@ -492,7 +513,9 @@ function render(d) {
     </div>
   </details>`;
 
-  $("#root").innerHTML = identity + readBlock + launch + flow + holders + deployer + price + ask + another + study;
+  const timeline = `<section class="sec"><p class="eyebrow">What changed <b>· timeline</b></p><div id="tlbox"><p class="prov">Loading the timeline…</p></div></section>`;
+
+  $("#root").innerHTML = identity + readBlock + timeline + launch + flow + holders + deployer + price + ask + another + study;
   wireAsk();
 
   // What was actually read, so the pilot can count DISTINCT tokens per tester rather than page loads.
@@ -562,6 +585,49 @@ async function loadPrice() {
   }
 }
 
+/* ═══ TIMELINE — what changed in this launch, from the agent's record (/api/timeline/<address>) ═══════════════
+   Every entry is an event a detector fired (posted or not) or a state change between two reads, with the numbers at
+   the time and the evidence: which wallets, how much, at which block, and where the fact came from. */
+const when = (ms) => { const d = new Date(ms); return d.toISOString().slice(5, 10).replace("-", "/") + " " + d.toISOString().slice(11, 16) + " UTC · " + ago(ms) + " ago"; };
+function evidenceHtml(e) {
+  const v = e.evidence || {}, parts = [];
+  if (v.wallets && v.wallets.length) parts.push(`<table>${v.wallets.map((w) => `<tr><td>${copyable(w.a, "wa")}</td>
+    <td>${has(w.amt) ? qty(w.amt) + " tokens sold" : ""}</td><td>${has(w.block) ? "block " + esc(w.block) : ""}</td>
+    <td>${has(w.bal) ? (w.bal > 0 ? "still holds " + qty(w.bal) : "holds none now") : ""}</td></tr>`).join("")}</table>`);
+  if (v.owner) parts.push(`Owner wallet ${copyable(v.owner, "wa")}${v.agentId ? ` · Orbio agent #${esc(v.agentId)}` : ""}`);
+  const d = v.detail || {};
+  if (has(d.withdrawnOrbio)) parts.push(`Withdrawn this time: ${qty(d.withdrawnOrbio)} ORBIO · total withdrawn ${qty(d.totalWithdrawnOrbio) ?? "?"} ORBIO`);
+  if (has(d.prior)) parts.push(`Earlier launches by this owner: ${esc(d.prior)} · graduated: ${esc(d.graduated ?? 0)}`);
+  if (has(d.convertedUsd)) parts.push(`Fees converted to credit: $${esc(d.convertedUsd)}`);
+  if (has(d.hoursLeft)) parts.push(`Lock ends in about ${esc(d.hoursLeft)} h${has(d.stakedOrbio) ? ` · ${qty(d.stakedOrbio)} ORBIO staked` : ""}`);
+  if (v.block) parts.push(`Read at block ${esc(v.block)}`);
+  if (v.note) parts.push(esc(v.note));
+  if (v.source) parts.push(`Source: ${esc(v.source)}`);
+  return parts.length ? `<details><summary>evidence</summary><div class="evd">${parts.join("<br>")}</div></details>` : "";
+}
+function timelineHtml(tl) {
+  const list = (tl && tl.entries) || [];
+  if (!list.length) return unavailable("Timeline", "Nothing recorded for this launch yet.");
+  const real = list.filter((e) => e.kind !== "coverage").length;
+  return `<ol class="tl">${list.map((e) => {
+    const c = e.context || {}, cx = [money(c.mcapUsd) && money(c.mcapUsd) + " market cap", has(c.holders) && qty(c.holders) + " holders",
+      has(c.ageH) && age(c.ageH) + " after launch"].filter(Boolean).join(" · ");
+    return `<li class="${e.kind === "coverage" ? "mark" : esc(e.sev)}"><span class="pin"></span>
+      <div><span class="when">${when(e.at)}</span><span class="lab">${esc(e.label)}</span>${e.validated === false ? '<span class="unval">not validated · not posted</span>' : ""}</div>
+      ${e.ref ? `<div class="cx">update on: ${esc(e.refHeadline || "an earlier event")}</div>` : ""}<div class="hl">${esc(e.headline || e.label)}</div>${cx ? `<div class="cx">at the time: ${cx}</div>` : ""}${evidenceHtml(e)}</li>`;
+  }).join("")}</ol>
+  <p class="prov">${real} event${real === 1 ? "" : "s"} recorded · every event the agent detected for this launch, whether or not
+    it was posted · times in UTC · facts, never a call.</p>`;
+}
+async function loadTimeline() {
+  const box = () => $("#tlbox"); if (!box()) return;
+  const r = await fetch(`/api/timeline/${ADDR}`).catch(() => null);
+  const tl = r && r.ok && (r.headers.get("content-type") || "").match(/json|text\/plain/) ? await r.json().catch(() => null) : null;
+  if (!box()) return;
+  box().innerHTML = tl ? timelineHtml(tl) : unavailable("Timeline", "Block0 has not recorded any event for this launch.");
+  if (tl) window.B0T && window.B0T("timeline_view", { token: ADDR, n: (tl.entries || []).length });
+}
+
 let STATIC = false;
 let freshnessTimer = null;
 const ago = (t) => { const m = Math.max(1, Math.round((Date.now() - t) / 60000)); return m < 60 ? m + " min" : m < 2880 ? Math.round(m / 60) + " h" : Math.round(m / 1440) + " days"; };
@@ -596,7 +662,10 @@ async function load() {
     else {
       STATIC = true;
       const s = await fetch(`/api/dossier/${ADDR}`).catch(() => null);
-      if (!s || !s.ok) { $("#root").innerHTML = notCovered() + empty; return; }
+      if (!s || !s.ok) {
+        $("#root").innerHTML = notCovered() + `<section class="sec"><p class="eyebrow">What changed <b>· while Block0 was reading it</b></p><div id="tlbox"><p class="prov">Loading the timeline…</p></div></section>` + empty;
+        loadTimeline(); return;
+      }
       d = await s.json();
       d = dossierView(d);
       if (d.expired) { $("#root").innerHTML = unavailable("Read expired", "This read is over three hours old or has no valid timestamp. Current activity is unavailable.") + empty; return; }
@@ -609,6 +678,7 @@ async function load() {
     if (d.error) throw new Error(d.error);
     document.title = (symOf(d) ? "$" + symOf(d) : "Unnamed token") + " — Block0 dossier";
     render(d);
+    loadTimeline();
     loadPrice();
   } catch (e) {
     $("#root").innerHTML = `<div class="state err">Could not read this token — ${esc(e.message)}</div>` + empty;

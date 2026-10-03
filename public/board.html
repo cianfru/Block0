@@ -214,7 +214,7 @@ function staticMode(){
 })();
 
 // ── live alerts strip (polls the public feed; no third party) ──
-const KLAB={"insider-dump":"early wallets selling","smart-convergence":"smart money","clean-launch":"clean launch","principal-withdrawn":"principal withdrawn","serial-owner":"repeat owner","cliff-24h":"lock ending","credit-idle":"credit idle","first-harvest":"first harvest"};
+const KLAB={"insider-dump":"early wallets selling","smart-convergence":"smart money","clean-launch":"clean launch","principal-withdrawn":"fee stake withdrawn","serial-owner":"repeat owner","cliff-24h":"lock ending","credit-idle":"credit idle","first-harvest":"first harvest"};
 const ago=(t)=>{const s=Math.max(0,(Date.now()-t)/1000);return s<60?Math.round(s)+"s":s<3600?Math.round(s/60)+"m":s<86400?Math.round(s/3600)+"h":Math.round(s/86400)+"d";};
 async function loadAlerts(){try{
   const d=await fetch("/api/alerts/feed?n=8").then(r=>r.json());
