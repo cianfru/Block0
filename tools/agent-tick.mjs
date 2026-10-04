@@ -51,6 +51,7 @@ for (;;) {
     state, orbio, apiKey: env.ORBIO_API_KEY || null,
     pons: { fetchActive, fetchGraduated },
     readToken: (t, x = {}) => computeIntel(t.address, t.sym, { pool: t.pool, mcapUsd: t.mcapUsd ?? null, launchedAt: t.launchedAt, graduated: t.graduated, whales: true, watch: x.watch }),
+    lastRead: (a) => reads[a] || null,   // the latest board read of a launch, for events on launches not re-read this cycle
     dryRun, forwardN, handle: env.AGENT_X_HANDLE || "",
     caps: { maxCreditPerDay: Number(env.AGENT_MAX_CREDIT_PER_DAY || 1.5), originalsPerDay: Number(env.AGENT_MAX_ORIGINALS_PER_DAY || 15) },
     log: (s) => console.log(new Date().toISOString(), s),

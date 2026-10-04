@@ -9,7 +9,7 @@
 //   • dry run is the default — only AGENT_DRY_RUN=0 publishes.
 import { detectEvents } from "../alert-events.mjs";
 import { normAgent, agentEvents } from "./agent-events.mjs";
-import { formatPost, formatReply, lint, cleanSym, UNVALIDATED } from "./format.mjs";
+import { formatPost, formatReply, lint, UNVALIDATED } from "./format.mjs";
 import { digestDue, remember, digestStats, formatDigest } from "./digest.mjs";
 import { notMaterial } from "./materiality.mjs";
 import { openFollowUps, watchList, writeFollowUp, formatFollowUp, followUpEntry } from "./followups.mjs";
@@ -100,7 +100,8 @@ export async function runTick(deps) {
     if (!t.address) continue;
     if (!t.graduated) { ungrad[t.address] = now; continue; }
     if (ungrad[t.address] && !cold) {
-      const r = tokens.find((x) => x.address === t.address), f = r?.flags || {}, h = ageH(t);
+      // launches graduate within hours, often before this cycle reached them: fall back to the agent's last read
+      const r = tokens.find((x) => x.address === t.address) || deps.lastRead?.(t.address) || null, f = r?.flags || {}, h = ageH(t);
       const facts = [h != null && `${h < 48 ? Math.round(h) + "h" : Math.round(h / 24) + "d"} after launch`, f.holders != null && `${f.holders.toLocaleString("en-US")} holders`,
         f.top10Pct != null && `top 10 wallets hold ${Math.round(f.top10Pct)}%`, f.sniperHeldPct != null && `early wallets hold ${Math.round(f.sniperHeldPct)}%`].filter(Boolean);
       ge.push({ id: `graduated:${t.address}:${now}`, kind: "graduated", sev: "info", at: now, address: t.address, sym: t.sym ?? r?.sym ?? null,
@@ -231,7 +232,7 @@ export async function runTick(deps) {
     state.digestDay = new Date(now).toISOString().slice(0, 10);
     const s = digestStats({ recent: state.recent, now, reads: tokens,
       launches: [...universe.values()].map((t) => ({ ageH: ageH(t), orbio: agentByToken.has(t.address) })) });
-    const text = formatDigest(s, { cleanSym });
+    const text = formatDigest(s);
     out.digest = { at: now, stats: s, text };
     if (dryRun) { out.dryRun.push({ at: now, kind: "digest", text }); state.budget = record(state.budget, { now, credit: 0 }); }
     else if (platform && !lint(text).length && canSpend(state.budget, POST_MAX_COST, { now, caps }) && state.stoppedDay !== state.digestDay) {

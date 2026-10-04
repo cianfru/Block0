@@ -337,10 +337,23 @@ test("digest: once per UTC day after 17:00, counts from the agent's own record, 
   const s = digestStats({ recent, now: at, launches: [{ ageH: 2, orbio: true }, { ageH: 5 }, { ageH: 30 }],
     reads: [{ sym: "AA", address: "0x" + "1".repeat(40), ageH: 3, flags: { holders: 900 } }, { sym: "BB", ageH: 40, flags: { holders: 5000 } }] });
   assert.deepEqual([s.launches, s.orbio, s.graduated, s.sells, s.sellTokens, s.serial, s.top.sym], [2, 1, 1, 2, 1, 1, "AA"]);
-  const text = formatDigest(s, { cleanSym });
+  const text = formatDigest(s);
   assert.match(text, /2 new launches \(1 Orbio agent\) · 1 graduated/);
   assert.match(text, /2 early-wallet sell-offs on 1 launch · 1 launch by repeat owners, none graduated/);
   assert.match(text, /Most holders: \$AA \(900\)\n0x1{40}/);
-  assert.match(formatDigest({ ...s, launches: 999, orbio: 999, sells: 9999, sellTokens: 999, serial: 999, top: { ...s.top, sym: "X".repeat(40), holders: 1e6 } }, { cleanSym }), /Facts, not advice\.$/);
+  assert.match(formatDigest({ ...s, launches: 999, orbio: 999, sells: 9999, sellTokens: 999, serial: 999, top: { ...s.top, sym: "X".repeat(40), holders: 1e6 } }), /Facts, not advice\.$/);
+  // a launch with no holders is never "most holders"; no symbol never reads "$?"
+  assert.equal(digestStats({ recent, now: at, launches: [], reads: [{ sym: "ORA", ageH: 2, flags: { holders: 0 } }] }).top, null);
+  assert.match(formatPost({ kind: "serial-owner", sym: "?", headline: "h", address: "0x1" }), /^▲ an unnamed launch — repeat owner/);
   assert.deepEqual(lint(text), []);
+});
+
+test("graduation: a launch not re-read this cycle takes its facts from the agent's last read", async () => {
+  const w = (graduated) => { const x = world(); const fa = x.pons.fetchActive;
+    x.pons.fetchActive = async (...a) => { const r = await fa(...a); return { ...r, items: r.items.map((t) => ({ ...t, graduated: t.address === A(1) ? graduated : false })) }; };
+    return x; };
+  const t1 = await runTick({ ...w(false), now: NOW, dryRun: true });
+  const x = w(true); x.readToken = async () => { throw new Error("not read this cycle"); };
+  const t2 = await runTick({ ...x, state: t1.state, now: NOW + 900e3, dryRun: true, lastRead: (a) => (a === A(1) ? { flags: { holders: 412, top10Pct: 31, sniperHeldPct: 8 } } : null) });
+  assert.match(t2.out.events.find((e) => e.kind === "graduated").headline, /412 holders · top 10 wallets hold 31% · early wallets hold 8%/);
 });

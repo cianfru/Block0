@@ -30,6 +30,8 @@ const age = (h) => (h == null ? null : h < 1 ? Math.max(1, Math.round(h * 60)) +
 // token symbols are attacker-controlled: keep them short and plain (no @mentions, URLs, domains or line breaks
 // smuggled in — a "." would let a symbol like "x.co" become a link)
 export const cleanSym = (s) => String(s || "?").replace(/[^\p{L}\p{N}_-]/gu, "").slice(0, 16) || "?";
+// "$SYM", or "an unnamed launch" when the launchpad has no symbol yet (never "$?")
+export const symTag = (s) => { const c = cleanSym(s); return c === "?" ? "an unnamed launch" : "$" + c; };
 
 export function footer(kind, { forwardN = null } = {}) {
   return UNVALIDATED.has(kind) ? `Not validated (forward test n=${forwardN ?? 0}). Facts, not advice.` : "On-chain facts, not advice.";
@@ -38,7 +40,7 @@ export function footer(kind, { forwardN = null } = {}) {
 export function formatPost(ev, { forwardN = null } = {}) {
   const k = KINDS[ev.kind] || AGENT_KINDS[ev.kind] || { icon: "•", label: ev.kind };
   const meta = [$(ev.mcapUsd) && `${$(ev.mcapUsd)} mcap`, age(ev.ageH), ev.venue === "orbio-agent" ? "Orbio agent" : null].filter(Boolean).join(" · ");
-  const lines = [`${k.icon} $${cleanSym(ev.sym)} — ${k.label}`, ev.headline, meta, ev.address, footer(ev.kind, { forwardN })].filter(Boolean);
+  const lines = [`${k.icon} ${symTag(ev.sym)} — ${k.label}`, ev.headline, meta, ev.address, footer(ev.kind, { forwardN })].filter(Boolean);
   let text = lines.join("\n");
   if (text.length > MAX_LEN) {                                   // trim the headline, never the address or footer
     const fixed = text.length - ev.headline.length;
@@ -59,7 +61,7 @@ export function formatReply(read) {
     f.snipers > 0 && `${f.snipers} snipers`,
     f.insiderSellersNow > 0 && `${f.insiderSellersNow} early wallets selling now`,
   ].filter(Boolean);
-  const head = `$${cleanSym(read.sym)} · ${[$(read.mcapUsd) && `${$(read.mcapUsd)} mcap`, age(read.ageH)].filter(Boolean).join(" · ")}`;
+  const head = `${symTag(read.sym)} · ${[$(read.mcapUsd) && `${$(read.mcapUsd)} mcap`, age(read.ageH)].filter(Boolean).join(" · ")}`;
   const owner = read.ownerRep ? `owner: ${read.ownerRep.launched} launches, ${read.ownerRep.graduated} graduated` : null;
   // the address and footer are never cut: drop whole facts from the end until the reply fits
   const build = () => [head, facts.join(" · "), owner, read.address, "Facts, not advice."].filter(Boolean).join("\n");

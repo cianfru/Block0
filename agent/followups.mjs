@@ -4,7 +4,7 @@
 // whether those exact wallets have since sold out; for every kind, market cap and holders then → now. The update goes
 // on the launch's timeline and, when the original was posted, as a reply to that post. Facts after the fact — never a
 // verdict on whether the event "mattered" (that is the forward test's job, and it is not this one).
-import { cleanSym, MAX_LEN } from "./format.mjs";
+import { symTag, MAX_LEN } from "./format.mjs";
 
 export const HORIZON_H = 24, GRACE_H = 6, KINDS = new Set(["insider-dump", "serial-owner", "graduated"]);
 
@@ -57,7 +57,7 @@ export function writeFollowUp(f, cur, { now = Date.now() } = {}) {
 
 export function formatFollowUp(f, headline) {
   const h = Math.round(HORIZON_H);
-  const lines = [`↻ $${cleanSym(f.sym)} — ${h}h later`, headline, f.address, "On-chain facts, not advice."];
+  const lines = [`↻ ${symTag(f.sym)} — ${h}h later`, headline, f.address, "On-chain facts, not advice."];
   let text = lines.join("\n");
   if (text.length > MAX_LEN) { lines[1] = headline.slice(0, Math.max(20, MAX_LEN - (text.length - headline.length) - 1)) + "…"; text = lines.join("\n"); }
   return text;
