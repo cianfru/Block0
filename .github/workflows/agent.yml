@@ -47,8 +47,19 @@ jobs:
       - name: Radar forward-test status (for the "n=" footer)
         run: git fetch -q --depth 1 origin radar-data && git show FETCH_HEAD:REPORT.txt > radar-report.txt || true
 
+      # The transfer store from the previous job (tools/agent-tick.mjs AGENT_STORE_FILE): without it every job spent its
+      # first ~3.5 h re-reading launches cold on the free node. Newest snapshot wins; GitHub evicts old ones (7 days unused
+      # / 10 GB per repo). A missing or unreadable snapshot only means a cold start.
+      - name: Restore the transfer store
+        uses: actions/cache/restore@v4
+        with:
+          path: agent-store.json.gz
+          key: agent-store-${{ github.run_id }}
+          restore-keys: agent-store-
+
       - name: Watch
         env:
+          AGENT_STORE_FILE: agent-store.json.gz
           AGENT_DIR: agent-data
           AGENT_GIT_COMMIT: "1"
           AGENT_WATCH_MIN: "340"
@@ -59,6 +70,13 @@ jobs:
           AGENT_MAX_CREDIT_PER_DAY: ${{ vars.AGENT_MAX_CREDIT_PER_DAY || '1.5' }}
           ORBIO_API_KEY: ${{ secrets.ORBIO_API_KEY }}
         run: node tools/agent-tick.mjs --watch
+
+      - name: Save the transfer store
+        if: (success() || failure()) && hashFiles('agent-store.json.gz') != ''
+        uses: actions/cache/save@v4
+        with:
+          path: agent-store.json.gz
+          key: agent-store-${{ github.run_id }}
 
       # Start the next job. Skipped when this one was cancelled, when it died within 30 min (a crash loop waits for
       # the cron instead), or when RUNNER_CHAIN is "0". (An unset variable is null, which GitHub coerces to 0 against
