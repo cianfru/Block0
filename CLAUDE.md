@@ -18,6 +18,10 @@ event lifecycle/follow-ups → watchlist → published editorial policy. Not a p
   `computeIntel({watch})`), mcap/holders then → now — on the timeline and threaded as a reply to the original post.
 - **Graduation** is a detector event (tick: seen on the curve → listed graduated; cold start only learns).
 - **Daily digest** (`agent/digest.mjs`): one post per UTC day after 17:00, counts over the last 24 h.
+- **Warm store across jobs (2026-10-05):** each ~5h40m job used to start with an empty in-memory transfer store and spent
+  ~3.5 h re-reading cold (19–79 of 150 launches a cycle). `store.mjs` `exportStore`/`importStore` snapshot it
+  (columnar, gzip, tokens idle >12 h dropped) to `AGENT_STORE_FILE`; `agent.yml` restores/saves it with actions/cache
+  (newest `agent-store-*` wins). Cold cost is block-range scanning, not volume: 12 launches = 140 transfers, 8 min.
 
 ## 🔎 CODE AUDIT 2026-10-01 — fixed on the branch (see commits "Facts:…", "Forward test protocol v2…")
 - **Vocabulary is now precise, keep it that way:** "early wallets" (snipers + bundles: a timing fact), never

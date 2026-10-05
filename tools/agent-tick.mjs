@@ -17,13 +17,15 @@
 //      AGENT_MAX_CREDIT_PER_DAY (default 1.5) · AGENT_MAX_ORIGINALS_PER_DAY (default 15) · AGENT_DIR (default data/agent)
 //      AGENT_FORWARD_REPORT (path to the radar REPORT.txt, for the "n=" in unvalidated footers)
 // Never set RPC_URL / ALCHEMY_* for this job: token reads run on the free native node.
-import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, mkdirSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { gzipSync, gunzipSync } from "node:zlib";
 import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { runTick, emptyState } from "../agent/tick.mjs";
 import { makeOrbio } from "../agent/orbio.mjs";
 import { fetchActive, fetchGraduated } from "../pons.mjs";
 import { computeIntel } from "../intel.mjs";
+import { exportStore, importStore, storeStats } from "../store.mjs";
 import { mergeReads, boardSnapshot, dossierOf, alertsFeed } from "../agent/board-snapshot.mjs";
 import { entryOf, stateEntries, appendTimeline, backfillEntries, expired } from "../agent/timeline.mjs";
 
@@ -42,6 +44,26 @@ const dryRun = env.AGENT_DRY_RUN !== "0";
 const WATCH = process.argv.includes("--watch");
 const until = Date.now() + Number(env.AGENT_WATCH_MIN || 345) * 60e3, every = Number(env.AGENT_INTERVAL_MIN || 15) * 60e3;
 const orbio = makeOrbio({ apiKey: env.ORBIO_API_KEY || null });
+
+// The transfer store survives between jobs (AGENT_STORE_FILE, restored/saved by actions/cache in agent.yml): a warm
+// store turns every read into a delta pull from the first cycle instead of after ~3.5 h of cold reads.
+const STORE_FILE = env.AGENT_STORE_FILE || "";
+if (STORE_FILE && existsSync(STORE_FILE)) {
+  try {
+    const t = Date.now(), n = importStore(JSON.parse(gunzipSync(readFileSync(STORE_FILE)).toString()));
+    console.log(`store: restored ${n} launches (${storeStats().transfers.toLocaleString("en-US")} transfers) in ${Date.now() - t} ms`);
+  } catch (e) { console.log("store: snapshot unreadable, starting cold:", e.message); }
+}
+function saveStore() {
+  if (!STORE_FILE) return;
+  try {
+    const t = Date.now(), json = JSON.stringify(exportStore());
+    if (json.length > 1.5e9) { console.log(`store: snapshot too large to save (${json.length} bytes)`); return; }
+    writeFileSync(STORE_FILE + ".tmp", gzipSync(json)); renameSync(STORE_FILE + ".tmp", STORE_FILE);   // never leave a half-written file
+    console.log(`store: saved ${storeStats().tokens} launches in ${Date.now() - t} ms`);
+  } catch (e) { console.log("store: save failed:", e.message); }
+}
+let cycles = 0;
 let state = read("state.json", emptyState());
 let reads = read("board-reads.json", {}), boardStats = null;   // latest read per live token → board.json for the static site
 
@@ -64,7 +86,9 @@ for (;;) {
   timelines(r.out, prevReads);
   if (r.out.stats) boardStats = r.out.stats;
   persist(r.out);
-  if (!WATCH || Date.now() + every > until) break;
+  const lastCycle = !WATCH || Date.now() + every > until;
+  if (lastCycle || ++cycles % 4 === 0) saveStore();   // hourly too, so a job that dies mid-way still hands most of it on
+  if (lastCycle) break;
   await new Promise((s) => setTimeout(s, Math.max(0, every - (Date.now() - t0))));
 }
 

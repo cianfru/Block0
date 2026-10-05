@@ -88,11 +88,12 @@ export async function getTransfers(addr, decimals = 18, opts = {}) {
         : (await findDeployBlock(addr, latest) ?? Math.max(0, latest - FALLBACK_SPAN));
     }
     const ev = await fillTimestamps(await pullTransfers(addr, deployBlock, latest, decimals), latest);
-    s = { ev, lastBlock: latest, deployBlock, pool: ((opts.pool || "").toLowerCase() || detectPool(ev) || ""), newN: ev.length };
+    s = { ev, lastBlock: latest, deployBlock, pool: ((opts.pool || "").toLowerCase() || detectPool(ev) || ""), newN: ev.length, usedAt: Date.now() };
     S.set(addr, s);
     return { ev: s.ev, pool: s.pool, deployBlock, latest, fresh: true, newN: ev.length };
   }
 
+  s.usedAt = Date.now();
   if (opts.pool && !s.pool) s.pool = opts.pool.toLowerCase();
   if (latest > s.lastBlock) {
     const delta = await fillTimestamps(await pullTransfers(addr, s.lastBlock + 1, latest, decimals), latest);
@@ -111,3 +112,35 @@ export function storeStats() {
 // Drop a token from the store (e.g. it fell off the board) so memory doesn't grow unbounded.
 export function evict(addr) { S.delete((addr || "").toLowerCase()); }
 export function keep(addrs) { const set = new Set(addrs.map((a) => (a || "").toLowerCase())); for (const a of [...S.keys()]) if (!set.has(a)) S.delete(a); }
+
+// SNAPSHOT — carry the store from one process to the next (the agent runs as a chain of ~5h40m jobs; a cold store
+// cost each job its first ~3.5 h, reading 19–79 of 150 launches a cycle — measured 2026-10-05). A snapshot is just the
+// transfers already pulled plus the block they run to, so the next process continues with a delta pull from
+// lastBlock + 1, exactly as if it had never stopped. Columnar with an address dictionary (~30 bytes a transfer before
+// gzip). Tokens not read for maxIdleMs are left out, so the snapshot tracks the live working set, not history.
+export function exportStore({ maxIdleMs = 12 * 3600e3, now = Date.now() } = {}) {
+  const dict = [], ix = new Map(), id = (a) => { let i = ix.get(a); if (i == null) { i = dict.length; dict.push(a); ix.set(a, i); } return i; };
+  const tokens = {};
+  for (const [addr, s] of S) {
+    if (s.usedAt != null && now - s.usedAt > maxIdleMs) continue;
+    const ev = s.ev, n = ev.length;
+    const c = { from: new Array(n), to: new Array(n), amt: new Array(n), block: new Array(n), ts: new Array(n), li: new Array(n) };
+    for (let k = 0; k < n; k++) { const e = ev[k]; c.from[k] = id(e.from); c.to[k] = id(e.to); c.amt[k] = e.amt; c.block[k] = e.block; c.ts[k] = e.ts ?? null; c.li[k] = e.li ?? 0; }
+    tokens[addr] = { lastBlock: s.lastBlock, deployBlock: s.deployBlock, pool: s.pool || "", usedAt: s.usedAt ?? now, ev: c };
+  }
+  return { v: 1, savedAt: now, dict, tokens };
+}
+// → number of tokens restored. A malformed or foreign snapshot restores nothing (the store simply starts cold).
+export function importStore(snap) {
+  if (!snap || snap.v !== 1 || !Array.isArray(snap.dict) || !snap.tokens) return 0;
+  let n = 0;
+  for (const [addr, t] of Object.entries(snap.tokens)) {
+    const c = t.ev, len = c?.block?.length ?? 0;
+    if (!len && t.lastBlock == null) continue;
+    const ev = new Array(len);
+    for (let k = 0; k < len; k++) ev[k] = { from: snap.dict[c.from[k]], to: snap.dict[c.to[k]], amt: c.amt[k], block: c.block[k], ts: c.ts[k], li: c.li[k] };
+    S.set(addr, { ev, lastBlock: t.lastBlock, deployBlock: t.deployBlock, pool: t.pool || "", newN: 0, usedAt: t.usedAt });
+    n++;
+  }
+  return n;
+}
