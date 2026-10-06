@@ -357,3 +357,19 @@ test("graduation: a launch not re-read this cycle takes its facts from the agent
   const t2 = await runTick({ ...x, state: t1.state, now: NOW + 900e3, dryRun: true, lastRead: (a) => (a === A(1) ? { flags: { holders: 412, top10Pct: 31, sniperHeldPct: 8 } } : null) });
   assert.match(t2.out.events.find((e) => e.kind === "graduated").headline, /412 holders · top 10 wallets hold 31% · early wallets hold 8%/);
 });
+
+test("candidates: plain Pons launches are read even when Orbio agents alone exceed the cap", async () => {
+  const launchedAt = Math.floor((NOW - 5 * 3600e3) / 1000);
+  const agents = Array.from({ length: 200 }, (_, i) => ({ ...raw(i + 10), token: "0x" + String(i + 10).padStart(40, "a"), launchedAt: String(launchedAt) }));
+  const x = world();
+  x.orbio.allAgents = async () => ({ agents, orbioUsd: 0.1 });
+  const pons = { address: "0x" + "f".repeat(40), sym: "PONS", mcapUsd: 60000, launchedAt: new Date(NOW - 5 * 3600e3).toISOString() };
+  x.pons.fetchActive = async () => ({ items: [pons] });
+  const read = [];
+  x.readToken = async (t) => { read.push(t.address); return { sym: t.sym, risk: 10, flags: { holders: 50 } }; };
+  // a cap below the number of Orbio agents, as in production (575 eligible agents vs the old cap of 150)
+  const t1 = await runTick({ ...x, now: NOW, dryRun: true, opts: { maxProfiles: 120 } });
+  const t2 = await runTick({ ...x, state: t1.state, now: NOW + 900e3, dryRun: true, opts: { maxProfiles: 120 } });
+  assert.ok(read.includes(pons.address), "the Pons launch was never read");
+  assert.ok(t2.out.tokens.length <= 120);
+});

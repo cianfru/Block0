@@ -18,10 +18,11 @@ import { parseMention, resolveSymbol, selectMentions } from "./mentions.mjs";
 import { OrbioError, FREE, postOutcome, mentionsOf } from "./orbio.mjs";
 import { deployerReputation, compactRep } from "../deployer.mjs";
 
-// maxProfiles is a ceiling, not the working limit — the time budget is. A token's FIRST read in a process is a full
-// history pull (a busy 2-day-old token: 36 s, 226 eth_getLogs on the free node); every later read is a delta
-// (0.1 s, 1 call). So a long-lived --watch process converges to re-reading every live candidate each cycle.
-export const DEFAULTS = { maxAgeH: 72, minMcap: 5000, maxProfiles: 150, timeBudgetMs: 8 * 60e3, concurrency: 3, keepDays: 7 };
+// maxProfiles is a ceiling, not the working limit — the time budget is. A token's FIRST read is a full history pull
+// (a busy 2-day-old token: 36 s, 226 eth_getLogs on the free node); every later read is a delta (0.1 s, 1 call), and the
+// store now survives between jobs (PR #25: 150 warm reads in ~54 s). At 150 the cap starved every plain Pons launch:
+// ~575 Orbio agents were eligible and went first, so graduating Pons launches were never read once (2026-10-06).
+export const DEFAULTS = { maxAgeH: 72, minMcap: 5000, maxProfiles: 800, timeBudgetMs: 8 * 60e3, concurrency: 3, keepDays: 7 };
 
 export function emptyState() {
   return { prevAgents: {}, lastFiredAgents: {}, prevBoard: {}, lastFiredBoard: {}, profiledAt: {}, perToken: {}, budget: null, answered: {}, replyAttempts: {}, stoppedDay: null, follow: {} };
@@ -63,10 +64,10 @@ export async function runTick(deps) {
   };
 
   // 3 · candidates: young, not dust; launches with a follow-up due within the hour first (it needs their wallets'
-  //     balances), then Orbio agents, then the least recently read (rotation under the cap)
+  //     balances), then the least recently read across BOTH venues (never-read first), Orbio vs Pons only as a tiebreak
   const watch = watchList(state.follow, now);
   const cands = [...universe.values()].filter((t) => { const h = ageH(t); return watch[t.address] || (h != null && h >= 0 && h <= o.maxAgeH && (t.mcapUsd || 0) >= o.minMcap); })
-    .sort((x, y) => (!!watch[y.address] - !!watch[x.address]) || (agentByToken.has(y.address) - agentByToken.has(x.address)) || ((state.profiledAt[x.address] || 0) - (state.profiledAt[y.address] || 0)) || (y.mcapUsd || 0) - (x.mcapUsd || 0))
+    .sort((x, y) => (!!watch[y.address] - !!watch[x.address]) || ((state.profiledAt[x.address] || 0) - (state.profiledAt[y.address] || 0)) || (agentByToken.has(y.address) - agentByToken.has(x.address)) || (y.mcapUsd || 0) - (x.mcapUsd || 0))
     .slice(0, o.maxProfiles);
 
   // 4 · read candidates (computeIntel on the free node), `concurrency` at a time; stop starting new reads at the
