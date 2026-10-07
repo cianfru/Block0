@@ -27,7 +27,8 @@
 //              70% and later 30% of events, and close7 mean percentile > 0.5. No verdict below 30 scored events.
 //
 //
-//   ⚠ SUPERSEDED BY PROTOCOL v3 (2026-10-01) — tools/radar-protocol.mjs holds the rules now in force (event ids, own
+//   ⚠ SUPERSEDED BY PROTOCOL v3 (2026-10-01) and v4 (2026-10-07, controls for young events) — tools/radar-protocol.mjs
+//   holds the rules now in force (event ids, own
 //   controls only, a post-entry outcome window, covered endpoints, transient failures retried). The text above is
 //   kept as the record of what v1 promised; v1/v2 rows stay in the log and are not scored.
 //
@@ -42,7 +43,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { loadWallets, makeFeed, marketFor } from "../radar-feed.mjs";
 import { fetchActive, fetchGraduated } from "../pons.mjs";
-import { PROTOCOL, eventId, outcomeFromCandles, report as reportOf, EMPTY_RUNS } from "./radar-protocol.mjs";
+import { PROTOCOL, SCORED, eventId, outcomeFromCandles, controlEligible, report as reportOf, EMPTY_RUNS } from "./radar-protocol.mjs";
 
 const DIR = process.env.RADAR_DIR || join("data", "radar"), LOG = join(DIR, "log.jsonl");
 const ONCE = process.argv.includes("--once"), WINDOW_H = ONCE ? 1.5 : 1, POLL_MS = 60000, WEEK = 7 * 86400, N_CTL = 4;
@@ -61,7 +62,7 @@ else await watch();
 async function watch() {
   const W = loadWallets(), feed = makeFeed(W);
   // one event per token per 7 days within the current protocol; legacy events do not block the new cohort
-  const recent = new Map(readLog().filter((r) => r.kind === "event" && r.v === PROTOCOL).map((r) => [r.token, r.t]));
+  const recent = new Map(readLog().filter((r) => r.kind === "event" && SCORED.has(r.v)).map((r) => [r.token, r.t]));
   console.log(`radar-log · ${W.wallets.length} wallets · ${LOG} · ${recent.size} events so far`);
   const stopAt = MINUTES ? Date.now() + MINUTES * 60e3 : Infinity;
   let committedAt = Date.now();
@@ -85,7 +86,7 @@ async function watch() {
           if (!(ev.mcapUsd > 0) || !ev.pairCreatedAt) continue;
           universe ??= await launches();
           const age = t - ev.pairCreatedAt;
-          const pool = universe.filter((u) => !touched.has(u.address) && u.address !== r.token && u.mcapUsd >= ev.mcapUsd * 0.5 && u.mcapUsd <= ev.mcapUsd * 2 && u.age >= age * 0.5 && u.age <= age * 2);
+          const pool = universe.filter((u) => !touched.has(u.address) && u.address !== r.token && controlEligible({ mcapUsd: ev.mcapUsd, age }, u));
           for (const c of shuffle(pool).slice(0, N_CTL)) {
             const cm = (await marketFor([c.address]))[c.address];
             if (!cm?.priceUsd) continue;
@@ -114,8 +115,10 @@ async function launches() {
   try {
     const [g, a] = await Promise.all([fetchGraduated(), fetchActive({ pageSize: 100, sort: "newest" })]);
     for (const x of [...a.items, ...g.items]) if (x.mcapUsd > 0 && x.launchedAt) out.push({ address: x.address, mcapUsd: x.mcapUsd, age: t - Date.parse(x.launchedAt) / 1000 });
-  } catch (e) { console.log("  pons unreachable — falling back to GeckoTerminal new pools:", e.message); }
-  if (!out.length) {
+  } catch (e) { console.log("  pons unreachable:", e.message); }
+  // v4: GeckoTerminal's new pools are always part of the control universe — they are the young, indexed (priceable)
+  // launches a minutes-old convergence has to be compared with
+  {
     for (let page = 1; page <= 5; page++) {
       try {
         const d = await (await fetch(`https://api.geckoterminal.com/api/v2/networks/robinhood/new_pools?page=${page}`)).json();
@@ -128,7 +131,7 @@ async function launches() {
       await new Promise((s) => setTimeout(s, 2500));
     }
   }
-  return out;
+  return [...new Map(out.map((u) => [u.address, u])).values()];   // a launch listed by both sources counts once
 }
 function shuffle(a) { const b = a.slice(); for (let i = b.length - 1; i > 0; i--) { const j = Math.floor(Math.random() * (i + 1)); [b[i], b[j]] = [b[j], b[i]]; } return b; }
 
@@ -151,7 +154,7 @@ async function outcomes() {
     return null;
   };
   for (const r of rows) {
-    if (r.v !== PROTOCOL || r.peak7 != null || r.outcomeNote || !r.pool || !r.priceUsd || now() < r.t + WEEK + 3600) continue;
+    if (!SCORED.has(r.v) || r.peak7 != null || r.outcomeNote || !r.pool || !r.priceUsd || now() < r.t + WEEK + 3600) continue;
     const list = await candles(r);
     if (list == null) { transient++; continue; }
     const o = outcomeFromCandles(r.t, r.priceUsd, list);
