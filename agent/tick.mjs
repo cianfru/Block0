@@ -94,6 +94,8 @@ export async function runTick(deps) {
   // forget tokens not read for a week (state stays small)
   for (const a of Object.keys(state.profiledAt)) if (now - state.profiledAt[a] > o.keepDays * 86400e3) { delete state.profiledAt[a]; delete state.prevBoard[a]; }
 
+  // a share as words: rounding 0.4% to "0%" would read as "none"
+  const pctWord = (x) => (x <= 0 ? "none" : x < 1 ? "under 1%" : Math.round(x) + "%");
   // 4b · graduation: a launch seen on the bonding curve and now listed graduated. A cold start (no memory of which
   //      launches were on the curve) only learns, so a backlog of old graduations can never fire.
   const ge = [], cold = state.ungrad == null, ungrad = { ...(state.ungrad || {}) };
@@ -104,7 +106,7 @@ export async function runTick(deps) {
       // launches graduate within hours, often before this cycle reached them: fall back to the agent's last read
       const r = tokens.find((x) => x.address === t.address) || deps.lastRead?.(t.address) || null, f = r?.flags || {}, h = ageH(t);
       const facts = [h != null && `${h < 48 ? Math.round(h) + "h" : Math.round(h / 24) + "d"} after launch`, f.holders != null && `${f.holders.toLocaleString("en-US")} holders`,
-        f.top10Pct != null && `top 10 wallets hold ${Math.round(f.top10Pct)}%`, f.sniperHeldPct != null && `early wallets hold ${Math.round(f.sniperHeldPct)}%`].filter(Boolean);
+        f.top10Pct != null && `top 10 wallets hold ${Math.round(f.top10Pct)}%`, f.sniperHeldPct != null && `early wallets hold ${pctWord(f.sniperHeldPct)}`].filter(Boolean);
       ge.push({ id: `graduated:${t.address}:${now}`, kind: "graduated", sev: "info", at: now, address: t.address, sym: t.sym ?? r?.sym ?? null,
         mcapUsd: t.mcapUsd ?? null, ageH: h, holders: f.holders ?? null, risk: r?.risk ?? null, venue: agentByToken.has(t.address) ? "orbio-agent" : "pons",
         detail: { holders: f.holders ?? null, top10Pct: f.top10Pct ?? null, earlyHeldPct: f.sniperHeldPct ?? null, bundles: f.bundles ?? null },

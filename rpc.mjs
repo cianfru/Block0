@@ -36,16 +36,28 @@ export const TRANSFER_TOPIC = "0xddf252ad1be2c89b69c2b068fc378daa952ba7f163c4a11
 export const LOGS_RANGE = Number(process.env.LOGS_RANGE || 8000); // generic-RPC eth_getLogs span (RH serves 10k)
 
 let rid = 1;
+// THROTTLE: the free node answers 403 (as well as 429) when one IP sends too much — measured 2026-10-07, dozens of reads
+// a cycle refused once the agent read ~370 launches per cycle. Each request used to retry on its own after 0.35–2 s
+// while its neighbours kept firing, so the block never lifted and the read was dropped. Now a 403/429 pauses EVERY
+// request in the process (pauseUntil), growing with consecutive throttles and resetting on the first success.
+const BLOCK_MS = Number(process.env.RPC_BLOCK_BACKOFF_MS || 2000);
+let pauseUntil = 0, throttles = 0;
+export const rpcThrottle = () => ({ pauseUntil, throttles });
+const waitPause = async () => { while (Date.now() < pauseUntil) await new Promise((s) => setTimeout(s, pauseUntil - Date.now())); };
 export async function rpc(method, params, tries = 6) {
   const body = JSON.stringify({ jsonrpc: "2.0", id: rid++, method, params });
   let err;
   for (let t = 0; t < tries; t++) {
     try {
+      await waitPause();
       const r = await fetch(RPCS[t % RPCS.length], { method: "POST", headers: UA, body });
-      if (r.status === 429) { // rate-limited: honour Retry-After, else back off much harder than a transient error
+      if (r.status === 429 || r.status === 403) { // throttled: honour Retry-After, else pause everyone, harder each time
         const ra = Number(r.headers.get("retry-after")) || 0;
-        err = new Error("http 429"); await new Promise((s) => setTimeout(s, ra ? ra * 1000 : 1500 * (t + 1))); continue;
+        throttles++;
+        pauseUntil = Math.max(pauseUntil, Date.now() + (ra ? ra * 1000 : Math.min(60e3, BLOCK_MS * 2 ** Math.min(throttles - 1, 5))));
+        err = new Error("http " + r.status); continue;
       }
+      throttles = 0;
       if (!r.ok) throw new Error("http " + r.status);
       const j = await r.json();
       if (j.error) throw new Error(j.error.message || "rpc error");
