@@ -356,6 +356,8 @@ test("graduation: a launch not re-read this cycle takes its facts from the agent
   const x = w(true); x.readToken = async () => { throw new Error("not read this cycle"); };
   const t2 = await runTick({ ...x, state: t1.state, now: NOW + 900e3, dryRun: true, lastRead: (a) => (a === A(1) ? { flags: { holders: 412, top10Pct: 31, sniperHeldPct: 8 } } : null) });
   assert.match(t2.out.events.find((e) => e.kind === "graduated").headline, /412 holders · top 10 wallets hold 31% · early wallets hold 8%/);
+  const t3 = await runTick({ ...x, state: t1.state, now: NOW + 900e3, dryRun: true, lastRead: (a) => (a === A(1) ? { flags: { holders: 9, top10Pct: 31, sniperHeldPct: 0.4 } } : null) });
+  assert.match(t3.out.events.find((e) => e.kind === "graduated").headline, /early wallets hold under 1%$/);
 });
 
 test("candidates: plain Pons launches are read even when Orbio agents alone exceed the cap", async () => {
