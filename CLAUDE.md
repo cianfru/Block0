@@ -36,6 +36,19 @@ event lifecycle/follow-ups → watchlist → published editorial policy. Not a p
   universe. v3 + v4 events are scored together (`SCORED`), each against its own controls; the report shows both.
   Unpriced events (311/534, curve launches never listed on a DEX) cannot be scored by any rule — no market candles.
 
+## 📚 WHAT WE KEEP (2026-10-07, owner: "understand what data we have and how to leverage it")
+- **Read history** (`agent/history.mjs`): one compact row per launch per hour → `agent-data/history/<day>.jsonl`, 60 days.
+  The record a later, PRE-REGISTERED test of launch paths needs (do launches that graduate look different at h1/6/24?).
+  Never shown as a signal.
+- **Owner track records** (`agent/owners.mjs`, `/owner?a=`, `/api/owner/:a` → `agent-data/owners/<a>.json`): the
+  launchpad's own count (Orbio agent list; Pons `/api/deployers`, complete, refreshed 6 h) + the owner's launches we
+  know. The dossier's deployer section links to it. Pons repeat deployers (≥3 earlier, 0 graduated, launch <1 h old)
+  now fire `serial-owner` too; ≥5 is material. Facts about a wallet, never a judgement of a person (no red on counts).
+- **The week in numbers** (`agent/stats.mjs`, `/stats` "This week", `/api/stats` → `stats.json`): Orbio launches and
+  graduations, single vs repeat owners, fees and their concentration, Pons graduations, events, launch structure.
+  Posted Mondays 17:00 UTC (dry run until live). First inventory (10-07): Orbio 1,661 agents / 19 graduated; one-agent
+  owners 18 of 1,078 graduated (1.7%), owners with 5+ agents 1 of 282 (0.4%); top-10 agents hold 58% of fees.
+
 ## 🔎 CODE AUDIT 2026-10-01 — fixed on the branch (see commits "Facts:…", "Forward test protocol v2…")
 - **Vocabulary is now precise, keep it that way:** "early wallets" (snipers + bundles: a timing fact), never
   "insiders". **Selling = tokens sent into a venue** (pool/curve/AMM/router); anything else is `earlyMovedOutNow`

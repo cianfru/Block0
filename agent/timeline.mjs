@@ -25,6 +25,7 @@ export function evidenceOf(ev) {
     wallets: (d.wallets || []).map((w) => ({ a: w.a, amt: w.amt ?? null, block: w.block ?? null, bal: w.bal ?? null })),
     note: "early wallet = a sniper (first buy within 3 blocks of the first pool buy) or a same-block bundle; a sale = tokens sent into the pool or curve in the 30 minutes before the read" };
   if (ev.kind === "graduated") return { source: "Pons launchpad listing (graduated flag) + the launch's own transfers", detail: d };
+  if (ev.kind === "serial-owner" && ev.venue === "pons") return { source: "Pons launchpad's deployer record (ponsfamily.com /api/deployers)", owner: ev.owner ?? null, detail: d };
   if (AGENT_KINDS[ev.kind]) return { source: ORBIO, owner: ev.owner ?? null, agentId: ev.agentId ?? null, detail: d };
   return { source: CHAIN, detail: d };
 }

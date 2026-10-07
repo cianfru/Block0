@@ -176,7 +176,7 @@
 <header class="hd">
   <div class="hd-in">
     <a href="/" class="wordmark">block<b>0</b></a>
-    <nav class="nav"><a href="/board">Live feed</a><a href="/token" class="on">Look up a launch</a><a href="/radar">Radar</a><a href="/methodology">How it works</a></nav>
+    <nav class="nav"><a href="/board">Live feed</a><a href="/stats">This week</a><a href="/token" class="on">Look up a launch</a><a href="/radar">Radar</a><a href="/methodology">How it works</a></nav>
     <div class="hd-r">
       <a class="chip chainchip" href="/board">← live feed</a>
       <span class="chip blockclock"></span>
@@ -472,7 +472,8 @@ function render(d) {
         : `The launchpad did not report a ${who} for this token.`);
 
   const deployer = `<section class="sec"><p class="eyebrow">${owner ? "Owner <b>· Orbio agent</b>" : "Deployer"}</p>${depBody}
-    ${dep.scope && dep.launched > 1 ? `<p class="prov">Counted across ${esc(dep.scope)}.</p>` : ""}</section>`;
+    ${dep.scope && dep.launched > 1 ? `<p class="prov">Counted across ${esc(dep.scope)}.</p>` : ""}
+    ${dep.address ? `<p style="margin-top:14px"><a class="chip" href="/owner?a=${esc(dep.address)}">Every launch by this ${who} →</a></p>` : ""}</section>`;
 
   const price = `<section class="sec"><p class="eyebrow">Price <b>· context, not the product</b></p>
     <div id="pricebox">${unavailable("Price history", "Loading market data…")}</div></section>`;

@@ -11,6 +11,7 @@ import { detectEvents } from "../alert-events.mjs";
 import { normAgent, agentEvents } from "./agent-events.mjs";
 import { formatPost, formatReply, lint, UNVALIDATED } from "./format.mjs";
 import { digestDue, remember, digestStats, formatDigest } from "./digest.mjs";
+import { weeklyStats, weeklyDue, weekKey, formatWeekly } from "./stats.mjs";
 import { notMaterial } from "./materiality.mjs";
 import { openFollowUps, watchList, writeFollowUp, formatFollowUp, followUpEntry } from "./followups.mjs";
 import { plan, record, canReply, canSpend, settle, freshBudget, POST_MAX_COST, MENTION_MAX_COST } from "./budget.mjs";
@@ -45,22 +46,28 @@ export async function runTick(deps) {
 
   // 2 · launch universe (free): Pons active (newest) + graduated, tagged with Orbio membership
   const universe = new Map();
+  let ponsGrads = [];
   try {
     const [act, grad] = await Promise.all([pons.fetchActive({ pageSize: 100, sort: "newest", age: "7d" }), pons.fetchGraduated()]);
+    ponsGrads = grad.items;
     for (const t of [...act.items, ...grad.items]) if (t.address) universe.set(t.address, t);
     out.stats = { launchTotal: act.launchTotal || null, graduatedTotal: grad.items.length || null };
   } catch (e) { out.errors.push("pons: " + e.message); }
   for (const a of agents) if (!universe.has(a.address)) universe.set(a.address, { address: a.address, sym: a.sym, mcapUsd: a.mcapUsd, launchedAt: a.launchedAt ? new Date(a.launchedAt * 1000).toISOString() : null, graduated: a.graduated });
   const ageH = (t) => (t.launchedAt ? (now - Date.parse(t.launchedAt)) / 3.6e6 : null);
-  // who launched it, and what else they launched. An Orbio agent's owner is checked against EVERY agent (complete);
-  // a Pons deployer only against the launches in view (latest 100 of the last 7 days + every graduated token).
+  // who launched it, and what else they launched. An Orbio agent's owner is checked against EVERY agent (complete); a
+  // Pons deployer against Pons's own record of that deployer (/api/deployers, complete, refreshed every 6 h), falling
+  // back to the launches in view when that is unavailable.
   const launchList = [...universe.values()];
+  state.deployers ||= {};
   const deployerOf = (t) => {
     const ag = agentByToken.get(t.address);
     if (ag?.owner) { const prior = agents.filter((x) => x.owner === ag.owner);
       return { address: ag.owner, launched: prior.length, graduated: prior.filter((x) => x.graduated).length, faded: null, scope: "every Orbio agent" }; }
+    const d = t.deployer && state.deployers[t.deployer];
+    if (d && d.launches != null) return { address: t.deployer, launched: d.launches, graduated: d.graduated, faded: null, firstSeenAt: d.firstSeenAt ?? null, scope: "every Pons launch (Pons's own count)" };
     const r = compactRep(deployerReputation(launchList, t));
-    return r ? { ...r, scope: "the latest 100 Pons launches (7 days) and every graduated token" } : null;
+    return r ? { ...r, scope: "the Pons launches in view (recent pages and graduations)" } : null;
   };
 
   // 3 · candidates: young, not dust; launches with a follow-up due within the hour first (it needs their wallets'
@@ -69,6 +76,17 @@ export async function runTick(deps) {
   const cands = [...universe.values()].filter((t) => { const h = ageH(t); return watch[t.address] || (h != null && h >= 0 && h <= o.maxAgeH && (t.mcapUsd || 0) >= o.minMcap); })
     .sort((x, y) => (!!watch[y.address] - !!watch[x.address]) || ((state.profiledAt[x.address] || 0) - (state.profiledAt[y.address] || 0)) || (agentByToken.has(y.address) - agentByToken.has(x.address)) || (y.mcapUsd || 0) - (x.mcapUsd || 0))
     .slice(0, o.maxProfiles);
+
+  // 3b · Pons deployer records for the candidates (one call per 40 deployers, each kept 6 h)
+  if (pons.fetchDeployers) {
+    const stale = [...new Set(cands.filter((t) => !agentByToken.has(t.address) && t.deployer).map((t) => t.deployer))]
+      .filter((a) => !state.deployers[a] || now - state.deployers[a].at > 6 * 3600e3);
+    if (stale.length) {
+      try { const got = await pons.fetchDeployers(stale); for (const a of stale) state.deployers[a] = { ...(got[a] || { launches: null }), at: now }; }
+      catch (e) { out.errors.push("pons deployers: " + e.message); }
+    }
+    for (const [a, d] of Object.entries(state.deployers)) if (now - d.at > o.keepDays * 86400e3) delete state.deployers[a];
+  }
 
   // 4 · read candidates (computeIntel on the free node), `concurrency` at a time; stop starting new reads at the
   //     time budget (reads already in flight finish)
@@ -117,8 +135,25 @@ export async function runTick(deps) {
   for (const [a, at] of Object.entries(ungrad)) if (now - at > o.keepDays * 86400e3) delete ungrad[a];
   state.ungrad = ungrad;
 
+  // 4c · a repeat Pons deployer's new launch: fired once per launch, only while it is under an hour old (so a restart
+  //      or this code's first run cannot fire a backlog); the bar for posting is agent/materiality.mjs (≥5 earlier)
+  state.serialFired ||= {};
+  const pe = [];
+  for (const t of cands) {
+    const d = t.deployer && state.deployers[t.deployer], h = ageH(t);
+    if (agentByToken.has(t.address) || !d || d.launches == null || state.serialFired[t.address] || h == null || h > 1) continue;
+    const prior = d.launches - 1;
+    if (prior >= 3 && d.graduated === 0) {
+      state.serialFired[t.address] = now;
+      pe.push({ id: `serial-owner:${t.address}:${now}`, kind: "serial-owner", sev: "bad", at: now, address: t.address, sym: t.sym ?? null, mcapUsd: t.mcapUsd ?? null,
+        ageH: h, venue: "pons", owner: t.deployer, detail: { prior, graduated: 0, source: "pons" },
+        headline: `deployer launched ${prior.toLocaleString("en-US")} tokens before this one · 0 graduated` });
+    }
+  }
+  for (const [a, at] of Object.entries(state.serialFired)) if (now - at > o.keepDays * 86400e3) delete state.serialFired[a];
+
   // 5 · gate: unvalidated kinds are logged only; the rest go through caps + lint
-  const all = [...be.events, ...ae.events, ...ge];
+  const all = [...be.events, ...ae.events, ...ge, ...pe];
   // every detected event, with the numbers and evidence it fired on; `fate` (what the agent did with it) is set below
   out.events = all.map((e) => ({ id: e.id, at: now, kind: e.kind, address: e.address, sym: e.sym ?? null, headline: e.headline ?? null,
     validated: !UNVALIDATED.has(e.kind), mcapUsd: e.mcapUsd ?? null, holders: e.holders ?? null, risk: e.risk ?? null, ageH: e.ageH ?? null,
@@ -229,6 +264,25 @@ export async function runTick(deps) {
   }
   for (const [id, f] of Object.entries(state.follow)) if (now - f.due > 3 * 86400e3) delete state.follow[id];
 
+  // 7b2 · the week in numbers (agent/stats.mjs): every cycle for the /stats page, posted once a week (Monday 17:00 UTC)
+  if (deps.weekRecord) {
+    out.weekly = weeklyStats({ agents, ponsGrads, events: deps.weekRecord.events, reads: deps.weekRecord.reads, now });
+    if (weeklyDue(state.weekKey, now) && agents.length) {
+      state.weekKey = weekKey(now);
+      const text = formatWeekly(out.weekly);
+      if (dryRun) { out.dryRun.push({ at: now, kind: "weekly", text }); state.budget = record(state.budget, { now, credit: 0 }); }
+      else if (platform && !lint(text).length && canSpend(state.budget, POST_MAX_COST, { now, caps }) && state.stoppedDay !== new Date(now).toISOString().slice(0, 10)) {
+        try {
+          state.budget = record(state.budget, { now, credit: POST_MAX_COST });
+          const r = await orbio.tool("social.post", { platforms: [platform], text }, String(POST_MAX_COST));
+          state.budget = settle(state.budget, POST_MAX_COST, r, now);
+          const o = postOutcome(r.result);
+          if (o.status !== "failed") out.posted.push({ at: now, kind: "weekly", text, ...o });
+        } catch (e) { stopDay(e); out.errors.push("weekly post: " + e.message); }
+      }
+    }
+  }
+
   // 7c · the daily digest: counts over the last 24 h, once per UTC day
   state.recent = remember(state.recent, out.events, now);
   if (digestDue(state.digestDay, now)) {
@@ -315,6 +369,16 @@ export async function runTick(deps) {
   state.budget = freshBudget(state.budget, now);
 
   out.tokens = tokens;
+  // owners of the launches read this cycle, for their track-record files (agent/owners.mjs): an Orbio owner with every
+  // agent they own, a Pons deployer with Pons's own count and the launch just read
+  out.owners = [];
+  for (const t of tokens) {
+    const d = t.deployer; if (!d?.address) continue;
+    const ag = agentByToken.get(t.address), at = t.ageH != null ? Math.round(now - t.ageH * 3.6e6) : null;
+    const launches = ag?.owner ? agents.filter((x) => x.owner === ag.owner).map((x) => ({ address: x.address, sym: x.sym, at: x.launchedAt ? x.launchedAt * 1000 : null, graduated: x.graduated, mcapUsd: x.mcapUsd }))
+      : [{ address: t.address, sym: t.sym, at, graduated: t.graduated, mcapUsd: t.mcapUsd }];
+    out.owners.push({ address: d.address, venue: ag?.owner ? "orbio" : "pons", record: { launched: d.launched ?? null, graduated: d.graduated ?? null, firstSeenAt: d.firstSeenAt ?? null, scope: d.scope ?? null }, launches });
+  }
   log(`agents ${agents.length} · candidates ${cands.length} · read ${tokens.length} · events ${all.length} · ${dryRun ? "dry-run" : "posted"} ${dryRun ? out.dryRun.length : out.posted.length} · held ${out.held.length} · logged ${out.logged.length} · errors ${out.errors.length}`);
   return { state, out };
 }

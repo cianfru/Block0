@@ -8,7 +8,9 @@
     { "source": "/api/board", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/board.json" },
     { "source": "/api/alerts/feed", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/alerts.json" },
     { "source": "/api/dossier/:addr", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/tokens/:addr.json" },
-    { "source": "/api/timeline/:addr", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/timelines/:addr.json" }
+    { "source": "/api/timeline/:addr", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/timelines/:addr.json" },
+    { "source": "/api/stats", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/stats.json" },
+    { "source": "/api/owner/:addr", "destination": "https://raw.githubusercontent.com/cianfru/Block0/agent-data/owners/:addr.json" }
   ],
   "redirects": [
     { "source": "/leaderboard", "destination": "/radar", "permanent": false },

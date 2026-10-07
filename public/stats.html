@@ -1,0 +1,146 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>This week on Robinhood Chain — Block0</title>
+<meta name="description" content="The last 7 days of Pons and Orbio launches in numbers: how many launched, how many graduated, what repeat owners did, how concentrated launches are. From the launchpads' own lists and Block0's reads.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+<style>
+  .st-hero{padding:46px 0 6px}
+  .st-hero h1{font-size:clamp(2.1rem,4.6vw,3rem);line-height:1.05;margin:10px 0 0}
+  .st-hero h1 em{font-style:italic;color:var(--brand)}
+  .st-hero .sub{margin-top:12px;max-width:62ch;color:var(--dim);font-size:.95rem;line-height:1.55}
+  .block{margin-top:34px}
+  .block h2{font-family:var(--sans);font-size:.7rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:0 0 12px}
+  .block h2 b{color:var(--brand)}
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden}
+  .fact{background:#121217;padding:16px 17px}
+  .fact .k{font-size:.63rem;letter-spacing:.13em;text-transform:uppercase;color:var(--mute);font-weight:700}
+  .fact .v{font-size:1.7rem;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+  .fact .v.bad{color:var(--coral)} .fact .v.good{color:var(--mint)}
+  .fact .s{font-size:.75rem;color:var(--mute);margin-top:6px;line-height:1.45}
+  .note{font-size:.84rem;color:var(--dim);line-height:1.6;margin-top:12px;max-width:72ch}
+  .prov{font-size:.72rem;color:var(--mute);font-family:var(--mono);line-height:1.7;margin-top:22px}
+  .cmp{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  @media(max-width:640px){.cmp{grid-template-columns:1fr}}
+  .cmp .c{border:1px solid var(--line);border-radius:14px;padding:16px;background:rgba(255,255,255,.02)}
+  .cmp .c h3{margin:0 0 10px;font-size:.9rem}
+  .cmp .row{display:flex;justify-content:space-between;font-size:.86rem;color:var(--dim);padding:6px 0;border-top:1px solid var(--line);font-variant-numeric:tabular-nums}
+  .cmp .row b{color:var(--tx)}
+</style>
+<script src="/blockclock.js" defer></script>
+<script src="/track.js" defer></script>
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav"><a href="/board">Live feed</a><a href="/stats" class="on">This week</a><a href="/token">Look up a launch</a><a href="/radar">Radar</a><a href="/methodology">How it works</a></nav>
+    <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span><span class="chip blockclock"></span></div>
+  </div>
+</header>
+
+<main class="wrap" style="max-width:980px">
+  <section class="st-hero">
+    <p class="micro eye">state of launches · last 7 days</p>
+    <h1>This week on <em>Robinhood Chain.</em></h1>
+    <p class="sub">Counts from the launchpads' own lists (Orbio's agents, Pons's graduations) and from Block0's reads of every live launch.
+      Descriptive numbers about what happened, recomputed every 15 minutes. None of it says what to buy.</p>
+  </section>
+  <div id="root"><div class="state">Loading the week…</div></div>
+</main>
+
+<footer class="ft">
+  <div class="ft-in">
+    <div class="ft-top">
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">What changed in a Robinhood Chain launch, who caused it, and the on-chain evidence. Never what to buy.</p></div>
+      <div class="ft-cols">
+        <div><p class="micro">Product</p><a href="/board">Live feed</a><a href="/stats">This week</a><a href="/token">Look up a launch</a><a href="/radar">Radar</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">How it works</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+      </div>
+    </div>
+    <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
+  </div>
+</footer>
+
+<script>
+const $ = (s) => document.querySelector(s);
+const n = (x) => (x == null ? "—" : Number(x).toLocaleString("en-US"));
+const p = (x) => (x == null ? "—" : x + "%");
+const usd = (x) => (x == null ? "—" : "$" + (x >= 1e6 ? (x / 1e6).toFixed(2) + "m" : x >= 1e3 ? Math.round(x / 1e3) + "k" : Math.round(x)));
+const fact = (k, v, s, cls = "") => `<div class="fact"><div class="k">${k}</div><div class="v ${cls}">${v}</div><div class="s">${s}</div></div>`;
+const rate = (a, b) => (b ? Math.round((a / b) * 1000) / 10 : null);
+(async () => {
+  const r = await fetch("/api/stats").catch(() => null);
+  const s = r && r.ok ? await r.json().catch(() => null) : null;
+  if (!s) { $("#root").innerHTML = '<div class="state">The weekly numbers are not available yet. They are written by the Block0 agent every 15 minutes.</div>'; return; }
+  const o = s.orbio, e = s.events, rd = s.reads;
+  const singleRate = rate(o.singleGraduated, o.singleOwners), repeatRate = rate(o.repeatGraduated, o.repeatLaunches);
+  $("#root").innerHTML = `
+  <section class="block"><h2>Launches <b>· 7 days</b></h2>
+    <div class="facts">
+      ${fact("Orbio agents launched", n(o.launched), `${n(o.allTime)} since Orbio opened`)}
+      ${fact("Of those, graduated", n(o.graduated), o.gradPct != null ? `${p(o.gradPct)} of this week's agents` : "")}
+      ${fact("Pons graduations", n(s.pons.graduated), "launches that left the bonding curve")}
+      ${fact("Launches being read", n(rd.launches), "under 72 h old, by Block0's agent")}
+    </div>
+  </section>
+
+  <section class="block"><h2>Who launches <b>· Orbio, all time</b></h2>
+    <div class="cmp">
+      <div class="c"><h3>Owners with one agent</h3>
+        <div class="row"><span>Owners</span><b>${n(o.singleOwners)}</b></div>
+        <div class="row"><span>Graduated</span><b>${n(o.singleGraduated)}</b></div>
+        <div class="row"><span>Rate</span><b>${p(singleRate)}</b></div></div>
+      <div class="c"><h3>Owners with 5 or more agents</h3>
+        <div class="row"><span>Owners · their launches</span><b>${n(o.repeatOwners)} · ${n(o.repeatLaunches)}</b></div>
+        <div class="row"><span>Graduated</span><b>${n(o.repeatGraduated)}</b></div>
+        <div class="row"><span>Rate</span><b>${p(repeatRate)}</b></div></div>
+    </div>
+    <p class="note">${n(o.owners)} wallets own the ${n(o.allTime)} Orbio agents. Each launch page names its owner and links to their full record.
+      A wallet's launch history is a fact about the wallet, not a judgement of the person, and graduations are few (${n(o.allTimeGraduated)} in total), so
+      treat the rates as a description, not a law.</p>
+  </section>
+
+  <section class="block"><h2>Money <b>· Orbio creator fees, all time</b></h2>
+    <div class="facts">
+      ${fact("Fees converted to credit", usd(o.feesUsd), "across every Orbio agent")}
+      ${fact("Share of the top 10 agents", p(o.feesTop10Pct), "of all converted fees")}
+    </div>
+  </section>
+
+  <section class="block"><h2>What changed <b>· detected by Block0, 7 days</b></h2>
+    <div class="facts">
+      ${fact("Early-wallet sell-offs", n(e.earlySales), `on ${n(e.earlySalesLaunches)} launches`)}
+      ${fact("Repeat-owner launches", n(e.repeatOwnerLaunches), "flagged when they appeared")}
+      ${fact("Graduations seen", n(e.graduations), "while Block0 was reading them")}
+      ${fact("Material changes", n(e.material), `of ${n(e.total)} detected, the rest kept on timelines`)}
+    </div>
+    <p class="note"><a href="/board" style="color:var(--brand)">See them on the live feed →</a></p>
+  </section>
+
+  <section class="block"><h2>What launches look like <b>· now</b></h2>
+    <div class="cmp">
+      <div class="c"><h3>On the bonding curve (${n(rd.curve.n)})</h3>
+        <div class="row"><span>Median holders</span><b>${n(rd.curve.holders)}</b></div>
+        <div class="row"><span>Median top-10 share</span><b>${p(rd.curve.top10 == null ? null : Math.round(rd.curve.top10))}</b></div></div>
+      <div class="c"><h3>Graduated (${n(rd.graduated.n)})</h3>
+        <div class="row"><span>Median holders</span><b>${n(rd.graduated.holders)}</b></div>
+        <div class="row"><span>Median top-10 share</span><b>${p(rd.graduated.top10 == null ? null : Math.round(rd.graduated.top10))}</b></div></div>
+    </div>
+    <p class="note">${p(rd.bundledPct)} of the launches being read show at least one bundle: wallets that bought in the same block at launch.</p>
+  </section>
+  <p class="prov">Computed ${new Date(s.at).toISOString().slice(0, 16).replace("T", " ")} UTC by the Block0 agent · window ${s.windowDays} days · sources: Orbio's agent list, Pons's
+    graduation list, Block0's event record and reads.</p>`;
+})();
+</script>
+</body>
+</html>

@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" type="image/svg+xml" href="/favicon.svg">
+<link rel="icon" type="image/x-icon" href="/favicon.ico" sizes="16x16 32x32 48x48">
+<link rel="apple-touch-icon" href="/apple-touch-icon.png">
+<title>Owner track record — Block0</title>
+<meta name="description" content="Every launch a wallet has made on Pons or Orbio, from the launchpad's own count: how many, how many graduated, and the ones Block0 has read.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Instrument+Serif:ital@0;1&display=swap">
+<link rel="stylesheet" href="/block0.css">
+<style>
+  .ow-hero{padding:46px 0 10px}
+  .ow-hero h1{font-size:clamp(2rem,4.4vw,2.8rem);line-height:1.05;margin:10px 0 0}
+  .ow-hero h1 em{font-style:italic;color:var(--brand)}
+  .addr{font-family:var(--mono);font-size:.82rem;color:var(--dim);margin-top:10px;word-break:break-all;cursor:pointer}
+  .facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:14px;overflow:hidden;margin-top:22px}
+  .fact{background:#121217;padding:16px 17px}
+  .fact .k{font-size:.63rem;letter-spacing:.13em;text-transform:uppercase;color:var(--mute);font-weight:700}
+  .fact .v{font-size:1.6rem;font-weight:700;margin-top:6px;font-variant-numeric:tabular-nums}
+  .fact .v.bad{color:var(--coral)} .fact .v.good{color:var(--mint)}
+  .fact .s{font-size:.74rem;color:var(--mute);margin-top:6px;line-height:1.45}
+  .prov{font-size:.72rem;color:var(--mute);font-family:var(--mono);line-height:1.7;margin-top:14px}
+  .list{display:grid;gap:8px;margin-top:14px}
+  .li{display:flex;align-items:center;gap:12px;padding:12px 14px;border:1px solid var(--line);border-radius:12px;color:var(--tx);text-decoration:none;background:rgba(255,255,255,.02)}
+  .li:hover{border-color:var(--line-2)}
+  .li .s{font-weight:700;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .li .d{font-size:.74rem;color:var(--mute);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .li .m{margin-left:auto;font-size:.8rem;color:var(--dim);font-variant-numeric:tabular-nums;white-space:nowrap}
+  .tag{font-size:.56rem;font-weight:800;letter-spacing:.1em;text-transform:uppercase;padding:2px 6px;border-radius:4px;border:1px solid var(--line);color:var(--mute)}
+  .tag.g{color:var(--mint);border-color:rgba(61,255,110,.35)}
+  h2.sh{font-family:var(--sans);font-size:.7rem;font-weight:800;letter-spacing:.16em;text-transform:uppercase;color:var(--mute);margin:34px 0 0}
+  h2.sh b{color:var(--brand)}
+  .scan{margin-top:18px}
+</style>
+<script src="/blockclock.js" defer></script>
+<script src="/track.js" defer></script>
+</head>
+<body>
+<div class="glows" aria-hidden="true"><div class="grid"></div><div class="orb a"></div><div class="orb b"></div><div class="orb c"></div></div>
+<header class="hd">
+  <div class="hd-in">
+    <a href="/" class="wordmark">block<b>0</b></a>
+    <nav class="nav"><a href="/board">Live feed</a><a href="/stats">This week</a><a href="/token">Look up a launch</a><a href="/radar">Radar</a><a href="/methodology">How it works</a></nav>
+    <div class="hd-r"><span class="chip chainchip">Robinhood Chain</span><span class="chip blockclock"></span></div>
+  </div>
+</header>
+
+<main class="wrap" style="max-width:900px">
+  <section class="ow-hero">
+    <p class="micro eye">owner track record</p>
+    <h1 id="title">What this wallet <em>launched before.</em></h1>
+    <div class="addr" id="addr"></div>
+  </section>
+  <div id="root"><div class="state">Loading…</div></div>
+  <form class="scan" onsubmit="return go(event)">
+    <input id="q" placeholder="0x… owner or deployer wallet" autocomplete="off" spellcheck="false">
+    <button class="go" type="submit">Look up</button>
+  </form>
+  <p class="caveat">Counts come from the launchpad itself (Orbio's agent list, Pons's deployer record). A launch history is a fact about a
+    wallet, not a judgement of the person behind it, and one wallet can belong to anyone. Not financial advice.</p>
+</main>
+
+<footer class="ft">
+  <div class="ft-in">
+    <div class="ft-top">
+      <div><a href="/" class="wordmark">block<b>0</b></a><p class="tag">What changed in a Robinhood Chain launch, who caused it, and the on-chain evidence. Never what to buy.</p></div>
+      <div class="ft-cols">
+        <div><p class="micro">Product</p><a href="/board">Live feed</a><a href="/stats">This week</a><a href="/token">Look up a launch</a><a href="/radar">Radar</a></div>
+        <div><p class="micro">Trust</p><a href="/methodology">How it works</a><a href="/terms">Terms</a><a href="https://github.com/cianfru/Block0">GitHub</a></div>
+      </div>
+    </div>
+    <p class="fine">Not financial advice. You are responsible for your own decisions.</p>
+  </div>
+</footer>
+
+<script src="/block0-cards.js"></script>
+<script>
+const $ = (s) => document.querySelector(s), esc = B0.esc;
+const A = (new URLSearchParams(location.search).get("a") || "").toLowerCase();
+const date = (t) => (t ? new Date(t).toISOString().slice(0, 10) : "—");
+function go(e) { e.preventDefault(); const v = $("#q").value.trim().toLowerCase(); if (/^0x[0-9a-f]{40}$/.test(v)) location.href = "/owner?a=" + v; return false; }
+window.go = go;
+function render(o) {
+  const r = o.record || {}, n = r.launched, g = r.graduated ?? 0, launches = o.launches || [];
+  const rate = n ? Math.round((g / n) * 1000) / 10 : null;
+  document.title = `${n ?? "?"} launches · ${g} graduated — Block0 owner record`;
+  $("#title").innerHTML = n != null ? `Launched <em>${n.toLocaleString("en-US")}</em> ${n === 1 ? "token" : "tokens"}, ${g} graduated.` : "What this wallet <em>launched before.</em>";
+  $("#root").innerHTML = `<div class="facts">
+      <div class="fact"><div class="k">Launches</div><div class="v">${n == null ? "—" : n.toLocaleString("en-US")}</div><div class="s">${o.venue === "orbio" ? "Orbio agents owned" : "Pons launches deployed"}</div></div>
+      <div class="fact"><div class="k">Graduated</div><div class="v ${g > 0 ? "good" : ""}">${g}</div><div class="s">left the bonding curve</div></div>
+      <div class="fact"><div class="k">Rate</div><div class="v">${rate == null ? "—" : rate + "%"}</div><div class="s">of this wallet's launches</div></div>
+      <div class="fact"><div class="k">First launch</div><div class="v" style="font-size:1.1rem">${date(r.firstSeenAt || launches.at(-1)?.at)}</div><div class="s">as far as the launchpad knows</div></div>
+    </div>
+    <p class="prov">Counted across ${esc(r.scope || "the launchpad's own record")}. Updated ${date(o.seenAt)} by the Block0 agent.</p>
+    <h2 class="sh">Launches <b>· ${launches.length} known to Block0</b></h2>
+    <div class="list">${launches.map((l) => `<a class="li" href="/token?address=${esc(l.address)}">
+        <span class="s">$${esc(l.sym && l.sym !== "?" ? l.sym : l.address.slice(0, 8) + "…")}</span><span class="d">${date(l.at)}</span>
+        ${l.graduated ? '<span class="tag g">graduated</span>' : ""}<span class="m">${l.mcapUsd ? B0.mcT(l.mcapUsd) + " mcap" : ""}</span></a>`).join("")
+      || '<p class="caveat">None of this wallet\'s launches has come through Block0\'s reads yet.</p>'}</div>
+    ${o.venue === "pons" && n > launches.length ? `<p class="prov">Block0 lists the launches it has read; Pons counts all ${n.toLocaleString("en-US")}.</p>` : ""}`;
+}
+(async () => {
+  if (!/^0x[0-9a-f]{40}$/.test(A)) { $("#root").innerHTML = '<div class="state">Paste an owner or deployer wallet below, or open one from a launch page.</div>'; return; }
+  $("#addr").textContent = A; $("#addr").title = "click to copy";
+  $("#addr").onclick = () => navigator.clipboard?.writeText(A);
+  const r = await fetch(`/api/owner/${A}`).catch(() => null);
+  const o = r && r.ok ? await r.json().catch(() => null) : null;
+  if (!o) { $("#root").innerHTML = '<div class="state">Block0 has no record for this wallet yet. Records are kept for the owners of launches the agent reads (Pons and Orbio, under 72 hours old).</div>'; return; }
+  render(o);
+  window.B0T && window.B0T("owner_view", { owner: A });
+})();
+</script>
+</body>
+</html>
