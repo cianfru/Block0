@@ -40,6 +40,7 @@ Kept deliberately to three families the data supports today:
 2. ~~Event lifecycle + follow-ups~~ — built 2026-10-03: 24 h follow-ups (`agent/followups.mjs`) on the timeline and
    threaded under the original post; materiality bar (`agent/materiality.mjs`); graduations; daily digest.
 3. ~~Watchlist~~ — built 2026-10-03: Follow on the launch page, "Following" on the live feed (browser-local, `public/follow.js`).
+3b. ~~Owner track records, read history, the week in numbers~~ — built 2026-10-07 (`/owner`, `history/`, `/stats`).
 4. **Editorial policy, published before any token launch:** identical treatment of Block0's own token, disclosed
    relationships, no favourable treatment for funding, no sensational wording.
 5. Next candidates: an explorer link per evidence row once a reliable explorer indexes the chain; transaction hashes on

@@ -375,3 +375,20 @@ test("candidates: plain Pons launches are read even when Orbio agents alone exce
   assert.ok(read.includes(pons.address), "the Pons launch was never read");
   assert.ok(t2.out.tokens.length <= 120);
 });
+
+test("pons deployers: Pons's own record names the deployer's history, and a repeat deployer's fresh launch fires once", async () => {
+  const dep = "0x" + "d".repeat(40), x = world();
+  const fresh = { address: "0x" + "e".repeat(40), sym: "NEW", mcapUsd: 30000, deployer: dep, launchedAt: new Date(NOW - 20 * 60e3).toISOString() };
+  x.pons.fetchActive = async () => ({ items: [fresh] });
+  const asked = [];
+  x.pons.fetchDeployers = async (list) => { asked.push(...list); return { [dep]: { launches: 9, graduated: 0, firstSeenAt: NOW - 86400e3, lastLaunchAt: NOW } }; };
+  const t1 = await runTick({ ...x, now: NOW, dryRun: true });
+  const ev = t1.out.events.find((e) => e.kind === "serial-owner" && e.address === fresh.address);
+  assert.ok(ev, "no repeat-deployer event");
+  assert.match(ev.headline, /deployer launched 8 tokens before this one · 0 graduated/);
+  assert.equal(ev.fate, "dry-run");                                                    // ≥5 earlier: material
+  assert.equal(t1.out.tokens.find((t) => t.address === fresh.address).deployer.scope, "every Pons launch (Pons's own count)");
+  const t2 = await runTick({ ...x, state: t1.state, now: NOW + 900e3, dryRun: true });
+  assert.ok(!t2.out.events.some((e) => e.kind === "serial-owner" && e.address === fresh.address));   // once per launch
+  assert.equal(asked.length, 1);                                                      // the record is kept 6 h, not re-fetched
+});

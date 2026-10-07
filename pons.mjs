@@ -71,6 +71,19 @@ export async function fetchGraduated({ days = 30, pages = 15, fetch: fetchImpl =
   return { items, total: items.length, observedAt: Date.now() };
 }
 
+// Pons's own record of each deployer: { address: { launches, graduated, firstSeenAt, lastLaunchAt } | null }, 40 a call.
+// Complete (every launch the deployer ever made on Pons), unlike any count over the launches we happen to have listed.
+export async function fetchDeployers(addresses, { fetch: fetchImpl = fetch } = {}) {
+  const out = {}, list = [...new Set(addresses.map((a) => String(a || "").toLowerCase()).filter((a) => /^0x[0-9a-f]{40}$/.test(a)))];
+  for (let i = 0; i < list.length; i += 40) {
+    const d = await j(`${BASE}/api/deployers?addresses=${list.slice(i, i + 40).join(",")}`, fetchImpl);
+    if (!d || typeof d.deployers !== "object") throw new Error("pons deployers schema changed");
+    for (const [a, v] of Object.entries(d.deployers)) out[a.toLowerCase()] = v ? { launches: Number(v.launches) || 0, graduated: Number(v.graduated) || 0,
+      firstSeenAt: v.firstSeenAt ? Number(v.firstSeenAt) * 1000 : null, lastLaunchAt: v.lastLaunchAt ? Number(v.lastLaunchAt) * 1000 : null } : null;
+  }
+  return out;
+}
+
 // specific launches by address (≤40 per call)
 export async function fetchLaunches(addresses, { fetch: fetchImpl = fetch } = {}) {
   const out = [];
