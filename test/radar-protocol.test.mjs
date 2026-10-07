@@ -76,3 +76,23 @@ test("v3: coverage is required in both time halves; reports do not retain stale 
   for (const x of good) if (x.kind === "control") x.close7 = null;
   assert.equal(report(good).verdict, null);
 });
+
+test("v4 controls: a minutes-old event takes controls up to 2 h old; older events keep ×0.5–2; mcap always ×0.5–2", async () => {
+  const { controlEligible } = await import("../tools/radar-protocol.mjs");
+  const young = { mcapUsd: 50000, age: 7 * 60 };
+  assert.equal(controlEligible(young, { mcapUsd: 60000, age: 90 * 60 }), true);          // v4: any age ≤ 2 h
+  assert.equal(controlEligible(young, { mcapUsd: 60000, age: 90 * 60 }, { protocol: 3 }), false);   // v3: 3.5–14 min only
+  assert.equal(controlEligible(young, { mcapUsd: 60000, age: 3 * 3600 }), false);
+  assert.equal(controlEligible(young, { mcapUsd: 200000, age: 600 }), false);           // mcap out of ×0.5–2
+  const old = { mcapUsd: 50000, age: 100 * 3600 };
+  assert.equal(controlEligible(old, { mcapUsd: 50000, age: 60 * 3600 }), true);
+  assert.equal(controlEligible(old, { mcapUsd: 50000, age: 30 * 3600 }), false);
+});
+
+test("v4 report: v3 and v4 events are scored together, each against its own controls, and counted per version", () => {
+  const rows = world().map((x, k) => ({ ...x, v: k % 10 < 5 ? 3 : 4 }));                 // a mix of both versions
+  const r = report(rows);
+  assert.ok(r.verdict !== null);
+  assert.match(r.lines.join("\n"), /by version: v3 \d+ priced, \d+ with controls · v4 \d+ priced/);
+  assert.equal(report(world().map((x) => ({ ...x, v: 2 }))).verdict, null);               // v1/v2 still never score
+});

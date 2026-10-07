@@ -23,6 +23,19 @@ event lifecycle/follow-ups → watchlist → published editorial policy. Not a p
   (columnar, gzip, tokens idle >12 h dropped) to `AGENT_STORE_FILE`; `agent.yml` restores/saves it with actions/cache
   (newest `agent-store-*` wins). Cold cost is block-range scanning, not volume: 12 launches = 140 transfers, 8 min.
 
+## 🔌 PONS v2 + RADAR v4 (2026-10-07)
+- **Pons moved to v2** (`ponsfamily.com`, the old `/api/pons-launches*` endpoints 404 — the agent and the radar both
+  lost Pons that morning). `pons.mjs` now reads `GET /api/launches` (40/page newest-first, `cursor=nextCursor`,
+  `stage=curve|graduated`, `sort=marketCap` = one page of the top 40) and `/api/launches/pinned?addresses=`. Items:
+  `createdAt` (unix s), `stage`, `curve`/`poolId`, `deployer`, `marketCapUsd`/`priceUsd` (also on the curve), quote can
+  be ETH or a tokenized stock. ~1,600 launches/day now, so "active" = newest ~3 pages + top 40 by mcap. Same item shape
+  as before for every caller; `fetchLiveMarkets` (parked experiment only) still points at the dead v1 route.
+- **Radar protocol v4** (declared before any v3 outcome was scored): only the CONTROL rule changed — events whose pool is
+  <2 h old take controls up to 2 h old (v3 asked for 3.5–14 min and found none: 146 of 211 priced events had no
+  controls, so v3's scoreable set was old launches, median 110 h); GeckoTerminal new pools are always in the control
+  universe. v3 + v4 events are scored together (`SCORED`), each against its own controls; the report shows both.
+  Unpriced events (311/534, curve launches never listed on a DEX) cannot be scored by any rule — no market candles.
+
 ## 🔎 CODE AUDIT 2026-10-01 — fixed on the branch (see commits "Facts:…", "Forward test protocol v2…")
 - **Vocabulary is now precise, keep it that way:** "early wallets" (snipers + bundles: a timing fact), never
   "insiders". **Selling = tokens sent into a venue** (pool/curve/AMM/router); anything else is `earlyMovedOutNow`

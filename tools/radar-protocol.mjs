@@ -23,7 +23,22 @@
 // In addition to the existing peak rules, require >=30 paired close outcomes and >=80% close
 // coverage in EACH chronological peak split. A close pair needs >=80% of its own logged
 // controls covered. These conservative completeness gates are not a power calculation.
-export const PROTOCOL = 3, WEEK = 7 * 86400, MAXMC = 1e6, EMPTY_RUNS = 3;
+// PROTOCOL v4 (2026-10-07, before ANY v3 outcome was scored — the first scores were due 2026-10-08 ~20:00 UTC):
+// only the CONTROL rule changes. Of 211 priced v3 events under $1M, 146 got no controls: a convergence is typically
+// seen ~7 minutes after its pool appears, and the ×0.5–2 age window asked for priced launches 3.5–14 minutes old,
+// which the Pons-only universe almost never had. The scoreable v3 events were therefore mostly old launches (median
+// 110 h vs 7 min), which is not the question. v4: (1) for an event whose pool is < 2 h old, a control may be any age
+// up to 2 h (older events keep ×0.5–2); (2) controls are drawn from Pons AND GeckoTerminal's new pools. Event
+// definition, entry pricing, outcomes and the verdict are unchanged, so v3 and v4 events are scored together (each
+// against its own controls) and the report also counts them per version. v1/v2 stay excluded.
+export const PROTOCOL = 4, SCORED = new Set([3, 4]), WEEK = 7 * 86400, MAXMC = 1e6, EMPTY_RUNS = 3, YOUNG_H = 2;
+
+// may `c` (a candidate launch) be a control for event `ev`? ages in seconds since the pool/launch appeared
+export function controlEligible(ev, c, { protocol = PROTOCOL } = {}) {
+  if (!(ev.mcapUsd > 0) || !(c.mcapUsd > 0) || c.mcapUsd < ev.mcapUsd * 0.5 || c.mcapUsd > ev.mcapUsd * 2) return false;
+  if (protocol >= 4 && ev.age < YOUNG_H * 3600) return c.age >= 0 && c.age <= YOUNG_H * 3600;
+  return c.age >= ev.age * 0.5 && c.age <= ev.age * 2;
+}
 export const MIN_CLOSE_PAIRS = 30, MIN_CLOSE_COVERAGE = 0.8;
 
 export const eventId = (token, t) => `${token}:${t}`;
@@ -42,13 +57,15 @@ export function outcomeFromCandles(entryT, entryPrice, candles, { week = WEEK } 
 // rows → { lines, verdict } — current protocol only; never mutate the input ledger.
 export function report(rows, { seed = 1 } = {}) {
   const lines = [], say = (l) => lines.push(l);
-  const v1 = rows.filter((r) => r.kind === "event" && r.v !== PROTOCOL);
-  const ev = rows.filter((r) => r.kind === "event" && r.v === PROTOCOL);
-  const ctl = rows.filter((r) => r.kind === "control" && r.v === PROTOCOL);
+  const v1 = rows.filter((r) => r.kind === "event" && !SCORED.has(r.v));
+  const ev = rows.filter((r) => r.kind === "event" && SCORED.has(r.v));
+  const ctl = rows.filter((r) => r.kind === "control" && SCORED.has(r.v));
   const eligible = ev.filter((r) => r.priceUsd && r.mcapUsd < MAXMC);
   const scored = eligible.filter((r) => r.peak7 != null).map((r) => ({ ...r, pPeak: null, pClose: null })).sort((a, b) => a.t - b.t);
-  say(`protocol v${PROTOCOL} · events logged ${ev.length} · priced & under $1M ${eligible.length} · peak scored ${scored.length}`
+  say(`protocol v${PROTOCOL} (v3+v4 scored together) · events logged ${ev.length} · priced & under $1M ${eligible.length} · peak scored ${scored.length}`
     + ` · end covered ${scored.filter((r) => r.close7 != null).length}`);
+  const ctlIds = new Set(ctl.map((c) => c.forId));
+  say(`by version: ${[...SCORED].map((v) => { const e = eligible.filter((r) => r.v === v); return `v${v} ${e.length} priced, ${e.filter((r) => ctlIds.has(r.id)).length} with controls`; }).join(" · ")}`);
   const byEvent = new Map();
   for (const c of ctl) (byEvent.get(c.forId) || byEvent.set(c.forId, []).get(c.forId)).push(c);
   const pct = (e, cs, k) => (cs.filter((c) => c[k] < e[k]).length + 0.5 * cs.filter((c) => c[k] === e[k]).length) / cs.length;
