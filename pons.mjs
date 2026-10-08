@@ -38,11 +38,18 @@ export async function launchesPage(params = {}, { fetch: fetchImpl = fetch } = {
   if (!Array.isArray(d?.items)) throw new Error("pons launches schema changed" + (d?.error ? `: ${d.error}` : ""));
   return { items: d.items.map(norm), nextCursor: d.nextCursor || null };
 }
-// newest-first pages of one stage until `pages` are read or a launch older than `sinceSec`
-async function pagesOf(stage, { pages, sinceSec = 0, fetch: fetchImpl }) {
+// newest-first pages of one stage until `pages` are read or a launch older than `sinceSec`.
+// `sort=newest` must be explicit: on 2026-10-08 Pons switched the default order to market cap, the client kept asking
+// for "the newest page" and silently got 7 old launches instead of ~130 (agent coverage fell from ~226 to ~40 launches a
+// cycle with no error). A first page whose newest launch is older than `freshH` now throws instead of shrinking quietly.
+async function pagesOf(stage, { pages, sinceSec = 0, freshH = 0, fetch: fetchImpl }) {
   const out = []; let cursor = null;
   for (let k = 0; k < pages; k++) {
-    const p = await launchesPage({ stage, ...(cursor ? { cursor } : {}) }, { fetch: fetchImpl });
+    const p = await launchesPage({ stage, sort: "newest", ...(cursor ? { cursor } : {}) }, { fetch: fetchImpl });
+    if (k === 0 && freshH && p.items.length) {
+      const newest = Math.max(...p.items.map((t) => Date.parse(t.launchedAt) || 0));
+      if (Date.now() - newest > freshH * 3600e3) throw new Error(`pons "newest" ${stage} feed is stale (newest launch ${new Date(newest).toISOString()}) — API order changed?`);
+    }
     out.push(...p.items);
     if (!p.nextCursor || !p.items.length || Date.parse(p.items.at(-1).launchedAt) / 1000 < sinceSec) break;
     cursor = p.nextCursor;
@@ -56,7 +63,7 @@ const AGE_S = { "24h": 86400, "7d": 7 * 86400, all: 0 };
 export async function fetchActive({ sort = "marketCap", age = "all", pageSize = 120, fetch: fetchImpl = fetch } = {}) {
   const since = AGE_S[age] ? Date.now() / 1000 - AGE_S[age] : 0;
   const [fresh, top] = await Promise.all([
-    pagesOf("curve", { pages: Math.max(1, Math.ceil(pageSize / 40)), sinceSec: since, fetch: fetchImpl }),
+    pagesOf("curve", { pages: Math.max(1, Math.ceil(pageSize / 40)), sinceSec: since, freshH: 6, fetch: fetchImpl }),
     launchesPage({ stage: "curve", sort: "marketCap" }, { fetch: fetchImpl }).then((p) => p.items),
   ]);
   const byAddr = new Map(); for (const t of [...fresh, ...top]) if (t.address && (!since || Date.parse(t.launchedAt) / 1000 >= since)) byAddr.set(t.address, t);

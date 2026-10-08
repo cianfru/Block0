@@ -31,3 +31,14 @@ test("fetchGraduated reads stage=graduated and a schema change fails loudly", as
   assert.equal(g.items[0].graduated, true);
   await assert.rejects(() => fetchActive({ fetch: async () => ({ ok: true, json: async () => ({ error: "The board is briefly unavailable." }) }) }), /schema changed: The board/);
 });
+
+test("the newest feed asks for sort=newest explicitly, and a stale 'newest' page fails loudly", async () => {
+  const urls = [], now = Date.now() / 1000;
+  const ok = async (u) => { urls.push(u); const q = new URL(u).searchParams;
+    return { ok: true, json: async () => ({ items: q.get("sort") === "marketCap" ? [] : [item(1, { createdAt: now - 60 })], nextCursor: null }) }; };
+  await fetchActive({ age: "7d", fetch: ok });
+  assert.ok(urls.some((u) => /stage=curve&sort=newest/.test(u)));
+  // Pons switched its default order on 2026-10-08: a "newest" page full of month-old launches must not pass as fresh
+  const stale = async (u) => ({ ok: true, json: async () => ({ items: [item(2, { createdAt: now - 20 * 86400 })], nextCursor: null }) });
+  await assert.rejects(() => fetchActive({ age: "all", fetch: stale }), /feed is stale/);
+});

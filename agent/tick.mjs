@@ -73,7 +73,13 @@ export async function runTick(deps) {
   // 3 · candidates: young, not dust; launches with a follow-up due within the hour first (it needs their wallets'
   //     balances), then the least recently read across BOTH venues (never-read first), Orbio vs Pons only as a tiebreak
   const watch = watchList(state.follow, now);
-  const cands = [...universe.values()].filter((t) => { const h = ageH(t); return watch[t.address] || (h != null && h >= 0 && h <= o.maxAgeH && (t.mcapUsd || 0) >= o.minMcap); })
+  // the dust floor follows where launches START: most Orbio agents never trade, so their median cap is the curve's
+  // opening value (~$5.7k on 2026-10-01, ~$3.4k on 10-08 as ETH fell). A fixed $5k floor dropped every Orbio agent
+  // that day. Candidates must stand 30% above the start, and never need more than minMcap.
+  const startCap = (() => { const c = agents.map((a) => a.mcapUsd).filter((x) => x > 0).sort((x, y) => x - y); return c.length ? c[Math.floor(c.length / 2)] : null; })();
+  const floor = startCap ? Math.min(o.minMcap, Math.round(startCap * 1.3)) : o.minMcap;
+  out.floorUsd = floor;
+  const cands = [...universe.values()].filter((t) => { const h = ageH(t); return watch[t.address] || (h != null && h >= 0 && h <= o.maxAgeH && (t.mcapUsd || 0) >= floor); })
     .sort((x, y) => (!!watch[y.address] - !!watch[x.address]) || ((state.profiledAt[x.address] || 0) - (state.profiledAt[y.address] || 0)) || (agentByToken.has(y.address) - agentByToken.has(x.address)) || (y.mcapUsd || 0) - (x.mcapUsd || 0))
     .slice(0, o.maxProfiles);
 
@@ -379,6 +385,6 @@ export async function runTick(deps) {
       : [{ address: t.address, sym: t.sym, at, graduated: t.graduated, mcapUsd: t.mcapUsd }];
     out.owners.push({ address: d.address, venue: ag?.owner ? "orbio" : "pons", record: { launched: d.launched ?? null, graduated: d.graduated ?? null, firstSeenAt: d.firstSeenAt ?? null, scope: d.scope ?? null }, launches });
   }
-  log(`agents ${agents.length} · candidates ${cands.length} · read ${tokens.length} · events ${all.length} · ${dryRun ? "dry-run" : "posted"} ${dryRun ? out.dryRun.length : out.posted.length} · held ${out.held.length} · logged ${out.logged.length} · errors ${out.errors.length}`);
+  log(`agents ${agents.length} · floor $${out.floorUsd} · candidates ${cands.length} · read ${tokens.length} · events ${all.length} · ${dryRun ? "dry-run" : "posted"} ${dryRun ? out.dryRun.length : out.posted.length} · held ${out.held.length} · logged ${out.logged.length} · errors ${out.errors.length}`);
   return { state, out };
 }
