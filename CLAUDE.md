@@ -30,6 +30,9 @@ event lifecycle/follow-ups → watchlist → published editorial policy. Not a p
   `createdAt` (unix s), `stage`, `curve`/`poolId`, `deployer`, `marketCapUsd`/`priceUsd` (also on the curve), quote can
   be ETH or a tokenized stock. ~1,600 launches/day now, so "active" = newest ~3 pages + top 40 by mcap. Same item shape
   as before for every caller; `fetchLiveMarkets` (parked experiment only) still points at the dead v1 route.
+  ⚠ 2026-10-08 Pons switched the DEFAULT order to market cap: always send `sort=newest` (a stale "newest" page now throws).
+  The agent's dust floor is relative: 1.3× the median Orbio agent cap (= the curve's opening value, ETH-priced: $5.7k on
+  10-01, $3.4k on 10-08), capped at $5k — a fixed $5k dropped every Orbio agent when ETH fell (coverage 226 → 40).
 - **Radar protocol v4** (declared before any v3 outcome was scored): only the CONTROL rule changed — events whose pool is
   <2 h old take controls up to 2 h old (v3 asked for 3.5–14 min and found none: 146 of 211 priced events had no
   controls, so v3's scoreable set was old launches, median 110 h); GeckoTerminal new pools are always in the control

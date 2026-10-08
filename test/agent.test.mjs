@@ -392,3 +392,16 @@ test("pons deployers: Pons's own record names the deployer's history, and a repe
   assert.ok(!t2.out.events.some((e) => e.kind === "serial-owner" && e.address === fresh.address));   // once per launch
   assert.equal(asked.length, 1);                                                      // the record is kept 6 h, not re-fetched
 });
+
+test("candidates: the dust floor follows the curve's starting value (Orbio agents at ~$3.4k on 2026-10-08)", async () => {
+  const x = world(), launchedAt = Math.floor((NOW - 5 * 3600e3) / 1000);
+  // 9 untraded agents at the curve start ($3.4k) and one that traded up to $4.6k
+  const agents = Array.from({ length: 10 }, (_, i) => ({ ...raw(i + 30), token: A(i + 30), launchedAt: String(launchedAt), price: { marketCapMicroUsd: String((i === 9 ? 4600 : 3400) * 1e6) } }));
+  x.orbio.allAgents = async () => ({ agents, orbioUsd: 0.1 });
+  x.pons.fetchActive = async () => ({ items: [] });
+  const read = [];
+  x.readToken = async (t) => { read.push(t.address); return { sym: t.sym, risk: 10, flags: { holders: 50 } }; };
+  const r = await runTick({ ...x, now: NOW, dryRun: true });
+  assert.equal(r.out.floorUsd, Math.round(3400 * 1.3));
+  assert.deepEqual(read, [A(39)]);                                                    // traded above the start: read; untraded: not
+});
