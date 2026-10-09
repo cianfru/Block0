@@ -405,3 +405,19 @@ test("candidates: the dust floor follows the curve's starting value (Orbio agent
   assert.equal(r.out.floorUsd, Math.round(3400 * 1.3));
   assert.deepEqual(read, [A(39)]);                                                    // traded above the start: read; untraded: not
 });
+
+test("tick: older launches come in a rotating Pons slice, are remembered above the floor, and drop out of the window", async () => {
+  const calls = [], old = (h) => new Date(NOW - h * 3600e3).toISOString();
+  const x = world();
+  x.pons.fetchSlice = async ({ fromSec, toSec }) => { calls.push([fromSec, toSec]);
+    return calls.length === 1 ? [{ address: A(7), sym: "MID", mcapUsd: 30000, launchedAt: old(10) }, { address: A(8), sym: "DUST", mcapUsd: 1200, launchedAt: old(11) }] : []; };
+  const t1 = await runTick({ ...x, now: NOW, dryRun: true });
+  assert.equal(calls[0][1], NOW / 1000 - 8 * 3600);                                   // first slice: 8–16 h old
+  assert.ok(t1.state.ponsKnown[A(7)] && !t1.state.ponsKnown[A(8)]);                    // dust is not remembered
+  assert.ok(t1.state.profiledAt[A(7)]);                                                 // and the remembered launch is read
+  const t2 = await runTick({ ...x, state: t1.state, now: NOW + 900e3, dryRun: true });
+  assert.equal(calls[1][1], (NOW + 900e3) / 1000 - 16 * 3600);                         // next cycle, the next slice
+  assert.ok(t2.state.ponsKnown[A(7)]);                                                  // kept until its slice comes round again
+  const t3 = await runTick({ ...x, state: t2.state, now: NOW + 63 * 3600e3, dryRun: true });
+  assert.equal(t3.state.ponsKnown[A(7)], undefined);                                    // past 72 h: gone
+});

@@ -57,6 +57,21 @@ async function pagesOf(stage, { pages, sinceSec = 0, freshH = 0, fetch: fetchImp
   return out;
 }
 const AGE_S = { "24h": 86400, "7d": 7 * 86400, all: 0 };
+// one time slice of the curve, newest first: launches created in [fromSec, toSec). The cursor is "<createdAt>.<address>",
+// so a synthetic "<toSec>.0xff…ff" starts the walk at any point in time. Used to re-price the older part of the agent's
+// 72 h window a slice per cycle — the newest pages alone cover only a few hours at ~1,600–3,700 launches a day, and the
+// marketCap sort returns only a dozen curve launches, so a launch that trades up after its first hours was never seen.
+export async function fetchSlice({ fromSec, toSec, maxPages = 50, fetch: fetchImpl = fetch } = {}) {
+  const out = []; let cursor = `${Math.floor(toSec)}.0x${"f".repeat(40)}`;
+  for (let k = 0; k < maxPages && cursor; k++) {
+    const p = await launchesPage({ stage: "curve", sort: "newest", cursor }, { fetch: fetchImpl });
+    for (const t of p.items) if (Date.parse(t.launchedAt) / 1000 >= fromSec) out.push(t);
+    if (!p.items.length || Date.parse(p.items.at(-1).launchedAt) / 1000 < fromSec) break;
+    cursor = p.nextCursor;
+  }
+  return out;
+}
+
 
 // active (pre-graduation) universe: the newest pages (`pageSize` launches, 40 a page) + the 40 largest on the curve.
 // sort "marketCap" orders the result by market cap; anything else keeps newest first.

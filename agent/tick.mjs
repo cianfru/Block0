@@ -23,6 +23,7 @@ import { deployerReputation, compactRep } from "../deployer.mjs";
 // (a busy 2-day-old token: 36 s, 226 eth_getLogs on the free node); every later read is a delta (0.1 s, 1 call), and the
 // store now survives between jobs (PR #25: 150 warm reads in ~54 s). At 150 the cap starved every plain Pons launch:
 // ~575 Orbio agents were eligible and went first, so graduating Pons launches were never read once (2026-10-06).
+const SLICE_H = 8;
 export const DEFAULTS = { maxAgeH: 72, minMcap: 5000, maxProfiles: 800, timeBudgetMs: 8 * 60e3, concurrency: 3, keepDays: 7 };
 
 export function emptyState() {
@@ -53,6 +54,21 @@ export async function runTick(deps) {
     for (const t of [...act.items, ...grad.items]) if (t.address) universe.set(t.address, t);
     out.stats = { launchTotal: act.launchTotal || null, graduatedTotal: grad.items.length || null };
   } catch (e) { out.errors.push("pons: " + e.message); }
+  // the older part of the window, one rotating slice a cycle (8 h each, 8..72 h old → the window is re-priced every ~2 h).
+  // Launches at or above last cycle's floor are remembered with their last-seen numbers until the next pass of their slice.
+  if (pons.fetchSlice) {
+    const known = state.ponsKnown || {}, nSlices = Math.ceil((o.maxAgeH - SLICE_H) / SLICE_H), k = (state.ponsSlice || 0) % nSlices;
+    const toSec = now / 1000 - (SLICE_H + k * SLICE_H) * 3600, fromSec = toSec - SLICE_H * 3600, keep = state.floorUsd || o.minMcap;
+    try {
+      const items = await pons.fetchSlice({ fromSec, toSec });
+      for (const a of Object.keys(known)) { const t = Date.parse(known[a].launchedAt) / 1000; if (t >= fromSec && t < toSec) delete known[a]; }
+      for (const t of items) if (t.address && (t.mcapUsd || 0) >= keep) known[t.address] = { ...t, logo: null };
+      state.ponsSlice = k + 1;
+    } catch (e) { out.errors.push("pons slice: " + e.message); }
+    for (const a of Object.keys(known)) if ((now - Date.parse(known[a].launchedAt)) / 3.6e6 > o.maxAgeH) delete known[a];
+    state.ponsKnown = known;
+    for (const t of Object.values(known)) if (!universe.has(t.address)) universe.set(t.address, t);
+  }
   for (const a of agents) if (!universe.has(a.address)) universe.set(a.address, { address: a.address, sym: a.sym, mcapUsd: a.mcapUsd, launchedAt: a.launchedAt ? new Date(a.launchedAt * 1000).toISOString() : null, graduated: a.graduated });
   const ageH = (t) => (t.launchedAt ? (now - Date.parse(t.launchedAt)) / 3.6e6 : null);
   // who launched it, and what else they launched. An Orbio agent's owner is checked against EVERY agent (complete); a
@@ -78,7 +94,7 @@ export async function runTick(deps) {
   // that day. Candidates must stand 30% above the start, and never need more than minMcap.
   const startCap = (() => { const c = agents.map((a) => a.mcapUsd).filter((x) => x > 0).sort((x, y) => x - y); return c.length ? c[Math.floor(c.length / 2)] : null; })();
   const floor = startCap ? Math.min(o.minMcap, Math.round(startCap * 1.3)) : o.minMcap;
-  out.floorUsd = floor;
+  out.floorUsd = floor; state.floorUsd = floor;
   const cands = [...universe.values()].filter((t) => { const h = ageH(t); return watch[t.address] || (h != null && h >= 0 && h <= o.maxAgeH && (t.mcapUsd || 0) >= floor); })
     .sort((x, y) => (!!watch[y.address] - !!watch[x.address]) || ((state.profiledAt[x.address] || 0) - (state.profiledAt[y.address] || 0)) || (agentByToken.has(y.address) - agentByToken.has(x.address)) || (y.mcapUsd || 0) - (x.mcapUsd || 0))
     .slice(0, o.maxProfiles);
