@@ -31,6 +31,10 @@ event lifecycle/follow-ups → watchlist → published editorial policy. Not a p
   be ETH or a tokenized stock. ~1,600 launches/day now, so "active" = newest ~3 pages + top 40 by mcap. Same item shape
   as before for every caller; `fetchLiveMarkets` (parked experiment only) still points at the dead v1 route.
   ⚠ 2026-10-08 Pons switched the DEFAULT order to market cap: always send `sort=newest` (a stale "newest" page now throws).
+  ⚠ 2026-10-09: ~1,600–3,700 launches/day, so the newest pages cover only ~2–8 h and `sort=marketCap` returns ~12 curve
+  launches: a launch that traded up after its first hours was never a candidate (~45/cycle). The cursor is
+  `<createdAt>.<address>`, so `fetchSlice` starts at any time; the tick reads one 8 h slice of the 8–72 h window a cycle
+  (`state.ponsSlice`) and remembers launches ≥ last cycle's floor in `state.ponsKnown` (re-priced every ~2 h). +~70 launches.
   The agent's dust floor is relative: 1.3× the median Orbio agent cap (= the curve's opening value, ETH-priced: $5.7k on
   10-01, $3.4k on 10-08), capped at $5k — a fixed $5k dropped every Orbio agent when ETH fell (coverage 226 → 40).
 - **Radar protocol v4** (declared before any v3 outcome was scored): only the CONTROL rule changed — events whose pool is

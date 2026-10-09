@@ -26,7 +26,7 @@ import { join } from "node:path";
 import { execSync } from "node:child_process";
 import { runTick, emptyState } from "../agent/tick.mjs";
 import { makeOrbio } from "../agent/orbio.mjs";
-import { fetchActive, fetchGraduated, fetchDeployers } from "../pons.mjs";
+import { fetchActive, fetchGraduated, fetchDeployers, fetchSlice } from "../pons.mjs";
 import { computeIntel } from "../intel.mjs";
 import { exportStore, importStore, storeStats } from "../store.mjs";
 import { mergeReads, boardSnapshot, dossierOf, alertsFeed } from "../agent/board-snapshot.mjs";
@@ -78,7 +78,7 @@ for (;;) {
   const t0 = Date.now();
   const r = await runTick({
     state, orbio, apiKey: env.ORBIO_API_KEY || null,
-    pons: { fetchActive, fetchGraduated, fetchDeployers },
+    pons: { fetchActive, fetchGraduated, fetchDeployers, fetchSlice },
     readToken: (t, x = {}) => computeIntel(t.address, t.sym, { pool: t.pool, mcapUsd: t.mcapUsd ?? null, launchedAt: t.launchedAt, graduated: t.graduated, whales: true, watch: x.watch }),
     lastRead: (a) => reads[a] || null,
     weekRecord: { events: readLines("events.jsonl").filter((e) => e.at > Date.now() - 7 * 86400e3), reads: Object.values(reads) },   // for agent/stats.mjs   // the latest board read of a launch, for events on launches not re-read this cycle

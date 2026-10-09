@@ -1,7 +1,7 @@
 // pons.mjs against the Pons v2 API (/api/launches, 2026-10-07): normalisation, cursor paging, the active/graduated split.
 import { test } from "node:test";
 import assert from "node:assert/strict";
-import { norm, fetchActive, fetchGraduated } from "../pons.mjs";
+import { norm, fetchActive, fetchGraduated, fetchSlice } from "../pons.mjs";
 
 const item = (i, o = {}) => ({ address: "0x" + String(i).padStart(40, "A"), symbol: "T" + i, name: "n", stage: "curve", createdAt: 1791370000 - i * 600,
   marketCapUsd: 4000 + i, priceUsd: 0.000004, deployer: "0xDEAD", curve: "0xC" + "0".repeat(39), pool: null, progress: 0.25, protocol: "v2", artwork: "ipfs://cid", ...o });
@@ -41,4 +41,16 @@ test("the newest feed asks for sort=newest explicitly, and a stale 'newest' page
   // Pons switched its default order on 2026-10-08: a "newest" page full of month-old launches must not pass as fresh
   const stale = async (u) => ({ ok: true, json: async () => ({ items: [item(2, { createdAt: now - 20 * 86400 })], nextCursor: null }) });
   await assert.rejects(() => fetchActive({ age: "all", fetch: stale }), /feed is stale/);
+});
+
+test("fetchSlice starts at a synthetic time cursor and keeps only launches inside [from, to)", async () => {
+  const urls = [], to = 1791500000, from = to - 8 * 3600;
+  const fetch = async (u) => { urls.push(u); const c = new URL(u).searchParams.get("cursor");
+    const page = c.startsWith(String(to)) ? [item(1, { createdAt: to - 60 }), item(2, { createdAt: to - 4 * 3600 })] : [item(3, { createdAt: from + 10 }), item(4, { createdAt: from - 10 })];
+    return { ok: true, json: async () => ({ items: page, nextCursor: "next" }) }; };
+  const r = await fetchSlice({ fromSec: from, toSec: to, fetch });
+  assert.deepEqual(r.map((t) => t.sym), ["T1", "T2", "T3"]);                          // T4 is older than the slice
+  assert.equal(new URL(urls[0]).searchParams.get("cursor"), `${to}.0x${"f".repeat(40)}`);
+  assert.equal(urls.length, 2);                                                        // stopped past the slice
+  assert.ok(urls.every((u) => /stage=curve&sort=newest/.test(u)));
 });
