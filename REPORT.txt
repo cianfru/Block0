@@ -1,4 +1,4 @@
-protocol v4 (v3+v4 scored together) · events logged 710 · priced & under $1M 267 · peak scored 19 · end covered 15
+protocol v4 (v3+v4 scored together) · events logged 712 · priced & under $1M 267 · peak scored 19 · end covered 15
 by version: v3 212 priced, 65 with controls · v4 55 priced, 40 with controls
 controls: 383 logged · 42 scored · events with no control 10 · events whose controls are not scored yet 0
 (111 events logged by legacy detectors (v1/v2) are kept in the log and not scored — see tools/radar-protocol.mjs)
