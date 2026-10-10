@@ -48,3 +48,10 @@ test("a later buyer who sells is not counted as an early wallet; whales report s
   const w1 = o.whales.find((w) => w.a === W(1));
   assert.deepEqual([w1.soldNow, w1.movedOutNow, w1.sniper], [0, 10, true]);
 });
+
+test("a launch with more transfers than a call takes arguments still reads (SI/CRH, 2026-10-10)", () => {
+  const ev = base();
+  for (let i = 0; i < 300000; i++) ev.push({ from: P, to: W(1000 + (i % 5000)), amt: 1, block: 1000 + i, ts: T0 + 7200 + i });
+  const f = read(ev, T0 + 7200 + 300000).flags;
+  assert.ok(f.holders > 5);
+});

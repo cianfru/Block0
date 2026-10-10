@@ -190,7 +190,9 @@ export function analyzeTransfers(ev, { ponsPool = "", poolStore = null, obsTs = 
   const venues = new Set([ponsPool, poolStore, detected, AMM].filter(Boolean));
   const isBuy = (e) => venues.has(e.from) || ROUTERS.has(e.from), isSell = (e) => venues.has(e.to) || ROUTERS.has(e.to);
   const isInfra = (a) => a === ZERO || a === DEAD || venues.has(a) || ROUTERS.has(a);
-  const tsMax = Math.max(...ev.map((e) => e.ts || 0)), tsMin = Math.min(...ev.map((e) => e.ts || 1e18));
+  // a loop, not Math.max(...spread): a busy launch has more transfers than a call can take arguments (SI, CRH on
+  // 2026-10-10: "Maximum call stack size exceeded" on every read)
+  let tsMax = -Infinity, tsMin = Infinity; for (const e of ev) { const a = e.ts || 0, b = e.ts || 1e18; if (a > tsMax) tsMax = a; if (b < tsMin) tsMin = b; }
   const now = obsTs != null && obsTs > 0 ? obsTs : tsMax;
   const RECENT = now - 1800; // the 30 minutes before the observation = "now"
 
